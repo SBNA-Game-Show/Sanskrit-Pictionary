@@ -1,13 +1,19 @@
+## Please do the following:
+
+### Clone the repository and swith to our team's branch whic is SanScripters
+git clone https://github.com/SBNA-Game-Show/Sanskrit-Pictionary.git
+git checkout SanScripters
+
+### Install project dependencies. As some of them are included .gitignore file. So you will not have them unless you run this command:
+npm install
+
 ## Available Scripts
 In the project directory, you can run:
 
 ### `npm start`
 
 Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Open (http://localhost:3000) to view it in your browser.
 
 ### `npm test`
 

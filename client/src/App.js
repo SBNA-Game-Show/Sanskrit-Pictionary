@@ -7,14 +7,16 @@ import './App.css';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Navigate to="/welcome" replace />} />
-        <Route path="/welcome" element={<Welcome />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/lobby" element={<Lobby />} />
-      </Routes>
-    </Router>
+    <div className='App'>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Navigate to="/welcome" replace />} />
+          <Route path="/welcome" element={<Welcome />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/lobby" element={<Lobby />} />
+        </Routes>
+      </Router>
+    </div>
   );
 }
 

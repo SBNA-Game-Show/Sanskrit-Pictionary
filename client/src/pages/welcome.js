@@ -1,11 +1,12 @@
-import React from 'react';
 import './welcome.css';
 
 function Welcome() {
   return (
-    <div className="alignText">
-      <h1>Welcome to Sanskrit Pictionary!</h1>
-    </div>
+    <>
+      <div className="alignText">
+        <h1>Welcome to Sanskrit Pictionary!</h1>
+      </div>
+    </>
   );
 }
 

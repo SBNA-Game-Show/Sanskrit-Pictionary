@@ -1,21 +1,28 @@
-import React from 'react';
+import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Navbar from './reusableComponents/navbar';
+import Footer from './reusableComponents/footer';
 import Welcome from './pages/welcome';
 import Lobby from './pages/lobby';
 import Signup from './pages/signup';
-import './App.css';
+
 
 function App() {
   return (
-    <div className='App'>
+    <div className="appWrapper">
+      <Navbar />
       <Router>
-        <Routes>
-          <Route path="/" element={<Navigate to="/welcome" replace />} />
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/lobby" element={<Lobby />} />
-        </Routes>
+        <div className="appContent">
+          <Routes>
+            <Route path="/" element={<Navigate to="/welcome" replace />} />
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/lobby" element={<Lobby />} />
+            <Route path="/signup" element={<Signup />} />
+          </Routes>
+        </div>
       </Router>
+      <img src="/background.png" className="background-image" alt="decorative" />
+      <Footer />
     </div>
   );
 }

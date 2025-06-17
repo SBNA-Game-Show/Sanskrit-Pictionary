@@ -1,7 +1,7 @@
 import './welcome.css';
 
 function Welcome() {
-  return (
+  return(
     <>
       <div className="alignText">
         <h1>Welcome to Sanskrit Pictionary!</h1>

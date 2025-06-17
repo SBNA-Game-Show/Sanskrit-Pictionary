@@ -9,7 +9,7 @@ function Signup() {
     navigate("/lobby"); 
     };
 
-    return (
+    return(
     <>
       <div className="signupContainer">
         <form className="signupForm" onSubmit={handleSubmit}>

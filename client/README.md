@@ -10,3 +10,4 @@ http://localhost:3000 (re-navigate to /welcome ) \
 http://localhost:3000/welcome \
 http://localhost:3000/signup \
 http://localhost:3000/lobby \
+http://localhost:3000/tutorialrules

@@ -1,7 +1,7 @@
 import './lobby.css';
 
 function Lobby() {
-  return (
+  return( 
     <>
       <div className="alignText">
         <h1>Lobby</h1>

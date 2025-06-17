@@ -7,7 +7,7 @@ const Navbar = () => {
       <a className="nav-logo" href="/welcome">Sanskrit Pictionary</a>
       <div className="nav-links">
         <a href="/lobby">Start Game</a>
-        <a href="/welcome">Tutorial & Rules</a>
+        <a href="/tutorialrules">Tutorial & Rules</a>
         <a href="/signup">Profile</a>
       </div>
     </nav>

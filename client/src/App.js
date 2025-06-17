@@ -5,6 +5,7 @@ import Footer from './reusableComponents/footer';
 import Welcome from './pages/welcome';
 import Lobby from './pages/lobby';
 import Signup from './pages/signup';
+import TutorialRules from './pages/tutorialrules';
 
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/lobby" element={<Lobby />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/tutorialrules" element={<TutorialRules />} />
           </Routes>
         </div>
       </Router>

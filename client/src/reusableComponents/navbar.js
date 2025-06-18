@@ -8,7 +8,7 @@ const Navbar = () => {
       <div className="nav-links">
         <a href="/lobby">Start Game</a>
         <a href="/tutorialrules">Tutorial & Rules</a>
-        <a href="/signup">Profile</a>
+        <a href="/signin">Profile</a>
       </div>
     </nav>
   );

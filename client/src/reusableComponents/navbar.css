@@ -1,0 +1,49 @@
+@import url(https://db.onlinewebfonts.com/c/7e96eba370659b4e4563309dc4ebb33f?family=Samarkan+Normal+V2);
+
+.navbar {
+  height: 60px;
+  background: rgba(242, 210, 182);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 10;
+}
+
+.nav-logo {
+  font-family: 'Samarkan Normal V2';
+  text-decoration: none;
+  font-size: 28px;
+  font-weight: bold;
+  color: rgb(238, 115, 7);
+  padding: 4px 12px;
+  text-shadow:  
+               -2px -2px 0 #000,
+                2px -2px 0 #000,
+                -2px 2px 0 #000,
+                2px 2px 0 #000,
+                -3px 0px 0 #000,
+                3px 0px 0 #000,
+                0px -3px 0 #000,
+                0px 3px 0 #000;
+}
+
+.nav-links {
+  display: flex;
+  gap: 30px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 20px;
+  font-weight:bold;
+  color: rgb(238, 115, 7);
+}
+
+.nav-links a:hover {
+  color: #b25014;
+}

@@ -1,0 +1,15 @@
+.footer {
+  background-color: rgba(242, 210, 182);
+  color: rgb(238, 115, 7);
+  text-align: center;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 1px 0;
+  line-height: 0.1;
+}
+
+.logo {
+  width: 15px;
+  vertical-align: middle;
+  margin-right: 5px;
+}

@@ -29,9 +29,9 @@ const Lobby = () => {
         <div className="user-list">
           <h2>User List</h2>
           <ul>
-            <li>👩‍🦰 Alice <span>Score: 0</span></li>
-            <li>👨 Bob <span>Score: 0</span></li>
-            <li>👨‍🦳 Charlie <span>Score: 0</span></li>
+            <li> Alice <span>Score: 0</span></li>
+            <li> Bob <span>Score: 0</span></li>
+            <li> Charlie <span>Score: 0</span></li>
           </ul>
         </div>
 

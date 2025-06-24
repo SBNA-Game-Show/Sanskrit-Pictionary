@@ -1,0 +1,34 @@
+.usercard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fffaf0;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 8px auto;
+  width: 180px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.usercard-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.usercard-name {
+  flex-grow: 1;
+  margin-left: 12px;
+  font-weight: 600;
+  color: #333;
+  text-align: left;
+}
+
+.usercard-points {
+  font-size: 14px;
+  color: #333;
+  min-width: 50px;
+  text-align: right;
+}

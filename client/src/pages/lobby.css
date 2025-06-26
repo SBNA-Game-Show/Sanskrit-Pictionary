@@ -3,7 +3,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 80vh;
+  min-height: 85vh;
   box-sizing: border-box;
   text-align: center;
 }
@@ -96,7 +96,7 @@
 }
 
 .option-buttons button {
-  background-color: white;
+  background-color: #fffaf0;
   border: 1px solid #ccc;
   padding: 6px 10px;
   border-radius: 6px;

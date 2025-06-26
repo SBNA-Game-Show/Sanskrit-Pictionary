@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import './lobby.css';
+import UserCard from '../reusableComponents/usercard';
+
 
 const handleCopyLink = () => {
   const link = "https://www.shareableURL.com";
@@ -11,6 +13,12 @@ const handleCopyLink = () => {
       console.error("Failed to copy: ", err);
     });
 };
+
+const players = [
+  { name: 'Alice', points: 16, imageSrc: 'avatar1.png' },
+  { name: 'Bob', points: 11, imageSrc: 'avatar2.png' },
+  { name: 'Charlie', points: 6, imageSrc: 'avatar3.png' }
+];
 
 const Lobby = () => {
   return (
@@ -28,11 +36,14 @@ const Lobby = () => {
       <div className="lobby-content">
         <div className="user-list">
           <h2>User List</h2>
-          <ul>
-            <li>👩‍🦰 Alice <span>Score: 0</span></li>
-            <li>👨 Bob <span>Score: 0</span></li>
-            <li>👨‍🦳 Charlie <span>Score: 0</span></li>
-          </ul>
+          {players.map(player => (
+            <UserCard
+              key={player.name}
+              imageSrc={player.imageSrc}
+              name={player.name}
+              points={player.points}
+            />
+          ))}
         </div>
 
         <div className="game-settings">

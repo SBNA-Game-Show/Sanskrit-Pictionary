@@ -32,6 +32,8 @@ function Signin() {
 
       // Store token in localStorage for now (can later use cookies or context)
       localStorage.setItem('token', token);
+      localStorage.setItem('displayName', res.data.displayName); // ✅ Store this for navbar
+      window.dispatchEvent(new Event("displayNameChanged")); // 🔄 Triggers update
 
       alert("✅ Login successful!");
       navigate('/lobby');

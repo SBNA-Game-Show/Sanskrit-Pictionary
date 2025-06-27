@@ -1,0 +1,29 @@
+.tutorialRulesContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;     
+  min-height: 85vh;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+    .tutorialRulesContainer h1 {
+      width: 100%;
+      max-width: 900px;
+      text-align: left;
+      margin-top: 2rem;
+      margin-bottom: 0cm;
+      color: #EE7524;
+    }
+
+    .tutorialRulesContainer ol,
+    .tutorialRulesContainer ul {
+      text-align: left;
+      max-width: 900px;
+      width: 100%;
+      margin-top: 0cm;
+      font-size: 1.2rem;
+      line-height: 1.6;
+      padding-left: 1.2rem; /* Add indent to match default list style */
+    }

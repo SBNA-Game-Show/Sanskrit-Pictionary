@@ -5,6 +5,7 @@ import UserCard from '../reusableComponents/usercard';
 import Button from '../reusableComponents/button';
 import InputBox from '../reusableComponents/inputbox';
 import Flashcard from '../reusableComponents/flashcard';
+import Chat from '../reusableComponents/chat';
 
 
 
@@ -37,6 +38,9 @@ const Test = () => {
 
         <h3>Reusable Flashcard Test</h3>
         <Flashcard items={words}/>
+
+        <h3>Reusable Chat-Box Test</h3>
+        <Chat />
         
     </div>
   );

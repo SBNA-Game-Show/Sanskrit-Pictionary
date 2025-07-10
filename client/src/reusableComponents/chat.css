@@ -2,7 +2,7 @@
   width: 100%;
   max-width: 500px;
   margin: 0 auto;
-  border-radius: 8px;
+  border-radius: 15px;
   background-color: rgba(242, 210, 182);
   padding: 20px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -10,7 +10,7 @@
 
 .chat-container h2 {
   text-align: center;
-  color: #f57c00;
+  color: black;
   margin-bottom: 0px;
   margin-top: 0px;
 }

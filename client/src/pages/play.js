@@ -133,6 +133,7 @@ const Play = () => {
       </div>
 
       <div className="input-area-wrapper">
+        <h5>Answer Box</h5>
         <div className="input-area2">
           <input type="text" placeholder="Type answer" />
           <button>Send</button>

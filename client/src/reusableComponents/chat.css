@@ -2,17 +2,17 @@
   width: 100%;
   max-width: 500px;
   margin: 0 auto;
+  border-radius: 8px;
   background-color: rgba(242, 210, 182);
   padding: 20px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-  margin-top: 20px;
 }
 
 .chat-container h2 {
   text-align: center;
   color: #f57c00;
-  margin-bottom: 10px;
+  margin-bottom: 0px;
+  margin-top: 0px;
 }
 
 #messages {

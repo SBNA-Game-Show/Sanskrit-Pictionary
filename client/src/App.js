@@ -14,6 +14,7 @@ import TutorialRules from "./pages/tutorialrules";
 import Signin from "./pages/signin";
 import ProtectedRoute from "./reusableComponents/ProtectedRoute";
 import Test from './pages/test';
+import Play from "./pages/play";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/signin" element={<Signin />} />
             <Route path="/tutorialrules" element={<TutorialRules />} />
             <Route path="/test" element={<Test />} />
+            <Route path="/play" element={<Play />} />
             <Route
               path="/lobby"
               element={

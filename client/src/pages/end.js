@@ -6,7 +6,7 @@ const End = () => {
   const navigate = useNavigate();
   
   // Mock data - replace with actual game data
-  const [gameResults, setGameResults] = useState({
+  const [gameResults] = useState({
     players: [
       { id: 1, name: 'Alice', score: 950, avatar: 'avatar1.png' },
       { id: 2, name: 'Bob', score: 875, avatar: 'avatar2.png' },
@@ -41,13 +41,6 @@ const End = () => {
 
   const handleGoHome = () => {
     navigate('/welcome');
-  };
-
-  const getRankSuffix = (rank) => {
-    if (rank === 1) return 'st';
-    if (rank === 2) return 'nd';
-    if (rank === 3) return 'rd';
-    return 'th';
   };
 
   const getRankEmoji = (rank) => {

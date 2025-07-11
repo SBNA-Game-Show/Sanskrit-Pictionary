@@ -12,6 +12,7 @@ import Lobby from "./pages/lobby";
 import Signup from "./pages/signup";
 import TutorialRules from "./pages/tutorialrules";
 import Signin from "./pages/signin";
+import End from "./pages/end";
 import ProtectedRoute from "./reusableComponents/ProtectedRoute";
 import Test from './pages/test';
 
@@ -28,6 +29,7 @@ function App() {
             <Route path="/signin" element={<Signin />} />
             <Route path="/tutorialrules" element={<TutorialRules />} />
             <Route path="/test" element={<Test />} />
+            <Route path="/end" element={<End />} />
             <Route
               path="/lobby"
               element={

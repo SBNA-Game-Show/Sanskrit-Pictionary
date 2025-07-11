@@ -10,7 +10,7 @@ const Chat = () => {
 
 useEffect(() => {
   if (!socket) {
-    const username = prompt('Enter your username:') || 'Anonymous';
+    //const username = prompt('Enter your username:') || 'Anonymous';
     setUsername(username);
 
     const newSocket = io('https://chat-box-backend-ipno.onrender.com');
@@ -64,7 +64,7 @@ useEffect(() => {
       <div className="input-area">
         <input
           type="text"
-          placeholder="Type your message..."
+          placeholder="Type message"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyPress}

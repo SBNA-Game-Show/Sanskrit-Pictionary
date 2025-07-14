@@ -27,7 +27,7 @@ function App() {
             <Route path="/signin" element={<Signin />} />
             <Route path="/tutorialrules" element={<TutorialRules />} />
             <Route
-              path="/lobby"
+              path="/lobby/:roomId"
               element={
                 <ProtectedRoute>
                   <Lobby />

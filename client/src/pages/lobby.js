@@ -1,49 +1,77 @@
 import { Link } from 'react-router-dom';
-import './lobby.css';
-import UserCard from '../reusableComponents/usercard';
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import io from "socket.io-client";
+import UserCard from "../reusableComponents/usercard";
+import "./lobby.css";
 
-
-const handleCopyLink = () => {
-  const link = "https://www.shareableURL.com";
-  navigator.clipboard.writeText(link)
-    .then(() => {
-      alert("Link copied to clipboard!");
-    })
-    .catch((err) => {
-      console.error("Failed to copy: ", err);
-    });
-};
-
-const players = [
-  { name: 'Alice', points: 16, imageSrc: 'avatar1.png' },
-  { name: 'Bob', points: 11, imageSrc: 'avatar2.png' },
-  { name: 'Charlie', points: 6, imageSrc: 'avatar3.png' }
-];
+const socket = io("http://localhost:5000");
 
 const Lobby = () => {
+  const { roomId } = useParams();
+  const [onlineUsers, setOnlineUsers] = useState([]);
+
+  useEffect(() => {
+    const userId = localStorage.getItem("userId");
+    if (!userId || !roomId) return;
+
+    socket.emit("registerLobby", { userId, roomId });
+
+    socket.emit("requestLobbyUsers", { roomId });
+
+    socket.on("lobbyUsers", (users) => {
+      setOnlineUsers(users);
+    });
+
+    socket.on("userJoinedLobby", ({ userId }) => {
+      setOnlineUsers((prev) => [...new Set([...prev, userId])]);
+    });
+
+    socket.on("userLeftLobby", ({ userId }) => {
+      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
+    });
+
+    return () => {
+      socket.off("lobbyUsers");
+      socket.off("userJoinedLobby");
+      socket.off("userLeftLobby");
+    };
+  }, [roomId]);
+
   return (
     <div className="lobby-container">
-
       <div className="lobby-url">
         <span>
-          <strong>Game Lobby URL:</strong> https://www.shareableURL.com
+          <strong>Game Lobby URL:</strong> {`http://localhost:3000/lobby/${roomId}`}
         </span>
-        <button className="copy-button" onClick={handleCopyLink}>
+        <button
+          className="copy-button"
+          onClick={() => {
+            navigator.clipboard.writeText(
+              `http://localhost:3000/lobby/${roomId}`
+            );
+            alert("Link copied to clipboard!");
+          }}
+        >
           Copy Link
         </button>
       </div>
 
       <div className="lobby-content">
         <div className="user-list">
-          <h2>User List</h2>
-          {players.map(player => (
-            <UserCard
-              key={player.name}
-              imageSrc={player.imageSrc}
-              name={player.name}
-              points={player.points}
-            />
-          ))}
+          <h2>Online Users</h2>
+          {onlineUsers.length === 0 ? (
+            <p>No users online.</p>
+          ) : (
+            onlineUsers.map((uid) => (
+              <UserCard
+                key={uid}
+                name={`User ${uid.substring(0, 5)}...`}
+                points={0}
+                imageSrc="avatar1.png"
+              />
+            ))
+          )}
         </div>
 
         <div className="game-settings">
@@ -51,35 +79,29 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Rounds</h3>
-            <label>Choose number of rounds<br />
-              <div className="option-buttons">
-                {[1, 2, 3, 4, 5].map(round => (
-                  <button key={round}>{round}</button>
-                ))}
-              </div>
-            </label>
+            <div className="option-buttons">
+              {[1, 2, 3, 4, 5].map((round) => (
+                <button key={round}>{round}</button>
+              ))}
+            </div>
           </div>
 
           <div className="setting-section">
             <h3>Select Timer</h3>
-            <label>Set duration of each round<br />
-              <div className="option-buttons">
-                {[30, 45, 60, 75, 90].map(timer => (
-                  <button key={timer}>{timer}</button>
-                ))}
-              </div>
-            </label>
+            <div className="option-buttons">
+              {[30, 45, 60, 75, 90].map((sec) => (
+                <button key={sec}>{sec}s</button>
+              ))}
+            </div>
           </div>
 
           <div className="setting-section">
             <h3>Select Difficulty</h3>
-            <label>Adjust challange level<br />
-              <div className="option-buttons">
-                {["Easy", "Medium", "Hard"].map(level => (
-                  <button key={level}>{level}</button>
-                ))}
-              </div>
-            </label>
+            <div className="option-buttons">
+              {["Easy", "Medium", "Hard"].map((level) => (
+                <button key={level}>{level}</button>
+              ))}
+            </div>
           </div>
 
           <button className="start-game-button">Start Game</button>

@@ -27,17 +27,19 @@ function Signin() {
         email: formData.email,
         password: formData.password
       });
-
-      const token = res.data.token;
-
+      console.log(res.data)
+      const { token, displayName, userId } = res.data;
+ 
       // Store token in localStorage for now (can later use cookies or context)
       localStorage.setItem('token', token);
-      localStorage.setItem('displayName', res.data.displayName); // ✅ Store this for navbar
+      localStorage.setItem('userId', userId); 
+      localStorage.setItem('displayName', displayName); // ✅ Store this for navbar
       window.dispatchEvent(new Event("displayNameChanged")); // 🔄 Triggers update
 
       alert("✅ Login successful!");
-      navigate('/lobby');
+      navigate('/lobby/room123');
     } catch (err) {
+      console.error(err);
       const errorMsg = err.response?.data?.error || "Login failed.";
       alert(errorMsg);
     }

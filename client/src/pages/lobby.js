@@ -23,13 +23,17 @@ const Lobby = () => {
       setOnlineUsers(users);
     });
 
-    socket.on("userJoinedLobby", ({ userId }) => {
-      setOnlineUsers((prev) => [...new Set([...prev, userId])]);
+    socket.on("userJoinedLobby", (user) => {
+      setOnlineUsers((prev) => {
+        const exists = prev.find((u) => u.userId === user.userId);
+        return exists ? prev : [...prev, user];
+      });
     });
 
     socket.on("userLeftLobby", ({ userId }) => {
-      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
+      setOnlineUsers((prev) => prev.filter((u) => u.userId !== userId));
     });
+
 
     return () => {
       socket.off("lobbyUsers");
@@ -63,14 +67,15 @@ const Lobby = () => {
           {onlineUsers.length === 0 ? (
             <p>No users online.</p>
           ) : (
-            onlineUsers.map((uid) => (
+            onlineUsers.map((user) => (
               <UserCard
-                key={uid}
-                name={`User ${uid.substring(0, 5)}...`}
+                key={user.userId}
+                name={user.displayName}
                 points={0}
                 imageSrc="avatar1.png"
               />
             ))
+
           )}
         </div>
 

@@ -1,75 +1,99 @@
+const mongoose = require("mongoose");
+
 function createLobbyManager(io, UserModel) {
   function findSocketByUserId(userId) {
-    for (let [id, socket] of io.sockets.sockets) {
+    for (let [, socket] of io.sockets.sockets) {
       if (socket.userId === userId) return socket;
     }
     return null;
   }
 
-  io.on('connection', (socket) => {
-    console.log('🔌 Socket connected:', socket.id);
+  io.on("connection", (socket) => {
+    console.log("🔌 Socket connected:", socket.id);
 
-    socket.on('registerLobby', async ({ userId, roomId }) => {
+    socket.on("registerLobby", async ({ userId, roomId }) => {
       socket.userId = userId;
       socket.roomId = roomId;
       socket.join(roomId);
 
-      const isValid = require("mongoose").Types.ObjectId.isValid;
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        const user = await UserModel.findByIdAndUpdate(
+          userId,
+          { isOnline: true },
+          { new: true }
+        );
 
-      if (isValid(userId)) {
-        await UserModel.findByIdAndUpdate(userId, { isOnline: true });
+        if (user) {
+          io.to(roomId).emit("userJoinedLobby", {
+            userId: user._id,
+            displayName: user.displayName,
+          });
+        } else {
+          console.warn("⚠️ User not found with ID:", userId);
+        }
       } else {
-        console.warn("❌ Invalid userId received in lobby:", userId);
+        console.warn("❌ Invalid userId received:", userId);
       }
-
-      io.to(roomId).emit('userJoinedLobby', { userId });
     });
 
-    socket.on('requestLobbyUsers', async ({ roomId }) => {
+    socket.on("requestLobbyUsers", async ({ roomId }) => {
       const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
       const users = [];
+
       if (socketsInRoom) {
         for (const sid of socketsInRoom) {
           const s = io.sockets.sockets.get(sid);
-          if (s?.userId) users.push(s.userId);
+          if (s?.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
+            const user = await UserModel.findById(s.userId);
+            if (user) {
+              users.push({
+                userId: user._id,
+                displayName: user.displayName,
+              });
+            }
+          }
         }
       }
-      console.log(`[LOBBY] Room: ${roomId} → Users:`, users);
-      socket.emit('lobbyUsers', users);
+
+      console.log(`[LOBBY] Room ${roomId} → Users:`, users);
+      socket.emit("lobbyUsers", users);
     });
 
-    socket.on('createTeam', ({ roomId, teamName }) => {
-      io.to(roomId).emit('teamCreated', { teamName, by: socket.userId });
+    socket.on("createTeam", ({ roomId, teamName }) => {
+      io.to(roomId).emit("teamCreated", {
+        teamName,
+        by: socket.userId,
+      });
     });
 
-    socket.on('inviteToTeam', ({ targetUserId, teamName, roomId }) => {
+    socket.on("inviteToTeam", ({ targetUserId, teamName }) => {
       const target = findSocketByUserId(targetUserId);
       if (target) {
-        target.emit('teamInviteReceived', {
+        target.emit("teamInviteReceived", {
           fromUserId: socket.userId,
           teamName,
         });
       } else {
-        socket.emit('inviteFailed', { targetUserId });
+        socket.emit("inviteFailed", { targetUserId });
       }
     });
 
-    socket.on('acceptTeamInvite', ({ roomId, teamName }) => {
-      io.to(roomId).emit('userJoinedTeam', {
+    socket.on("acceptTeamInvite", ({ roomId, teamName }) => {
+      io.to(roomId).emit("userJoinedTeam", {
         userId: socket.userId,
         teamName,
       });
     });
 
-    socket.on('disconnect', async () => {
+    socket.on("disconnect", async () => {
       const { userId, roomId } = socket;
       if (roomId && userId) {
-        io.to(roomId).emit('userLeftLobby', { userId });
+        io.to(roomId).emit("userLeftLobby", { userId });
       }
-      if (userId) {
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
       }
-      console.log('❌ Socket disconnected:', socket.id);
+      console.log("❌ Socket disconnected:", socket.id);
     });
   });
 

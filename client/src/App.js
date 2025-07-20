@@ -16,6 +16,7 @@ import End from "./pages/end";
 import ProtectedRoute from "./reusableComponents/ProtectedRoute";
 import Test from './pages/test';
 import Play from "./pages/play";
+import Profile from './pages/profile';
 
 function App() {
   return (
@@ -32,6 +33,8 @@ function App() {
             <Route path="/test" element={<Test />} />
             <Route path="/play" element={<Play />} />
             <Route path="/end" element={<End />} />
+            <Route path="/profile" element={<Profile />} />
+
             <Route
               path="/lobby"
               element={

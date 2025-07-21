@@ -1,0 +1,254 @@
+.gameend-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 85vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.gameend-title {
+  font-size: 2.5rem;
+  color: rgb(238, 115, 7);
+  margin-bottom: 30px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.gameend-content {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.leaderboard-section {
+  background-color: rgba(242, 210, 182);
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  width: 350px;
+  min-height: 400px;
+}
+
+.leaderboard-section h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: rgb(238, 115, 7);
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.trophy-icon {
+  font-size: 1.5rem;
+}
+
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fffaf0;
+  margin-bottom: 12px;
+  padding: 15px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.leaderboard-item:first-child {
+  border-color: #FFD700;
+  background-color: #FFF8DC;
+}
+
+.leaderboard-item:nth-child(2) {
+  border-color: #C0C0C0;
+}
+
+.leaderboard-item:nth-child(3) {
+  border-color: #CD7F32;
+}
+
+.player-rank {
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: rgb(238, 115, 7);
+  width: 30px;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  margin-left: 15px;
+}
+
+.player-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 12px;
+  object-fit: cover;
+}
+
+.player-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.player-score {
+  font-weight: bold;
+  color: rgb(238, 115, 7);
+  font-size: 1.1rem;
+}
+
+.best-drawing-section {
+  background-color: rgba(242, 210, 182);
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  width: 350px;
+  text-align: center;
+  min-height: 400px;
+}
+
+.best-drawing-section h2 {
+  margin-bottom: 20px;
+  color: rgb(238, 115, 7);
+  font-size: 1.8rem;
+}
+
+.drawing-display {
+  background-color: #fffaf0;
+  border: 3px solid rgb(238, 115, 7);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.drawing-placeholder {
+  font-size: 4rem;
+  color: #ccc;
+}
+
+.drawing-info {
+  margin-top: 15px;
+}
+
+.drawing-word {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.drawing-artist {
+  font-size: 1rem;
+  color: rgb(238, 115, 7);
+  font-weight: 500;
+}
+
+.gameend-actions {
+  margin-top: 30px;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.action-button {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  min-width: 140px;
+}
+
+.new-game-button {
+  background-color: rgb(238, 115, 7);
+  color: white;
+}
+
+.new-game-button:hover {
+  background-color: rgb(116, 185, 12);
+  transform: translateY(-2px);
+}
+
+.home-button {
+  background-color: #6c757d;
+  color: white;
+}
+
+.home-button:hover {
+  background-color: #5a6268;
+  transform: translateY(-2px);
+}
+
+.game-stats {
+  background-color: rgba(242, 210, 182);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 10px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: rgb(238, 115, 7);
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .gameend-content {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .leaderboard-section,
+  .best-drawing-section {
+    width: 90%;
+    max-width: 400px;
+  }
+  
+  .gameend-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .action-button {
+    width: 200px;
+  }
+}

@@ -1,125 +1,201 @@
+/* General container */
 .lobby-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 85vh;
-  box-sizing: border-box;
-  text-align: center;
-}
-
-.lobby-url {
-  background-color: rgba(242, 210, 182);
-  padding: 15px 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 40px;
-}
-
-.copy-button {
-  background-color: rgb(238, 115, 7);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-    .copy-button:hover {
-  background-color: rgb(116, 185, 12);
-  }
-
-.lobby-content {
-  display: flex;
-  gap: 40px;
-  justify-content: center;
-}
-
-.user-list {
-  background-color: rgba(242, 210, 182);
-  border-radius: 15px;
-  padding: 20px;
-  width: 200px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  text-align: left;
-}
-
-.user-list h2 {
-  text-align: center;
-  margin-bottom: 15px;
-}
-
-.user-list ul {
-  list-style: none;
+  background-color: #e9f4fa;
+  font-family: 'Segoe UI', sans-serif;
   padding: 0;
   margin: 0;
+  min-height: 100vh;
 }
 
-.user-list li {
-  margin-bottom: 15px;
+/* Header */
+.lobby-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: #f4be92;
+  padding: 15px 40px;
 }
 
-.game-settings {
-  background-color: rgba(242, 210, 182);
-  border-radius: 15px;
-  padding: 20px 30px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  width: 400px;
-  text-align: left;
+.lobby-header h1 {
+  margin: 0;
+  color: #5a2600;
+  font-size: 2rem;
 }
 
-.game-settings h2 {
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-.game-settings h3 {
-  margin-bottom: 0px;
-}
-
-.setting-section {
-  margin-bottom: 20px;
-}
-
-.option-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.option-buttons button {
-  background-color: #fffaf0;
-  border: 1px solid #ccc;
-  padding: 6px 10px;
-  border-radius: 6px;
+.lobby-nav span {
+  margin-left: 25px;
+  font-weight: bold;
+  color: #d35f00;
   cursor: pointer;
-  min-width: 40px;
 }
 
-.option-buttons button:hover {
-  background-color: rgb(238, 115, 7);
+/* Lobby URL */
+.lobby-url-box {
+  margin: 30px auto;
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
 }
 
-.start-game-button {
-  display: block;
-  margin: 0 auto;
-  padding: 10px 25px;
-  border: none;
-  background-color: rgb(238, 115, 7);
+.lobby-url-box label {
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+.lobby-url-box input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #aaa;
+}
+
+.lobby-url-box button {
+  padding: 8px 12px;
+  background-color: #f7931e;
   color: white;
-  border-radius: 10px;
+  border: none;
+  border-radius: 5px;
   font-weight: bold;
   cursor: pointer;
 }
 
-    .start-game-button:hover {
-  background-color: rgb(116, 185, 12);
-  }
+/* Lobby body layout */
+.lobby-body {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 20px;
+  gap: 25px;
+}
+
+/* User List Section */
+.user-section {
+  background-color: #f2c7a0;
+  border-radius: 20px;
+  padding: 20px;
+  width: 300px;
+  min-height: 330px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+}
+
+.user-section h3 {
+  margin-bottom: 10px;
+}
+
+.player-entry {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.emoji {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.player-name {
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.player-score {
+  margin-left: auto;
+  font-weight: bold;
+  color: #e76800;
+}
+
+/* Team Lists */
+.team-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.team {
+  background-color: #f2c7a0;
+  border-radius: 20px;
+  padding: 15px 20px;
+  min-width: 200px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+}
+
+.team h3 {
+  margin-bottom: 8px;
+}
+
+.team p {
+  font-size: 16px;
+  margin: 4px 0;
+}
+
+/* Join Buttons */
+.team-buttons {
+  margin-top: 20px;
+}
+
+.team-buttons button {
+  padding: 8px 16px;
+  margin-right: 10px;
+  background-color: #f7931e;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Game Settings Section */
+.game-settings {
+  background-color: #f4a764;
+  border-radius: 20px;
+  padding: 25px;
+  min-width: 270px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+}
+
+.game-settings h3 {
+  margin-bottom: 15px;
+}
+
+.setting-group {
+  margin-bottom: 20px;
+}
+
+.setting-group label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.setting-group button {
+  margin-right: 6px;
+  margin-top: 5px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: #f2f2f2;
+  font-weight: 500;
+}
+
+.setting-group button.active {
+  background-color: #f7931e;
+  color: white;
+}
+
+/* Start Game Button */
+.start-game-btn {
+  margin-top: 20px;
+  background-color: #f97316;
+  border: none;
+  color: white;
+  font-weight: bold;
+  padding: 12px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  width: 100%;
+  font-size: 1rem;
+}

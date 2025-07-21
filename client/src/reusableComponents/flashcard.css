@@ -1,0 +1,71 @@
+.flashcard-container {
+  display: grid;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  margin: 0 auto;
+  max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vocab-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fffaf0;
+  width: 270px;
+}
+
+.sanskrit-word {
+  grid-column: span 3;
+  grid-row: 1;
+  text-align: center;
+  font-family: 'Sans-serif';
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.sound-button {
+  grid-column: 1;
+  grid-row: span 2;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  margin: 0 auto;
+  align-self: center;
+}
+
+.numimage {
+  grid-column: 2;
+  grid-row: span 2;
+  width: 90px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.translation-row {
+  grid-column: 3;
+  grid-row: 2;
+  text-align: center;
+  font-size: 16px;
+  color: #333;
+}
+
+.transliteration-row {
+  grid-column: 3;
+  grid-row: 3;
+  text-align: center;
+  font-size: 16px;
+  color: #333;
+  align-self: center;
+}

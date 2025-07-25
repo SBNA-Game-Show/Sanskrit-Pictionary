@@ -6,6 +6,8 @@ import Button from '../reusableComponents/button';
 import InputBox from '../reusableComponents/inputbox';
 import Flashcard from '../reusableComponents/flashcard';
 import Chat from '../reusableComponents/chat';
+import WordHistory from '../reusableComponents/wordhistory';
+
 
 
 
@@ -16,7 +18,35 @@ const words = [
     translation: "Book",
     audioSrc: "",
     imageSrc: "books.png"
-  }
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
 ]
 
 const Test = () => {
@@ -41,6 +71,9 @@ const Test = () => {
 
         <h3>Reusable Chat-Box Test</h3>
         <Chat />
+
+        <h3>Reusable Wordhistory Test</h3>
+        <WordHistory history={words} />
         
     </div>
   );

@@ -1,0 +1,31 @@
+.word-history-container {
+  background: rgba(242, 210, 182);
+  border-radius: 15px;
+  margin: 15px auto;
+  width: 90%;
+  max-width: 2000px;
+  padding: 10px;
+}
+
+.word-history-header {
+  display: flex;
+  justify-content:center;
+  align-items: center;
+  position:relative;
+  padding: 0 15px;
+  min-height: 50px;
+}
+
+.word-history-title {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.word-history-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 15px;
+}

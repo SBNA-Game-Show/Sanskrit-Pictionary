@@ -1,4 +1,3 @@
-// signin.jsx
 import React, { useState } from 'react';
 import './signin.css';
 import { useNavigate } from 'react-router-dom';
@@ -23,21 +22,26 @@ function Signin() {
     e.preventDefault();
 
     try {
+      // Always clear session on login attempt (prevents "sticking")
+      sessionStorage.clear();
+
       const res = await axios.post('/api/auth/login', {
         email: formData.email,
         password: formData.password
       });
-      console.log(res.data)
+
       const { token, displayName, userId } = res.data;
- 
-      // Store token in localStorage for now (can later use cookies or context)
-      localStorage.setItem('token', token);
-      localStorage.setItem('userId', userId); 
-      localStorage.setItem('displayName', displayName); // ✅ Store this for navbar
-      window.dispatchEvent(new Event("displayNameChanged")); // 🔄 Triggers update
+
+      // Store login info in sessionStorage
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('userId', userId);
+      sessionStorage.setItem('displayName', displayName);
+
+      // Optional: Notify for navbar/profile reactive update
+      window.dispatchEvent(new Event("displayNameChanged"));
 
       alert("✅ Login successful!");
-      navigate('/lobby/room123');
+      navigate('/lobby');
     } catch (err) {
       console.error(err);
       const errorMsg = err.response?.data?.error || "Login failed.";
@@ -49,7 +53,6 @@ function Signin() {
     <div className="signinContainer">
       <form className="signinForm" onSubmit={handleSubmit}>
         <h2>Sign In</h2>
-
         <label htmlFor="email">Email</label>
         <input
           type="email"

@@ -1,39 +1,30 @@
-import { Link } from 'react-router-dom';
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import io from "socket.io-client";
+import { socket } from "./socket.js"; // Adjust path as needed
 import UserCard from "../reusableComponents/usercard";
 import "./lobby.css";
-
-const socket = io("http://localhost:5000");
 
 const Lobby = () => {
   const { roomId } = useParams();
   const [onlineUsers, setOnlineUsers] = useState([]);
 
   useEffect(() => {
-    const userId = localStorage.getItem("userId");
+    const userId = sessionStorage.getItem("userId");
     if (!userId || !roomId) return;
 
     socket.emit("registerLobby", { userId, roomId });
-
     socket.emit("requestLobbyUsers", { roomId });
 
-    socket.on("lobbyUsers", (users) => {
-      setOnlineUsers(users);
-    });
-
+    socket.on("lobbyUsers", (users) => setOnlineUsers(users));
     socket.on("userJoinedLobby", (user) => {
       setOnlineUsers((prev) => {
         const exists = prev.find((u) => u.userId === user.userId);
         return exists ? prev : [...prev, user];
       });
     });
-
     socket.on("userLeftLobby", ({ userId }) => {
       setOnlineUsers((prev) => prev.filter((u) => u.userId !== userId));
     });
-
 
     return () => {
       socket.off("lobbyUsers");
@@ -46,18 +37,16 @@ const Lobby = () => {
     <div className="lobby-container">
       <div className="lobby-url">
         <span>
-          <strong>Game Lobby URL:</strong> {`http://localhost:3000/lobby/${roomId}`}
+          <strong>Game Lobby ID:</strong> {roomId}
         </span>
         <button
           className="copy-button"
           onClick={() => {
-            navigator.clipboard.writeText(
-              `http://localhost:3000/lobby/${roomId}`
-            );
+            navigator.clipboard.writeText(roomId);
             alert("Link copied to clipboard!");
           }}
         >
-          Copy Link
+          Copy ID
         </button>
       </div>
 
@@ -75,13 +64,10 @@ const Lobby = () => {
                 imageSrc="avatar1.png"
               />
             ))
-
           )}
         </div>
-
         <div className="game-settings">
           <h2>Game Settings</h2>
-
           <div className="setting-section">
             <h3>Select Rounds</h3>
             <div className="option-buttons">
@@ -90,7 +76,6 @@ const Lobby = () => {
               ))}
             </div>
           </div>
-
           <div className="setting-section">
             <h3>Select Timer</h3>
             <div className="option-buttons">
@@ -99,7 +84,6 @@ const Lobby = () => {
               ))}
             </div>
           </div>
-
           <div className="setting-section">
             <h3>Select Difficulty</h3>
             <div className="option-buttons">
@@ -108,7 +92,6 @@ const Lobby = () => {
               ))}
             </div>
           </div>
-
           <button className="start-game-button">Start Game</button>
         </div>
       </div>

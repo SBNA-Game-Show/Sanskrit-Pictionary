@@ -22,7 +22,7 @@ const Navbar = () => {
     };
   }, []);
 
-  return (
+ return (
     <nav className="navbar">
       <a className="nav-logo" href="/welcome">Sanskrit Pictionary</a>
       <div className="nav-links">
@@ -30,7 +30,7 @@ const Navbar = () => {
         <a href="/tutorialrules">Tutorial & Rules</a>
         {
           displayName
-            ? <span className="nav-user">{displayName}</span>
+            ? <a href="/profile"><span className="nav-user">{displayName}</span></a>
             : <a href="/signin">Profile</a>
         }
       </div>

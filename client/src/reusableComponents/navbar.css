@@ -47,3 +47,14 @@
 .nav-links a:hover {
   color: #b25014;
 }
+
+.nav-user-link {
+  text-decoration: none;
+  color: #333;
+}
+
+.nav-user-link:hover .nav-user {
+  text-decoration: underline;
+  cursor: pointer;
+}
+

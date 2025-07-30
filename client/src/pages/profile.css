@@ -1,10 +1,11 @@
 .profile-container {
+  background: rgba(242, 210, 182);
   max-width: 600px;
-  margin: 3rem auto;
+  margin: 4rem auto;
   padding: 2rem;
-  background-color: #f0f7ff;
   border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
 .profile-header {

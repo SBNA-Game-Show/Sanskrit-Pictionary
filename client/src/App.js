@@ -16,13 +16,13 @@ import End from "./pages/end";
 import ProtectedRoute from "./reusableComponents/ProtectedRoute";
 import Test from './pages/test';
 import Play from "./pages/play";
-import Profile from './pages/profile'; 
+import Profile from './pages/profile';
 
 function App() {
   return (
-    <div className="appWrapper">
-      <Navbar />
-      <Router>
+    <Router>
+      <div className="appWrapper">
+        <Navbar />
         <div className="appContent">
           <Routes>
             <Route path="/" element={<Navigate to="/welcome" replace />} />
@@ -33,7 +33,7 @@ function App() {
             <Route path="/test" element={<Test />} />
             <Route path="/play" element={<Play />} />
             <Route path="/end" element={<End />} />
-            <Route path="/profile" element={<Profile />} /> {}
+            <Route path="/profile" element={<Profile />} />
             <Route
               path="/lobby"
               element={
@@ -44,14 +44,14 @@ function App() {
             />
           </Routes>
         </div>
-      </Router>
-      <img
-        src="/background.png"
-        className="background-image"
-        alt="decorative"
-      />
-      <Footer />
-    </div>
+        <img
+          src="/background.png"
+          className="background-image"
+          alt="decorative"
+        />
+        <Footer />
+      </div>
+    </Router>
   );
 }
 

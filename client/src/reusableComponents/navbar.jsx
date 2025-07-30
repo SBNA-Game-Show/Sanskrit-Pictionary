@@ -1,30 +1,40 @@
 import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from "react-router-dom";
+import { socket } from "../pages/socket.js"; // Adjust path as needed
 import './navbar.css';
 
 const Navbar = () => {
-  const [displayName, setDisplayName] = useState(() => localStorage.getItem('displayName'));
+  const [displayName, setDisplayName] = useState(() => sessionStorage.getItem('displayName'));
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // In case the value changes while app is running
     const handleStorageChange = () => {
-      setDisplayName(localStorage.getItem('displayName'));
+      setDisplayName(sessionStorage.getItem('displayName'));
     };
-
-    // Listen to 'storage' changes (from other tabs)
-    window.addEventListener('storage', handleStorageChange);
-
-    // Also listen to navigation events or local changes
     window.addEventListener('displayNameChanged', handleStorageChange);
-
+    window.addEventListener('storage', handleStorageChange);
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('displayNameChanged', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
- return (
+  const handleLogout = () => {
+  // If socket is connected, clean up presence before disconnect
+  if (socket && socket.connected) {
+    socket.emit("leaveLobby");
+    socket.disconnect();
+  }
+  sessionStorage.clear();
+  window.dispatchEvent(new Event("displayNameChanged"));
+  navigate("/signin", { replace: true });
+};
+
+  return (
     <nav className="navbar">
-      <a className="nav-logo" href="/welcome">Sanskrit Pictionary</a>
+      <Link className="nav-logo" to="/welcome">
+        Sanskrit Pictionary
+      </Link>
       <div className="nav-links">
         <a href="/lobby">Start Game</a>
         <a href="/tutorialrules">Tutorial & Rules</a>
@@ -33,6 +43,22 @@ const Navbar = () => {
             ? <a href="/profile"><span className="nav-user">{displayName}</span></a>
             : <a href="/signin">Profile</a>
         }
+        <Link to="/lobby">Start Game</Link>
+        <Link to="/tutorialrules">Tutorial & Rules</Link>
+        {displayName ? (
+          <span className="nav-user">
+            {displayName}
+            <button
+              onClick={handleLogout}
+              className="logout-btn"
+              style={{ marginLeft: 8 }}
+            >
+              Log Out
+            </button>
+          </span>
+        ) : (
+          <Link to="/signin">Profile</Link>
+        )}
       </div>
     </nav>
   );

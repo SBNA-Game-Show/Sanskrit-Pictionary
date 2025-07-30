@@ -1,13 +1,9 @@
-import "./App.css";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import './App.css';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./reusableComponents/navbar";
 import Footer from "./reusableComponents/footer";
 import Welcome from "./pages/welcome";
+import LobbyMenu from "./pages/lobbyMenu"
 import Lobby from "./pages/lobby";
 import Signup from "./pages/signup";
 import TutorialRules from "./pages/tutorialrules";
@@ -34,8 +30,9 @@ function App() {
             <Route path="/play" element={<Play />} />
             <Route path="/end" element={<End />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/lobby" element={<LobbyMenu />} />     
             <Route
-              path="/lobby"
+              path="/lobby/:roomId"
               element={
                 <ProtectedRoute>
                   <Lobby />
@@ -49,6 +46,7 @@ function App() {
           className="background-image"
           alt="decorative"
         />
+        <img src="/background.png" className="background-image" alt="decorative" />
         <Footer />
       </div>
     </Router>

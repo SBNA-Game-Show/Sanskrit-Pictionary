@@ -36,28 +36,24 @@ const Navbar = () => {
         Sanskrit Pictionary
       </Link>
       <div className="nav-links">
-        <a href="/lobby">Start Game</a>
-        <a href="/tutorialrules">Tutorial & Rules</a>
-        {
-          displayName
-            ? <a href="/profile"><span className="nav-user">{displayName}</span></a>
-            : <a href="/signin">Profile</a>
-        }
         <Link to="/lobby">Start Game</Link>
         <Link to="/tutorialrules">Tutorial & Rules</Link>
         {displayName ? (
-          <span className="nav-user">
-            {displayName}
-            <button
-              onClick={handleLogout}
-              className="logout-btn"
-              style={{ marginLeft: 8 }}
-            >
-              Log Out
-            </button>
-          </span>
+          <a href='/profile'>
+            <span className="nav-user">
+              {displayName}
+            </span>
+          </a>
         ) : (
           <Link to="/signin">Profile</Link>
+        )}
+        {displayName && (
+          <button
+            onClick={handleLogout}
+            className="logout-btn2"
+            style={{ marginLeft: 8 }}>
+            Log Out
+          </button>
         )}
       </div>
     </nav>

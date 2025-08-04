@@ -29,9 +29,9 @@
   font-weight: bold;
 }
 
-    .copy-button:hover {
+.copy-button:hover {
   background-color: rgb(116, 185, 12);
-  }
+}
 
 .lobby-content {
   display: flex;
@@ -108,6 +108,17 @@
   background-color: rgb(238, 115, 7);
 }
 
+.option-buttons button.active {
+  background-color: rgb(238, 115, 7);
+  color: white;
+  border: none;
+  font-weight: bold;
+}
+
+.option-buttons button.active:hover {
+  background-color: rgb(116, 185, 12); 
+}
+
 .start-game-button {
   display: block;
   margin: 0 auto;
@@ -120,11 +131,32 @@
   cursor: pointer;
 }
 
-    .start-game-button:hover {
+.start-game-button:hover {
   background-color: rgb(116, 185, 12);
-  }
+}
 
-  .lobby-room-input {
+.lobby-room-input {
   margin-right: 12px;
   font-size: 16px;
+}
+
+.game-status {
+  margin-top: 20px;
+  background-color: rgba(242, 210, 182);
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  width: 400px; 
+}
+
+.game-status h3 {
+  margin: 0 0 8px;
+  color: rgb(238, 115, 7); 
+}
+
+.game-status p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #333;
 }

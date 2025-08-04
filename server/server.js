@@ -39,5 +39,8 @@ const User = require("./models/User");
 const createLobbyManager = require("./backend/lobbyManager");
 createLobbyManager(io, User);
 
+const createGameSocket = require("./game/gameSocket");
+createGameSocket(io);
+
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

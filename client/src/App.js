@@ -27,7 +27,7 @@ function App() {
             <Route path="/signin" element={<Signin />} />
             <Route path="/tutorialrules" element={<TutorialRules />} />
             <Route path="/test" element={<Test />} />
-            <Route path="/play" element={<Play />} />
+            <Route path="/play/:roomId" element={<Play />} />
             <Route path="/end" element={<End />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/lobby" element={<LobbyMenu />} />     

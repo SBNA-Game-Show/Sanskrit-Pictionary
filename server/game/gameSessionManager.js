@@ -57,6 +57,18 @@ class GameSessionManager {
       session.scores[userId] = (session.scores[userId] || 0) + points;
     }
   }
+
+  getPlayersWithScores(gameId) {
+  const session = this.sessions.get(gameId);
+  if (!session) return [];
+  
+  return session.players.map(p => ({
+    name: p.displayName,
+    userId: p.userId,
+    points: session.scores[p.userId] || 0,
+    imageSrc: p.imageSrc || '' 
+  }));
+  }
 }
 
 module.exports = new GameSessionManager();

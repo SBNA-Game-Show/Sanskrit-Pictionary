@@ -22,7 +22,7 @@ const Lobby = () => {
   useEffect(() => {
     if (!myUserId || !roomId) return;
 
-    socket.emit("registerLobby", { userId: myUserId, roomId });
+    socket.emit("registerLobby", { userId: myUserId, displayName: myDisplayName, roomId });
     socket.emit("requestLobbyUsers", { roomId });
     socket.on("lobbyUsers", setOnlineUsers);
     socket.on("userJoinedLobby", user => {
@@ -49,6 +49,8 @@ const Lobby = () => {
       setCurrentRound(currentRound);
       setCurrentPlayer(currentPlayer);
       setTimeLeft(timer);
+
+      navigate(`/play/${roomId}`);
     });
 
     socket.on("startTimer", ({ duration }) => {

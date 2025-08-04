@@ -1,18 +1,18 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import './play.css';
 import Chat from '../reusableComponents/chat';
 import UserCard from '../reusableComponents/usercard';
 import Flashcard from '../reusableComponents/flashcard';
 import { ReactSketchCanvas } from 'react-sketch-canvas';
+import { socket } from './socket';
 
-const players = [
-  { name: 'Alice', points: 16, imageSrc: 'avatar1.png' },
-  { name: 'Bob', points: 11, imageSrc: 'avatar2.png' },
-  { name: 'Charlie', points: 6, imageSrc: 'avatar3.png' }
-];
 
 const Play = () => {
   const canvasRef = useRef(null);
+  const { roomId } = useParams();
+  const [players, setPlayers] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [eraseMode, setEraseMode] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(5);
   const [eraserWidth, setEraserWidth] = useState(10);
@@ -50,6 +50,30 @@ const Play = () => {
     }
   ];
 
+  useEffect(() => {
+    if (!roomId) return;
+    socket.emit("startTimer", { roomId });
+    socket.on("timerUpdate", ({ secondsLeft }) => {
+      setTimeLeft(secondsLeft);
+    });
+    socket.emit("getRoomPlayers", { roomId });
+
+    socket.on("updatePlayers", (players) => {
+    setPlayers(players);
+    });
+    
+    socket.on("roomPlayers", ({ players }) => {
+      setPlayers(players);
+    });
+
+    return () => {
+      socket.off("timerUpdate");
+      socket.off("updatePlayers");
+      socket.off("roomPlayers");
+    };
+  }, [roomId]);
+
+
   return (
     <div className="play-grid">
 
@@ -58,7 +82,7 @@ const Play = () => {
       </div>
 
       <div className="time-box">
-        <strong>Time Left: </strong><a><label htmlFor='timeleft'>46</label> sec</a>
+        <strong>Time Left: </strong><a><label htmlFor='timeleft'>{timeLeft}</label> sec</a>
       </div>
 
       <div className="hint-box">
@@ -71,10 +95,10 @@ const Play = () => {
         <h2>User List</h2>
         {players.map((player) => (
           <UserCard
-            key={player.name}
-            imageSrc={player.imageSrc}
-            name={player.name}
-            points={player.points}
+            key={player.userId}
+            imageSrc={player.imageSrc || "default.png"}
+            name={player.displayName}
+            points={player.points || 0}
           />
         ))}
       </div>

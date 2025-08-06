@@ -96,6 +96,12 @@ function createGameSocket(io) {
       io.to(roomId).emit("roomPlayers", { players });
     });
 
+    socket.on("startRound", async ({ roomId }) => {
+    await gameSessionManager.startRound(roomId, io);
+    });
+
+
+
     // Proceed to next round (manual trigger)
     socket.on('nextRound', ({ gameId }) => {
       console.log("[nextRound] received:", { gameId });
@@ -114,6 +120,12 @@ function createGameSocket(io) {
         clearActiveTimer(gameId);
       }
     });
+    
+    // Handle answer submission
+    socket.on("submitAnswer", ({ gameId, userId, answer }) => {
+      console.log(`[submitAnswer] From ${userId} in ${gameId}: ${answer}`);
+      gameSessionManager.handleAnswer(gameId, userId, answer, io);
+  });
 
     socket.on("disconnect", () => {
       console.log("🔌 Socket disconnected:", socket.id);

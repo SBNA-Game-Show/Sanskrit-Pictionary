@@ -6,6 +6,7 @@ const flashcardSchema = new mongoose.Schema({
   translation: { type: String, required: true },
   audioSrc: { type: String },
   imageSrc: { type: String },
+  difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'easy' },
   otherNames: [{ type: String }],
   otherInformation: { type: String }
 }, { timestamps: true });

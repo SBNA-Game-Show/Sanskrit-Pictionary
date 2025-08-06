@@ -17,6 +17,13 @@ const Play = () => {
   const [strokeWidth, setStrokeWidth] = useState(5);
   const [eraserWidth, setEraserWidth] = useState(10);
   const [strokeColor, setStrokeColor] = useState("#000000");
+  
+  const [flashcard, setFlashcard] = useState(null);
+  const [currentPlayerName, setCurrentPlayerName] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [isCurrentPlayer, setIsCurrentPlayer] = useState(false);
+
+  const [answer, setAnswer] = useState("");
 
   const handlePenClick = () => {
     setEraseMode(false);
@@ -40,17 +47,25 @@ const Play = () => {
     setStrokeColor(e.target.value);
   };
 
-  const words = [
-    {
-      word: "पुस्तकम्‌",
-      transliteration: "Pustakam",
-      translation: "Book",
-      audioSrc: "",
-      imageSrc: "books.png"
-    }
-  ];
+  const handleSubmitAnswer = () => {
+    if (answer.trim() === "") return;
+
+    socket.emit("submitAnswer", {
+      roomId,
+      userId: currentUserId,
+      answer: answer.trim()
+    });
+
+    setAnswer("");
+  };
+
+  
 
   useEffect(() => {
+
+    const userId = sessionStorage.getItem("userId");
+    setCurrentUserId(userId);
+
     if (!roomId) return;
     socket.emit("startTimer", { roomId });
     socket.on("timerUpdate", ({ secondsLeft }) => {
@@ -66,19 +81,52 @@ const Play = () => {
       setPlayers(players);
     });
 
+    socket.on("newFlashcard", (data) => {
+      setFlashcard(data);
+    });
+
+    socket.on("roundStarted", ({ round, totalRounds, currentPlayer }) => {
+      setCurrentPlayerName(currentPlayer);
+      setFlashcard(null); //Clear the flashcard from the previous round
+      setAnswer("");
+
+      //Determine whether you are the one who set the question
+      const me = players.find((p) => p.userId === userId);
+      setIsCurrentPlayer(me?.displayName === currentPlayer);
+    });
+
+    socket.on("correctAnswer", ({ userId, displayName, points }) => {
+      alert(`${displayName} answered correctly! +10 pts`);
+      socket.emit("getRoomPlayers", { roomId });
+    });
+
+    socket.on("wrongAnswer", ({ userId, displayName }) => {
+      console.log(`${displayName} guessed wrong`);
+    });
+
+
     return () => {
       socket.off("timerUpdate");
       socket.off("updatePlayers");
       socket.off("roomPlayers");
+      socket.off("newFlashcard");
+      socket.off("roundStarted");
+      socket.off("correctAnswer");
+      socket.off("wrongAnswer");
     };
-  }, [roomId]);
+  }, [roomId, players]);
 
 
   return (
     <div className="play-grid">
 
       <div className="score-box">
-        <strong>Score: </strong><a><label htmlFor='score'>11</label> pts</a>
+        <strong>Score: </strong>
+        <a>
+          <label htmlFor='score'>
+            {players.find(p => p.userId === currentUserId)?.points || 0}
+          </label> pts
+        </a>
       </div>
 
       <div className="time-box">
@@ -86,10 +134,16 @@ const Play = () => {
       </div>
 
       <div className="hint-box">
-        <strong>Word Hint: </strong><label htmlFor='wordhint'>b_o_</label>
+        <strong>Word Hint: </strong>
+        <label htmlFor='wordhint'>
+          {flashcard && !isCurrentPlayer ? flashcard.hint.replace(/[a-zA-Z]/g, '_') : '...'}
+        </label>
       </div>
 
-      <Flashcard items={words} />
+      {flashcard && isCurrentPlayer && (
+        <Flashcard items={[flashcard]} />
+      )}
+
 
       <div className="user-list">
         <h2>User List</h2>
@@ -153,16 +207,25 @@ const Play = () => {
       </div>
 
       <div className="chat-box">
+        <div style={{ textAlign: "center", marginBottom: "5px" }}>
+          <strong>Drawing by:</strong> {currentPlayerName}
+        </div>
         <Chat />
       </div>
 
       <div className="input-area-wrapper">
         <h5>Answer Box</h5>
         <div className="input-area2">
-          <input type="text" placeholder="Type answer" />
-          <button>Send</button>
+          <input
+            type="text"
+            placeholder="Type answer"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+          />
+          <button onClick={handleSubmitAnswer}>Send</button>
         </div>
       </div>
+
 
     </div>
   );

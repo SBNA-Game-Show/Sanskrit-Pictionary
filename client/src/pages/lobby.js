@@ -91,6 +91,11 @@ const Lobby = () => {
     onlineUsers.find(u => u.userId === userId)?.displayName || userId;
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(u => !inAnyTeam.includes(u.userId));
+  const myTeam = teams.Red.includes(myUserId)
+    ? "Red"
+    : teams.Blue.includes(myUserId)
+      ? "Blue"
+      : null;
   const renderStyledName = (userId) => {
     const name = getDisplayName(userId);
     const isHost = userId === hostId;
@@ -165,7 +170,23 @@ const Lobby = () => {
             padding: 10,
             minWidth: 150
           }}>
-            <h3 style={{ color: "crimson", textAlign: "center" }}>Red Team</h3>
+            <h3 style={{
+              color: "crimson",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8
+            }}>
+              <span>Red Team</span>
+              {myTeam === "Blue" && (
+                <button
+                  style={{ marginLeft: 8, fontSize: 12, color: "crimson", border: "1px solid crimson", background: "transparent", borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}
+                  onClick={() => handleJoinTeam("Red")}
+                >
+                  Switch to Red
+                </button>
+              )}
+            </h3>
             {teams.Red.length === 0
               ? <p style={{ color: "#999" }}>No players</p>
               : teams.Red.map(uid => <div key={uid}>{renderStyledName(uid)}</div>)
@@ -178,7 +199,24 @@ const Lobby = () => {
             padding: 10,
             minWidth: 150
           }}>
-            <h3 style={{ color: "royalblue", textAlign: "center" }}>Blue Team</h3>
+            <h3 style={{
+              color: "royalblue",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8
+            }}>
+              <span>Blue Team</span>
+              {myTeam === "Red" && (
+                <button
+                  style={{ marginLeft: 8, fontSize: 12, color: "royalblue", border: "1px solid royalblue", background: "transparent", borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}
+                  onClick={() => handleJoinTeam("Blue")}
+                >
+                  Switch to Blue
+                </button>
+              )}
+            </h3>
+
             {teams.Blue.length === 0
               ? <p style={{ color: "#999" }}>No players</p>
               : teams.Blue.map(uid => <div key={uid}>{renderStyledName(uid)}</div>)
@@ -254,8 +292,8 @@ const Lobby = () => {
                 timer: selectedTimer,
                 difficulty: selectedDifficulty,
               });
-              }}
-            >
+            }}
+          >
             Start Game
           </button>
         </div>

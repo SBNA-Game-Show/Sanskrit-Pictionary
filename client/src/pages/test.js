@@ -47,6 +47,27 @@ const words = [
     audioSrc: "",
     imageSrc: "books.png"
   },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  }
 ]
 
 const Test = () => {

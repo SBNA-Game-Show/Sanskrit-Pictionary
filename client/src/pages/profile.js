@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./profile.css";
+import Flashcard from '../reusableComponents/flashcard';
+import WordHistory from '../reusableComponents/wordhistory';
 
 function Profile() {
   const [user, setUser] = useState({ username: "", email: "" });
@@ -49,56 +51,124 @@ function Profile() {
     window.location.href = "/signin";
   };
 
+  const words = [
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  },
+  {
+    word: "पुस्तकम्‌",
+    transliteration: "Pustakam",
+    translation: "Book",
+    audioSrc: "",
+    imageSrc: "books.png"
+  }
+]
+
   return (
-    <div className="profile-container">
-      <div className="profile-header">
-        <div className="profile-icon-box">
-          <img src="/profile-icon.png" alt="Profile Icon" className="profile-icon" />
+    <div>
+
+      <div className="profile-container">
+        <div className="profile-header">
+          <div className="profile-icon-box">
+            <img src="/profile-icon.png" alt="Profile Icon" className="profile-icon" />
+          </div>
+          <h1>Profile</h1>
         </div>
-        <h1>Profile</h1>
+
+        <div className="user-info">
+          <p><strong>Username:</strong> {user.username}</p>
+          <p><strong>Email:</strong> {user.email}</p>
+        </div>
+
+        <form className="profile-form" onSubmit={handleChangePassword}>
+          <h3>Change Password</h3>
+          <label>
+            Old Password:
+            <input
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            New Password:
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Confirm Password:
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" className="save-btn">Change Password</button>
+        </form>
+
+        {message && <p className="status-message">{message}</p>}
+
+        <button className="logout-btn" onClick={handleLogout}>Logout</button> 
       </div>
 
-      <div className="user-info">
-        <p><strong>Username:</strong> {user.username}</p>
-        <p><strong>Email:</strong> {user.email}</p>
+      <div>
+        <WordHistory history={words} />
       </div>
-
-      <form className="profile-form" onSubmit={handleChangePassword}>
-        <h3>Change Password</h3>
-        <label>
-          Old Password:
-          <input
-            type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          New Password:
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Confirm Password:
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </label>
-        <button type="submit" className="save-btn">Change Password</button>
-      </form>
-
-      {message && <p className="status-message">{message}</p>}
-
-      <button className="logout-btn" onClick={handleLogout}>Logout</button>
+       
     </div>
+
   );
 }
 

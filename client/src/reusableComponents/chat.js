@@ -1,64 +1,56 @@
-import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
-import './chat.css';
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { socket } from "../pages/socket"; // adjust path if needed
+import "./chat.css";
 
-const Chat = () => {
-  const [username, setUsername] = useState('');
-  const [message, setMessage] = useState('');
+const Chat = ({ myUserId, myDisplayName, myTeam }) => {
+  const { roomId } = useParams(); // pulls from URL if in Play page
+  const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const [socket, setSocket] = useState(null);
 
-useEffect(() => {
-  if (!socket) {
-    //const username = prompt('Enter your username:') || 'Anonymous';
-    setUsername(username);
-
-    const newSocket = io('https://chat-box-backend-ipno.onrender.com');
-    setSocket(newSocket);
-
-    newSocket.emit('setName', username);
-    
-    newSocket.on('connect', () => {
-      console.log('Socket connected');
+  useEffect(() => {
+    // Fetch chat history when component mounts
+    socket.emit("getChatHistory", { roomId });
+    socket.on("chatHistory", (msgs) => {
+      setMessages(msgs);
     });
 
-    newSocket.on('message', (msg) => {
-      console.log('Received message:', msg);
-      setMessages((prev) => [...prev, msg]);
-    });
-
-    newSocket.on('connect_error', (err) => {
-      console.error('Connection error:', err.message);
-    });
-    newSocket.on('error', (err) => {
-      console.error('Socket error:', err);
+    // Listen for new chat messages
+    socket.on("chat", (msgObj) => {
+      setMessages((prev) => [...prev, msgObj]);
     });
 
     return () => {
-      console.log('Cleaning up socket');
-      newSocket.disconnect();
+      socket.off("chatHistory");
+      socket.off("chat");
     };
-  }
-}, [socket]);
-
+  }, [roomId]);
 
   const handleSend = () => {
-    if (message.trim() !== '' && socket) {
-      socket.emit('message', message);
-      setMessage('');
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleSend();
+    if (!message.trim()) return;
+    socket.emit("chat", {
+      roomId,
+      userId: myUserId,
+      displayName: myDisplayName,
+      team: myTeam,
+      message
+    });
+    setMessage("");
   };
 
   return (
     <div className="chat-container">
-      <h2>Chat</h2>
+      <h2>Lobby Chat</h2>
       <ul id="messages">
         {messages.map((msg, i) => (
-          <li key={i}>{msg}</li>
+          <li key={i}>
+            <span style={{
+              color: msg.team === "Red" ? "crimson" : msg.team === "Blue" ? "royalblue" : "#222",
+              fontWeight: "bold"
+            }}>
+              {msg.displayName}
+            </span>: {msg.message}
+          </li>
         ))}
       </ul>
       <div className="input-area">
@@ -66,8 +58,8 @@ useEffect(() => {
           type="text"
           placeholder="Type message"
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyPress}
+          onChange={e => setMessage(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSend()}
         />
         <button onClick={handleSend}>Send</button>
       </div>

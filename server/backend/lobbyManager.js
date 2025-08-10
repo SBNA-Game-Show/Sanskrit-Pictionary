@@ -185,7 +185,7 @@ function createLobbyManager(io, UserModel) {
 
     // --- HOST CONTROLS ---
     socket.on("resetTeams", ({ roomId }) => {
-      if (rooms[roomId] && socket.userId === rooms[roomId].hostId) {
+      if (rooms[roomId] && rooms[roomId].teams && socket.userId === rooms[roomId].hostId) {
         rooms[roomId].teams.Red = [];
         rooms[roomId].teams.Blue = [];
         io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
@@ -193,7 +193,7 @@ function createLobbyManager(io, UserModel) {
     });
 
     socket.on("randomizeTeams", ({ roomId }) => {
-      if (rooms[roomId] && socket.userId === rooms[roomId].hostId) {
+      if (rooms[roomId] && rooms[roomId].teams && socket.userId === rooms[roomId].hostId) {
         const userIds = Array.from(io.sockets.adapter.rooms.get(roomId) || [])
           .map(sid => io.sockets.sockets.get(sid))
           .filter(s => s && s.userId)
@@ -222,11 +222,28 @@ function createLobbyManager(io, UserModel) {
       }
     });
 
+    // --- HOST: UPDATE SETTINGS (host only) ---
     socket.on("updateGameSettings", ({ roomId, newSettings }) => {
       if (rooms[roomId] && socket.userId === rooms[roomId].hostId) {
         rooms[roomId].settings = { ...rooms[roomId].settings, ...newSettings };
         io.to(roomId).emit("gameSettingsUpdate", rooms[roomId].settings);
       }
+    });
+
+    // --- Prevent non-host or empty teams from starting the game
+    socket.on("startGame", ({ gameId, totalRounds, timer, difficulty }) => {
+      if (
+        !rooms[gameId] ||
+        socket.userId !== rooms[gameId].hostId ||
+        rooms[gameId].teams.Red.length === 0 ||
+        rooms[gameId].teams.Blue.length === 0
+      ) {
+        io.to(socket.id).emit("startGameError", { 
+          message: "Only the host can start, and both teams must have players." 
+        });
+        return;
+      }
+      // ...continue with starting game logic if valid...
     });
 
     // --- CHAT ---
@@ -256,3 +273,4 @@ function createLobbyManager(io, UserModel) {
 }
 
 module.exports = createLobbyManager;
+

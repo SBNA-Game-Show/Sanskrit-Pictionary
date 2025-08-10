@@ -13,12 +13,23 @@ const Lobby = () => {
   const myUserId = sessionStorage.getItem("userId");
   const myDisplayName = sessionStorage.getItem("displayName");
   const navigate = useNavigate();
+
+  // Game setting states
   const [selectedRounds, setSelectedRounds] = useState(1);
   const [selectedTimer, setSelectedTimer] = useState(30);
   const [selectedDifficulty, setSelectedDifficulty] = useState("Easy");
   const [currentRound, setCurrentRound] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
+
+  // Is this player the host
+  const isHost = myUserId === hostId;
+
+  // for checking if both teams have enough players or not
+  const redTeamHasPlayers = teams.Red.length > 0;
+  const blueTeamHasPlayers = teams.Blue.length > 0;
+  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
+
 
   useEffect(() => {
     if (!myUserId || !roomId) return;
@@ -36,7 +47,15 @@ const Lobby = () => {
       setOnlineUsers(prev => prev.filter(u => u.userId !== userId));
     });
     socket.on("hostSet", setHostId);
+
     socket.on("teamsUpdate", setTeams);
+
+    // SYNC SETTINGS to ALL users
+    socket.on("gameSettingsUpdate", (settings) => {
+      setSelectedRounds(settings.rounds);
+      setSelectedTimer(settings.timer);
+      setSelectedDifficulty(settings.difficulty);
+    });
 
     socket.on("userKicked", ({ userId }) => {
       if (userId === myUserId) {
@@ -81,6 +100,7 @@ const Lobby = () => {
       socket.off("userLeftLobby");
       socket.off("hostSet");
       socket.off("teamsUpdate");
+      socket.off("gameSettingsUpdate");
       socket.off("userKicked");
       socket.off("kicked");
       socket.off("roundStarted");
@@ -89,6 +109,7 @@ const Lobby = () => {
     };
   }, [roomId, myUserId, navigate]);
 
+  // ------- Team/Users logic -------
   const getDisplayName = userId =>
     onlineUsers.find(u => u.userId === userId)?.displayName || userId;
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
@@ -98,20 +119,39 @@ const Lobby = () => {
     : teams.Blue.includes(myUserId)
       ? "Blue"
       : null;
-
   const renderStyledName = (userId) => {
     const name = getDisplayName(userId);
-    const isHost = userId === hostId;
+    const isHostUser = userId === hostId;
+    let color = "#222";
+    if (teams.Red.includes(userId)) color = "crimson";
+    if (teams.Blue.includes(userId)) color = "royalblue";
     return (
-      <span style={{ fontWeight: isHost ? "bold" : "normal" }}>
+      <span style={{ fontWeight: isHostUser ? "bold" : "normal", color }}>
         {name}
-        {isHost && <span title="Host" style={{ marginLeft: 3, color: "#e3aa13" }}> 👑</span>}
+        {isHostUser && <span title="Host" style={{ marginLeft: 3, color: "#e3aa13" }}> 👑</span>}
       </span>
     );
   };
 
   const handleJoinTeam = (teamColor) => {
     socket.emit("joinTeam", { roomId, teamColor, userId: myUserId });
+  };
+
+  // ----- Only host can change settings -----
+  const handleSettingsChange = (setting, value) => {
+    if (!isHost) return;
+    let updatedSettings = {
+      rounds: selectedRounds,
+      timer: selectedTimer,
+      difficulty: selectedDifficulty
+    };
+    if (setting === "rounds") updatedSettings.rounds = value;
+    if (setting === "timer") updatedSettings.timer = value;
+    if (setting === "difficulty") updatedSettings.difficulty = value;
+    setSelectedRounds(updatedSettings.rounds);
+    setSelectedTimer(updatedSettings.timer);
+    setSelectedDifficulty(updatedSettings.difficulty);
+    socket.emit("updateGameSettings", { roomId, newSettings: updatedSettings });
   };
 
   return (
@@ -130,7 +170,6 @@ const Lobby = () => {
           Copy ID
         </button>
       </div>
-
       <div
         className="lobby-content"
         style={{
@@ -177,7 +216,7 @@ const Lobby = () => {
             {teams.Red.length === 0
               ? <p style={{ color: "#999" }}>No players</p>
               : teams.Red.map(uid =>
-                <div key={uid} style={{ color: "crimson" }}>
+                <div key={uid}>
                   {renderStyledName(uid)}
                 </div>
               )
@@ -188,7 +227,7 @@ const Lobby = () => {
             {teams.Blue.length === 0
               ? <p style={{ color: "#999" }}>No players</p>
               : teams.Blue.map(uid =>
-                <div key={uid} style={{ color: "royalblue" }}>
+                <div key={uid}>
                   {renderStyledName(uid)}
                 </div>
               )
@@ -196,10 +235,9 @@ const Lobby = () => {
           </div>
         </div>
 
-        {/* COLUMN 3: SETTINGS */}
+        {/* COLUMN 3: SETTINGS (HOST ONLY editable) */}
         <div className="game-settings" style={{ minWidth: 260 }}>
           <h2>Game Settings</h2>
-          {/* Rounds */}
           <div className="setting-section">
             <h3>Select Rounds</h3>
             <div className="option-buttons">
@@ -207,14 +245,14 @@ const Lobby = () => {
                 <button
                   key={round}
                   className={selectedRounds === round ? "active" : ""}
-                  onClick={() => setSelectedRounds(round)}
+                  onClick={() => handleSettingsChange("rounds", round)}
+                  disabled={!isHost}
                 >
                   {round}
                 </button>
               ))}
             </div>
           </div>
-          {/* Timer */}
           <div className="setting-section">
             <h3>Select Timer</h3>
             <div className="option-buttons">
@@ -222,14 +260,14 @@ const Lobby = () => {
                 <button
                   key={sec}
                   className={selectedTimer === sec ? "active" : ""}
-                  onClick={() => setSelectedTimer(sec)}
+                  onClick={() => handleSettingsChange("timer", sec)}
+                  disabled={!isHost}
                 >
                   {sec}s
                 </button>
               ))}
             </div>
           </div>
-          {/* Difficulty */}
           <div className="setting-section">
             <h3>Select Difficulty</h3>
             <div className="option-buttons">
@@ -237,7 +275,8 @@ const Lobby = () => {
                 <button
                   key={level}
                   className={selectedDifficulty === level ? "active" : ""}
-                  onClick={() => setSelectedDifficulty(level)}
+                  onClick={() => handleSettingsChange("difficulty", level)}
+                  disabled={!isHost}
                 >
                   {level}
                 </button>
@@ -247,16 +286,30 @@ const Lobby = () => {
           <button
             className="start-game-button"
             onClick={() => {
-              socket.emit("startGame", {
-                gameId: roomId,
-                totalRounds: selectedRounds,
-                timer: selectedTimer,
-                difficulty: selectedDifficulty,
-              });
+              if (isHost) {
+                socket.emit("startGame", {
+                  gameId: roomId,
+                  totalRounds: selectedRounds,
+                  timer: selectedTimer,
+                  difficulty: selectedDifficulty,
+                });
+              }
             }}
+            disabled={!canStartGame}
           >
             Start Game
           </button>
+
+          {!isHost && (
+  <small style={{ color: "#999" }}>Only the host can start the game.</small>
+          )}
+
+          {isHost && (!redTeamHasPlayers || !blueTeamHasPlayers) && (
+  <small style={{ color: "crimson" }}>
+    Both teams must have at least one player to start the game.
+  </small>
+)}
+
         </div>
 
         {/* COLUMN 4: CHAT */}

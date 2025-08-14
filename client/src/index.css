@@ -1,3 +1,28 @@
+/* must be first */
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700&display=swap');
+
+:root {
+  --ui-font: 'Rubik', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* set the font on the root element */
+html {
+  font-family: var(--ui-font);
+}
+
+/* inherit onto body and children (don’t override with other families) */
+body {
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ensure form controls use the same font */
+input, button, select, textarea {
+  font: inherit;
+}
+
+/* your existing layout rules */
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -7,14 +32,6 @@ html, body, #root {
   background-color: #F0F8FF;
   position: relative;
   overflow-x: hidden;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 code {

@@ -10,12 +10,17 @@ const invitationSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
   displayName: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  email:       { type: String, required: true, unique: true },
+  password:    { type: String, required: true },
+
+  // NEW — used by lobby to draw the avatar
+  avatarSeed:  { type: String, default: "player" },
+  avatarStyle: { type: String, default: "funEmoji" },
+
   isTeamLeader: { type: Boolean, default: false },
-  isOnline: { type: Boolean, default: false },
-  roles: { type: [String], default: ['USER'] },
-  teamID: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+  isOnline:     { type: Boolean, default: false },
+  roles:        { type: [String], default: ['USER'] },
+  teamID:       { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
   hostedSessions: [{ type: String }],
   invitations: [invitationSchema]
 }, { timestamps: true });

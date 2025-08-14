@@ -12,7 +12,6 @@
     "axios": "^1.10.0",
     "html2pdf.js": "^0.10.3",
     "react": "^19.1.0",
-    "react-avatar-editor": "^13.0.2",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2",
     "react-scripts": "5.0.1",

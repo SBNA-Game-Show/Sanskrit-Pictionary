@@ -26,25 +26,28 @@ const Lobby = () => {
   const isHost = myUserId === hostId;
 
   // for checking if both teams have enough players or not
-  const redTeamHasPlayers = teams.Red.length > 0;
-  const blueTeamHasPlayers = teams.Blue.length > 0;
+  const redTeamHasPlayers = teams.Red.length > 0; //have to change this to 1 to allow starting with 2 players on each team
+  const blueTeamHasPlayers = teams.Blue.length > 0; //---same change needed as mentioned above
   const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
-
 
   useEffect(() => {
     if (!myUserId || !roomId) return;
 
-    socket.emit("registerLobby", { userId: myUserId, displayName: myDisplayName, roomId });
+    socket.emit("registerLobby", {
+      userId: myUserId,
+      displayName: myDisplayName,
+      roomId,
+    });
     socket.emit("requestLobbyUsers", { roomId });
 
     socket.on("lobbyUsers", setOnlineUsers);
-    socket.on("userJoinedLobby", user => {
-      setOnlineUsers(prev =>
-        prev.some(u => u.userId === user.userId) ? prev : [...prev, user]
+    socket.on("userJoinedLobby", (user) => {
+      setOnlineUsers((prev) =>
+        prev.some((u) => u.userId === user.userId) ? prev : [...prev, user]
       );
     });
     socket.on("userLeftLobby", ({ userId }) => {
-      setOnlineUsers(prev => prev.filter(u => u.userId !== userId));
+      setOnlineUsers((prev) => prev.filter((u) => u.userId !== userId));
     });
     socket.on("hostSet", setHostId);
 
@@ -78,7 +81,7 @@ const Lobby = () => {
     socket.on("startTimer", ({ duration }) => {
       setTimeLeft(duration);
       const timerInterval = setInterval(() => {
-        setTimeLeft(prev => {
+        setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timerInterval);
             return 0;
@@ -110,15 +113,17 @@ const Lobby = () => {
   }, [roomId, myUserId, navigate]);
 
   // ------- Team/Users logic -------
-  const getDisplayName = userId =>
-    onlineUsers.find(u => u.userId === userId)?.displayName || userId;
+  const getDisplayName = (userId) =>
+    onlineUsers.find((u) => u.userId === userId)?.displayName || userId;
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
-  const unassignedUsers = onlineUsers.filter(u => !inAnyTeam.includes(u.userId));
+  const unassignedUsers = onlineUsers.filter(
+    (u) => !inAnyTeam.includes(u.userId)
+  );
   const myTeam = teams.Red.includes(myUserId)
     ? "Red"
     : teams.Blue.includes(myUserId)
-      ? "Blue"
-      : null;
+    ? "Blue"
+    : null;
   const renderStyledName = (userId) => {
     const name = getDisplayName(userId);
     const isHostUser = userId === hostId;
@@ -128,7 +133,12 @@ const Lobby = () => {
     return (
       <span style={{ fontWeight: isHostUser ? "bold" : "normal", color }}>
         {name}
-        {isHostUser && <span title="Host" style={{ marginLeft: 3, color: "#e3aa13" }}> 👑</span>}
+        {isHostUser && (
+          <span title="Host" style={{ marginLeft: 3, color: "#e3aa13" }}>
+            {" "}
+            👑
+          </span>
+        )}
       </span>
     );
   };
@@ -143,7 +153,7 @@ const Lobby = () => {
     let updatedSettings = {
       rounds: selectedRounds,
       timer: selectedTimer,
-      difficulty: selectedDifficulty
+      difficulty: selectedDifficulty,
     };
     if (setting === "rounds") updatedSettings.rounds = value;
     if (setting === "timer") updatedSettings.timer = value;
@@ -185,7 +195,7 @@ const Lobby = () => {
           {unassignedUsers.length === 0 ? (
             <p>No users online.</p>
           ) : (
-            unassignedUsers.map(user => (
+            unassignedUsers.map((user) => (
               <div key={user.userId} style={{ marginBottom: 6 }}>
                 {renderStyledName(user.userId)}
                 {user.userId === myUserId && (
@@ -210,28 +220,33 @@ const Lobby = () => {
         </div>
 
         {/* COLUMN 2: TEAMS */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 180 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+            minWidth: 180,
+          }}
+        >
           <div style={{ background: "#f8e7e9", borderRadius: 8, padding: 10 }}>
             <h3 style={{ color: "crimson", marginBottom: 8 }}>Red Team</h3>
-            {teams.Red.length === 0
-              ? <p style={{ color: "#999" }}>No players</p>
-              : teams.Red.map(uid =>
-                <div key={uid}>
-                  {renderStyledName(uid)}
-                </div>
-              )
-            }
+            {teams.Red.length === 0 ? (
+              <p style={{ color: "#999" }}>No players</p>
+            ) : (
+              teams.Red.map((uid) => (
+                <div key={uid}>{renderStyledName(uid)}</div>
+              ))
+            )}
           </div>
           <div style={{ background: "#e7eef8", borderRadius: 8, padding: 10 }}>
             <h3 style={{ color: "royalblue", marginBottom: 8 }}>Blue Team</h3>
-            {teams.Blue.length === 0
-              ? <p style={{ color: "#999" }}>No players</p>
-              : teams.Blue.map(uid =>
-                <div key={uid}>
-                  {renderStyledName(uid)}
-                </div>
-              )
-            }
+            {teams.Blue.length === 0 ? (
+              <p style={{ color: "#999" }}>No players</p>
+            ) : (
+              teams.Blue.map((uid) => (
+                <div key={uid}>{renderStyledName(uid)}</div>
+              ))
+            )}
           </div>
         </div>
 
@@ -241,7 +256,7 @@ const Lobby = () => {
           <div className="setting-section">
             <h3>Select Rounds</h3>
             <div className="option-buttons">
-              {[1, 2, 3, 4, 5].map(round => (
+              {[1, 2, 3, 4, 5].map((round) => (
                 <button
                   key={round}
                   className={selectedRounds === round ? "active" : ""}
@@ -256,7 +271,7 @@ const Lobby = () => {
           <div className="setting-section">
             <h3>Select Timer</h3>
             <div className="option-buttons">
-              {[30, 45, 60, 75, 90].map(sec => (
+              {[30, 45, 60, 75, 90, 100000].map((sec) => (
                 <button
                   key={sec}
                   className={selectedTimer === sec ? "active" : ""}
@@ -271,7 +286,7 @@ const Lobby = () => {
           <div className="setting-section">
             <h3>Select Difficulty</h3>
             <div className="option-buttons">
-              {["Easy", "Medium", "Hard"].map(level => (
+              {["Easy", "Medium", "Hard"].map((level) => (
                 <button
                   key={level}
                   className={selectedDifficulty === level ? "active" : ""}
@@ -301,15 +316,16 @@ const Lobby = () => {
           </button>
 
           {!isHost && (
-  <small style={{ color: "#999" }}>Only the host can start the game.</small>
+            <small style={{ color: "#999" }}>
+              Only the host can start the game.
+            </small>
           )}
 
           {isHost && (!redTeamHasPlayers || !blueTeamHasPlayers) && (
-  <small style={{ color: "crimson" }}>
-    Both teams must have at least one player to start the game.
-  </small>
-)}
-
+            <small style={{ color: "crimson" }}>
+              Both teams must have at least one player to start the game.
+            </small>
+          )}
         </div>
 
         {/* COLUMN 4: CHAT */}
@@ -325,9 +341,7 @@ const Lobby = () => {
       {currentRound && (
         <div className="game-status">
           <h3>Round: {currentRound}</h3>
-          <p>
-            Current Player: {currentPlayer?.displayName || currentPlayer}
-          </p>
+          <p>Current Player: {currentPlayer?.displayName || currentPlayer}</p>
           <p>Time Left: {timeLeft}s</p>
         </div>
       )}

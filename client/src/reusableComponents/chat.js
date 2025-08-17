@@ -17,6 +17,7 @@ const Chat = ({ myUserId, myDisplayName, myTeam }) => {
 
     // Listen for new chat messages
     socket.on("chat", (msgObj) => {
+      console.log("Received chat message:", msgObj); // 👈 Log incoming
       setMessages((prev) => [...prev, msgObj]);
     });
 
@@ -28,14 +29,16 @@ const Chat = ({ myUserId, myDisplayName, myTeam }) => {
 
   const handleSend = () => {
     if (!message.trim()) return;
-    socket.emit("chat", {
-      roomId,
-      userId: myUserId,
-      displayName: myDisplayName,
-      team: myTeam,
-      message
-    });
-    setMessage("");
+    const msgObj = {
+    roomId,
+    userId: myUserId,
+    displayName: myDisplayName,
+    team: myTeam,
+    message
+  };
+  console.log("Sending chat message:", msgObj); // 👈 Logs to console every send
+  socket.emit("chat", msgObj);
+  setMessage("");
   };
 
   return (

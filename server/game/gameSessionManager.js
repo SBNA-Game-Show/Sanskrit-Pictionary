@@ -1,27 +1,22 @@
-// const Flashcard = require("../models/Flashcard");
+// server/game/gameSessionManager.js
+// GameSessionManager - manages in-memory game sessions and fetches flashcards from MongoDB
+const Flashcard = require("../models/Flashcard");
 
 class GameSessionManager {
   constructor() {
     this.sessions = new Map();
-
-    // Local flashcards for testing
-    this.testFlashcards = [
-      { word: "Apple", translation: "Fruit", imageSrc: "", audioSrc: "", transliteration: "æpl" },
-      { word: "Tree", translation: "Plant", imageSrc: "", audioSrc: "", transliteration: "triː" },
-      { word: "Sun", translation: "Star", imageSrc: "", audioSrc: "", transliteration: "sʌn" },
-    ];
   }
 
   createSession(gameId, players, totalRounds, timer, difficulty) {
+    // shuffle players and assign teams (even/odd)
     const shuffled = players.slice().sort(() => Math.random() - 0.5);
     shuffled.forEach((p, i) => {
       p.team = i % 2 === 0 ? "Red" : "Blue";
     });
 
-    let firstDrawerIndex = shuffled.findIndex(p => p.team === "Red");
-    if (firstDrawerIndex === -1) {
-      firstDrawerIndex = 0;
-    }
+    // make sure the first drawer is on Red team if available
+    let firstDrawerIndex = shuffled.findIndex((p) => p.team === "Red");
+    if (firstDrawerIndex === -1) firstDrawerIndex = 0;
 
     this.sessions.set(gameId, {
       players: shuffled,
@@ -34,27 +29,77 @@ class GameSessionManager {
       scores: {},
       currentFlashcard: null,
     });
+
+    // init scores
+    shuffled.forEach((p) => {
+      this.sessions.get(gameId).scores[p.userId] = 0;
+    });
+
+    console.log(
+      `[createSession] gameId=${gameId} players=${shuffled.length} timer=${timer} difficulty=${difficulty}`
+    );
   }
 
   getSession(gameId) {
     return this.sessions.get(gameId);
   }
 
-  // --- ORIGINAL DB CALL COMMENTED OUT ---
-  /*
+  /**
+   * Try to fetch a random flashcard from MongoDB.
+   * - Uses case-insensitive matching for difficulty
+   * - Falls back to any random flashcard if none for given difficulty
+   */
   async getRandomFlashcard(difficulty) {
-    const flashcards = await Flashcard.aggregate([
-      { $match: { difficulty } },
-      { $sample: { size: 1 } }
-    ]);
-    return flashcards[0];
-  }
-  */
+    try {
+      // Build query (case-insensitive) only if difficulty provided
+      let query = {};
+      if (difficulty) {
+        // allow either "Easy"/"easy" etc.
+        query = { difficulty: { $regex: `^${difficulty}$`, $options: "i" } };
+      }
 
-  // Local test version (no Mongo)
-  async getRandomFlashcard(difficulty) {
-    const list = this.testFlashcards;
-    return list[Math.floor(Math.random() * list.length)];
+      // Log counts for debugging
+      const countMatching = await Flashcard.countDocuments(query);
+      const totalCount = await Flashcard.countDocuments({});
+      console.log(
+        `[getRandomFlashcard] difficulty=${difficulty} matching=${countMatching} total=${totalCount}`
+      );
+
+      // If there are no matching docs for difficulty, fallback to any
+      if (countMatching === 0 && totalCount > 0) {
+        console.warn(
+          `[getRandomFlashcard] No flashcards found for difficulty "${difficulty}". Falling back to any flashcard.`
+        );
+        // pick any random document
+        const any = await Flashcard.aggregate([{ $sample: { size: 1 } }]);
+        return any && any.length ? any[0] : null;
+      }
+
+      // If both counts are zero, return null
+      if (totalCount === 0) {
+        console.warn("[getRandomFlashcard] Database has no flashcards at all.");
+        return null;
+      }
+
+      // Get a random matching flashcard
+      const res = await Flashcard.aggregate([
+        { $match: query },
+        { $sample: { size: 1 } },
+      ]);
+
+      if (!res || res.length === 0) {
+        console.warn(
+          "[getRandomFlashcard] aggregate returned no results (unexpected)."
+        );
+        return null;
+      }
+
+      console.log("[getRandomFlashcard] chosen:", res[0]);
+      return res[0];
+    } catch (err) {
+      console.error("[getRandomFlashcard] error:", err);
+      return null;
+    }
   }
 
   async startRound(gameId, io) {
@@ -63,6 +108,7 @@ class GameSessionManager {
 
     session.roundInProgress = true;
 
+    // fetch a flashcard from DB (with fallback)
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
       io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
@@ -71,28 +117,70 @@ class GameSessionManager {
     session.currentFlashcard = flashcard;
 
     const currentPlayer = session.players[session.currentPlayerIndex];
+    if (!currentPlayer) {
+      console.warn("[startRound] no currentPlayer for session", gameId);
+      return;
+    }
 
+    // DEBUG logs
+    console.log(
+      `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`
+    );
+    console.log("[startRound] flashcard chosen:", flashcard);
+
+    // Emit the flashcard ONLY to the drawer's socket (private)
     io.to(currentPlayer.socketId).emit("newFlashcard", {
+      // include fields the frontend expects; keep names consistent
       word: flashcard.word,
-      hint: flashcard.translation,
-      image: flashcard.imageSrc,
-      audio: flashcard.audioSrc,
-      transliteration: flashcard.transliteration
+      transliteration: flashcard.transliteration,
+      hint: flashcard.translation, // used as 'hint' on frontend
+      image: flashcard.imageSrc || "",
+      audio: flashcard.audioSrc || "",
+      difficulty: flashcard.difficulty || session.difficulty || "unknown",
     });
 
+    console.log(
+      `[startRound] emitted newFlashcard to socket ${currentPlayer.socketId}`
+    );
+
+    // Broadcast which player is drawing
     io.to(gameId).emit("drawerChanged", {
       userId: currentPlayer.userId,
       displayName: currentPlayer.displayName,
-      team: currentPlayer.team
+      team: currentPlayer.team,
     });
 
-    io.to(gameId).emit("roundStarted", {
-      round: session.currentRound + 1,
+    // Broadcast a roundStarted payload that matches what lobby/play expect
+    const roundPayload = {
+      currentRound: session.currentRound + 1,
       totalRounds: session.totalRounds,
-      currentPlayer: currentPlayer.displayName
-    });
+      currentPlayer: currentPlayer.displayName,
+      timer: session.timer,
+    };
+    io.to(gameId).emit("roundStarted", roundPayload);
 
-    session.players.forEach((p) => { p.hasAnswered = false; });
+    // Also emit a full gameState for clients that request it or to synchronize
+    const gameState = {
+      players: this.getPlayersWithScores(gameId),
+      currentPlayerIndex: session.currentPlayerIndex,
+      drawer: {
+        userId: currentPlayer.userId,
+        displayName: currentPlayer.displayName,
+        team: currentPlayer.team,
+        socketId: currentPlayer.socketId,
+      },
+      currentRound: session.currentRound + 1,
+      totalRounds: session.totalRounds,
+      timer: session.timer,
+      currentFlashcard: null, // not broadcast to everyone; drawer already got it privately
+      scores: session.scores,
+    };
+    io.to(gameId).emit("gameState", gameState);
+
+    // reset answer flags
+    session.players.forEach((p) => {
+      p.hasAnswered = false;
+    });
   }
 
   nextRound(gameId) {
@@ -101,7 +189,8 @@ class GameSessionManager {
     if (session.currentRound >= session.totalRounds) return null;
 
     session.currentRound++;
-    session.currentPlayerIndex = (session.currentPlayerIndex + 1) % session.players.length;
+    session.currentPlayerIndex =
+      (session.currentPlayerIndex + 1) % session.players.length;
     session.roundInProgress = true;
 
     return {
@@ -114,7 +203,8 @@ class GameSessionManager {
 
   handleAnswer(gameId, userId, answer, io) {
     const session = this.getSession(gameId);
-    if (!session || !session.currentFlashcard || !session.roundInProgress) return;
+    if (!session || !session.currentFlashcard || !session.roundInProgress)
+      return;
 
     const correct = session.currentFlashcard.word.trim().toLowerCase();
     const submitted = answer.trim().toLowerCase();
@@ -145,7 +235,7 @@ class GameSessionManager {
     } else {
       io.to(gameId).emit("wrongAnswer", {
         userId,
-        displayName: player.displayName
+        displayName: player.displayName,
       });
     }
   }
@@ -157,7 +247,7 @@ class GameSessionManager {
 
   addPlayer(gameId, player) {
     const session = this.getSession(gameId);
-    if (session && !session.players.find(p => p.userId === player.userId)) {
+    if (session && !session.players.find((p) => p.userId === player.userId)) {
       session.players.push(player);
       session.scores[player.userId] = 0;
     }
@@ -173,12 +263,12 @@ class GameSessionManager {
   getPlayersWithScores(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return [];
-    return session.players.map(p => ({
+    return session.players.map((p) => ({
       displayName: p.displayName,
       userId: p.userId,
       team: p.team,
       points: session.scores[p.userId] || 0,
-      imageSrc: p.imageSrc || ''
+      imageSrc: p.imageSrc || "",
     }));
   }
 }

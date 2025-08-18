@@ -2,6 +2,45 @@
 // GameSessionManager - manages in-memory game sessions and fetches flashcards from MongoDB
 const Flashcard = require("../models/Flashcard");
 
+// ========== helpers: normalization & synonyms ==========
+function normDeva(s) {
+  return (s || "")
+    .toString()
+    .trim()
+    .normalize("NFC")
+    .replace(/[\u200C\u200D\uFEFF]/g, "") // ZWNJ/ZWJ/BOM
+    .replace(/[\u2018\u2019\u201C\u201D"'`]+/g, "") // quotes
+    .replace(/[^\p{L}\p{M}\p{N}\u0900-\u097F]/gu, ""); // keep letters/marks/digits + Devanagari
+}
+
+function normLatin(s) {
+  return (s || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip latin diacritics
+    .replace(/[^a-z0-9]+/g, ""); // keep a-z0-9
+}
+
+function stripCommonEndings(s) {
+  return s.replace(/(am|ah|aḥ|m|ḥ|ṃ)$/u, "");
+}
+
+function toArray(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  return String(v).split(/[\/,;|、，\s]+/).filter(Boolean);
+}
+
+function pushManyDeva(set, raw) {
+  for (const x of toArray(raw)) {
+    const t = normDeva(x);
+    if (t) set.add(t);
+  }
+}
+// ======================================================
+
 class GameSessionManager {
   constructor() {
     this.sessions = new Map();
@@ -51,49 +90,40 @@ class GameSessionManager {
    */
   async getRandomFlashcard(difficulty) {
     try {
-      // Build query (case-insensitive) only if difficulty provided
       let query = {};
       if (difficulty) {
-        // allow either "Easy"/"easy" etc.
         query = { difficulty: { $regex: `^${difficulty}$`, $options: "i" } };
       }
 
-      // Log counts for debugging
       const countMatching = await Flashcard.countDocuments(query);
       const totalCount = await Flashcard.countDocuments({});
       console.log(
         `[getRandomFlashcard] difficulty=${difficulty} matching=${countMatching} total=${totalCount}`
       );
 
-      // If there are no matching docs for difficulty, fallback to any
       if (countMatching === 0 && totalCount > 0) {
         console.warn(
           `[getRandomFlashcard] No flashcards found for difficulty "${difficulty}". Falling back to any flashcard.`
         );
-        // pick any random document
         const any = await Flashcard.aggregate([{ $sample: { size: 1 } }]);
         return any && any.length ? any[0] : null;
       }
 
-      // If both counts are zero, return null
       if (totalCount === 0) {
         console.warn("[getRandomFlashcard] Database has no flashcards at all.");
         return null;
       }
 
-      // Get a random matching flashcard
       const res = await Flashcard.aggregate([
         { $match: query },
         { $sample: { size: 1 } },
       ]);
-
       if (!res || res.length === 0) {
         console.warn(
           "[getRandomFlashcard] aggregate returned no results (unexpected)."
         );
         return null;
       }
-
       console.log("[getRandomFlashcard] chosen:", res[0]);
       return res[0];
     } catch (err) {
@@ -108,7 +138,6 @@ class GameSessionManager {
 
     session.roundInProgress = true;
 
-    // fetch a flashcard from DB (with fallback)
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
       io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
@@ -122,45 +151,34 @@ class GameSessionManager {
       return;
     }
 
-    // DEBUG logs
     console.log(
       `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`
     );
-    console.log("[startRound] flashcard chosen:", flashcard);
 
-    // Emit the flashcard ONLY to the drawer's socket (private)
+    // Send flashcard privately to drawer
     io.to(currentPlayer.socketId).emit("newFlashcard", {
-      // include fields the frontend expects; keep names consistent
       word: flashcard.word,
       transliteration: flashcard.transliteration,
-      hint: flashcard.translation, // used as 'hint' on frontend
+      hint: flashcard.translation,
       image: flashcard.imageSrc || "",
       audio: flashcard.audioSrc || "",
       difficulty: flashcard.difficulty || session.difficulty || "unknown",
     });
 
-    console.log(
-      `[startRound] emitted newFlashcard to socket ${currentPlayer.socketId}`
-    );
-
-    // Broadcast which player is drawing
     io.to(gameId).emit("drawerChanged", {
       userId: currentPlayer.userId,
       displayName: currentPlayer.displayName,
       team: currentPlayer.team,
     });
 
-    // Broadcast a roundStarted payload that matches what lobby/play expect
-    const roundPayload = {
+    io.to(gameId).emit("roundStarted", {
       currentRound: session.currentRound + 1,
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
       timer: session.timer,
-    };
-    io.to(gameId).emit("roundStarted", roundPayload);
+    });
 
-    // Also emit a full gameState for clients that request it or to synchronize
-    const gameState = {
+    io.to(gameId).emit("gameState", {
       players: this.getPlayersWithScores(gameId),
       currentPlayerIndex: session.currentPlayerIndex,
       drawer: {
@@ -172,12 +190,10 @@ class GameSessionManager {
       currentRound: session.currentRound + 1,
       totalRounds: session.totalRounds,
       timer: session.timer,
-      currentFlashcard: null, // not broadcast to everyone; drawer already got it privately
+      currentFlashcard: null, // drawer-only
       scores: session.scores,
-    };
-    io.to(gameId).emit("gameState", gameState);
+    });
 
-    // reset answer flags
     session.players.forEach((p) => {
       p.hasAnswered = false;
     });
@@ -201,44 +217,97 @@ class GameSessionManager {
     };
   }
 
-  handleAnswer(gameId, userId, answer, io) {
+  // NOTE: include remainingSeconds for time-based scoring
+  handleAnswer(gameId, userId, answer, io, remainingSeconds = 0) {
     const session = this.getSession(gameId);
-    if (!session || !session.currentFlashcard || !session.roundInProgress)
-      return;
-
-    const correct = session.currentFlashcard.word.trim().toLowerCase();
-    const submitted = answer.trim().toLowerCase();
+    if (!session || !session.currentFlashcard || !session.roundInProgress) {
+      return { allSubmitted: false };
+    }
 
     const player = session.players.find((p) => p.userId === userId);
-    if (!player || player.hasAnswered) return;
+    if (!player) return { allSubmitted: false };
 
-    player.hasAnswered = true;
+    if (player.hasAnswered) {
+      io.to(gameId).emit("answerResult", {
+        ok: false,
+        userId,
+        reason: "ALREADY_ANSWERED",
+      });
+      return { allSubmitted: false };
+    }
 
-    if (submitted === correct) {
-      session.scores[userId] = (session.scores[userId] || 0) + 10;
+    // ----- correctness (Devanagari + english + transliteration + synonyms) -----
+    const submittedRaw = answer;
+
+    const subDeva = normDeva(submittedRaw);
+    const subLat = normLatin(submittedRaw);
+
+    const corWord = session.currentFlashcard.word;
+    const traWord = session.currentFlashcard.translation;
+    const romWord = session.currentFlashcard.transliteration;
+
+    const corDeva = normDeva(corWord);
+    const traLat = normLatin(traWord);
+    const romLat = normLatin(romWord);
+
+    // synonyms/aliases/altWords supported if provided by DB
+    const acceptDeva = new Set();
+    pushManyDeva(acceptDeva, corWord);
+    pushManyDeva(acceptDeva, session.currentFlashcard.synonyms);
+    pushManyDeva(acceptDeva, session.currentFlashcard.aliases);
+    pushManyDeva(acceptDeva, session.currentFlashcard.altWords);
+
+    const isCorrect =
+      (subDeva && acceptDeva.has(subDeva)) ||
+      (subLat && traLat && subLat === traLat) ||
+      (subLat &&
+        romLat &&
+        (subLat === romLat ||
+          stripCommonEndings(subLat) === stripCommonEndings(romLat)));
+
+    if (isCorrect) {
+      // ----- time-based score -----
+      const MAX_SCORE = 200;
+      const MIN_SCORE = 10;
+      const total = Number(session.timer) || 60;
+      const remain = Math.max(
+        0,
+        Math.min(total, Number(remainingSeconds) || 0)
+      );
+      const ratio = total > 0 ? remain / total : 0;
+      const gained = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * ratio);
+
+      player.hasAnswered = true;
+      session.scores[userId] = (session.scores[userId] || 0) + gained;
+
       io.to(gameId).emit("correctAnswer", {
         userId,
         displayName: player.displayName,
         points: session.scores[userId],
+        scoreGained: gained,
+        remainingSeconds: remain,
       });
 
       io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
 
-      setTimeout(() => {
-        const next = this.nextRound(gameId);
-        if (!next) {
-          io.to(gameId).emit("gameEnded");
-        } else {
-          io.to(gameId).emit("clear-canvas");
-          this.startRound(gameId, io);
-        }
-      }, 1500);
-    } else {
-      io.to(gameId).emit("wrongAnswer", {
-        userId,
-        displayName: player.displayName,
-      });
+      // check if all teammates (excluding drawer) already answered
+      const drawer = session.players[session.currentPlayerIndex];
+      const teammates = session.players.filter(
+        (p) => p.team === drawer.team && p.userId !== drawer.userId
+      );
+      const everyoneCorrect =
+        teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
+
+      // DO NOT start next round here; let socket layer decide using this flag
+      return { allSubmitted: Boolean(everyoneCorrect) };
     }
+
+    // wrong answer
+    io.to(gameId).emit("wrongAnswer", {
+      userId,
+      displayName: player.displayName,
+    });
+    return { allSubmitted: false };
   }
 
   endRound(gameId) {

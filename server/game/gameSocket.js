@@ -1,5 +1,6 @@
 const gameSessionManager = require('../game/gameSessionManager');
 const activeTimers = {};
+const advancingRounds = new Set();      
 
 function createGameSocket(io) {
   io.on('connection', (socket) => {
@@ -66,25 +67,19 @@ function createGameSocket(io) {
         socket.emit('answerRejected', { message: "It's not your team's turn to guess!" });
         return;
       }
-      gameSessionManager.handleAnswer(gameId, userId, answer, io);
+      const remainingSeconds = activeTimers[gameId]?.secondsLeft ?? 0;
+      
+      //If all players on the same team have submitted their guesses, the current round ends immediately and the next round begins.
+      const result = gameSessionManager.handleAnswer(gameId, userId, answer, io, remainingSeconds);
+      if (result?.allSubmitted) {
+         clearActiveTimer(gameId);
+         proceedToNextRound(io, gameId);
+        }
     });
 
     socket.on('nextRound', ({ gameId }) => {
-      const roundInfo = gameSessionManager.nextRound(gameId);
-      if (roundInfo) {
-        const drawerPlayer = roundInfo.currentPlayer;
-        io.to(gameId).emit('drawerChanged', {
-          userId: drawerPlayer.userId,
-          displayName: drawerPlayer.displayName,
-          team: drawerPlayer.team,
-        });
-        io.to(gameId).emit('roundStarted', roundInfo);
-        io.to(gameId).emit('startTimer', { duration: roundInfo.timer });
-        startSynchronizedTimer(io, gameId, roundInfo.timer);
-      } else {
-        io.to(gameId).emit('gameEnded');
-        clearActiveTimer(gameId);
-      }
+      clearActiveTimer(gameId);
+      proceedToNextRound(io, gameId);
     });
 
     socket.on("startRound", async ({ roomId }) => {
@@ -104,29 +99,22 @@ function createGameSocket(io) {
 
 function startSynchronizedTimer(io, gameId, duration) {
   clearActiveTimer(gameId);
-  let secondsLeft = duration;
+
+  let secondsLeft = Number.isFinite(duration) ? Math.max(0, Math.floor(duration)) : 0;
+
   const intervalId = setInterval(() => {
-    secondsLeft--;
+    secondsLeft = Math.max(0, secondsLeft - 1);
     io.to(gameId).emit("timerUpdate", { secondsLeft });
+
     if (secondsLeft <= 0) {
       clearInterval(intervalId);
       delete activeTimers[gameId];
-      const nextRoundInfo = gameSessionManager.nextRound(gameId);
-      if (nextRoundInfo) {
-        const drawerPlayer = nextRoundInfo.currentPlayer;
-        io.to(gameId).emit('drawerChanged', {
-          userId: drawerPlayer.userId,
-          displayName: drawerPlayer.displayName,
-          team: drawerPlayer.team,
-        });
-        io.to(gameId).emit('roundStarted', nextRoundInfo);
-        io.to(gameId).emit('startTimer', { duration: nextRoundInfo.timer });
-        startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
-      } else {
-        io.to(gameId).emit('gameEnded');
-      }
+
+      // Timer reaches zero → proceed to next round
+      proceedToNextRound(io, gameId);
     }
   }, 1000);
+
   activeTimers[gameId] = { intervalId, secondsLeft };
 }
 
@@ -134,6 +122,38 @@ function clearActiveTimer(gameId) {
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
     delete activeTimers[gameId];
+  }
+}
+
+function proceedToNextRound(io, gameId) {
+  if (advancingRounds.has(gameId)) return; // Already advancing, avoid duplication
+  advancingRounds.add(gameId);
+
+  try {
+    const nextRoundInfo = gameSessionManager.nextRound(gameId);
+
+    if (nextRoundInfo) {
+      const drawerPlayer = nextRoundInfo.currentPlayer;
+
+      io.to(gameId).emit('drawerChanged', {
+        userId: drawerPlayer.userId,
+        displayName: drawerPlayer.displayName,
+        team: drawerPlayer.team,
+      });
+
+      io.to(gameId).emit('roundStarted', nextRoundInfo);
+      io.to(gameId).emit('startTimer', { duration: nextRoundInfo.timer });
+
+      startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
+
+      // Start new round (if nextRound didn't automatically draw a new topic, this is handled by startRound)
+      gameSessionManager.startRound(gameId, io);
+    } else {
+      io.to(gameId).emit('gameEnded');
+      clearActiveTimer(gameId);
+    }
+  } finally {
+    advancingRounds.delete(gameId);
   }
 }
 

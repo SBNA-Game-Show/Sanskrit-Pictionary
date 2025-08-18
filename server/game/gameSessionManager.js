@@ -116,38 +116,54 @@ class GameSessionManager {
     const session = this.getSession(gameId);
     if (!session || !session.currentFlashcard || !session.roundInProgress) return;
 
-    const correct = session.currentFlashcard.word.trim().toLowerCase();
-    const submitted = answer.trim().toLowerCase();
+    const correctWord = (session.currentFlashcard.word || '').trim().toLowerCase();
+    const submitted = (answer || '').trim().toLowerCase();
+
 
     const player = session.players.find((p) => p.userId === userId);
-    if (!player || player.hasAnswered) return;
+    if (!player) return;
 
-    player.hasAnswered = true;
+    if (player.hasAnswered) {
+      io.to(gameId).emit("answerResult", { ok: false, userId, reason: "ALREADY_CORRECT" });
+      return { allSubmitted: false };
+    }
 
-    if (submitted === correct) {
-      session.scores[userId] = (session.scores[userId] || 0) + 10;
+    if (submitted === correctWord) {
+      //Score by speed: linearly decreasing
+      const MAX_SCORE = 200;
+      const MIN_SCORE = 10;
+
+      const total = Number(session.timer) || 60; 
+      const remain = Math.max(0, Math.min(total, Number(remainingSeconds) || 0));
+      const remainRatio = total > 0 ? (remain / total) : 0;
+      const gained = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * remainRatio);
+
+      // Scoring
+      player.hasAnswered = true;
+      session.scores[userId] = (session.scores[userId] || 0) + gained;
+      
       io.to(gameId).emit("correctAnswer", {
         userId,
         displayName: player.displayName,
         points: session.scores[userId],
+        scoreGained: gained, 
+        remainingSeconds: remain   
       });
 
       io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
 
-      setTimeout(() => {
-        const next = this.nextRound(gameId);
-        if (!next) {
-          io.to(gameId).emit("gameEnded");
-        } else {
-          this.startRound(gameId, io);
-        }
-      }, 1500);
-    } else {
-      io.to(gameId).emit("wrongAnswer", {
-        userId,
-        displayName: player.displayName
-      });
+      const drawer = session.players[session.currentPlayerIndex];
+      const teammates = session.players.filter(p => p.team === drawer.team && p.userId !== drawer.userId);
+      const everyoneCorrect = teammates.length > 0 && teammates.every(p => p.hasAnswered === true);
+
+      return { allSubmitted: Boolean(everyoneCorrect) };
     }
+
+    io.to(gameId).emit("wrongAnswer", {
+      userId,
+      displayName: player.displayName
+    });
+    return { allSubmitted: false };
   }
 
   endRound(gameId) {

@@ -45,3 +45,32 @@ router.post("/change-password", async (req, res) => {
 });
 
 module.exports = router;
+
+
+// NEW — save displayName + avatar configuration
+router.put("/me/profile", async (req, res) => {
+  try {
+    const { userId, displayName, avatarSeed, avatarStyle } = req.body;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        ...(displayName && { displayName }),
+        ...(avatarSeed && { avatarSeed }),
+        ...(avatarStyle && { avatarStyle }),
+      },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.json({
+      displayName: user.displayName,
+      avatarSeed:  user.avatarSeed,
+      avatarStyle: user.avatarStyle,
+    });
+  } catch (e) {
+    console.error("Profile update error:", e);
+    res.status(400).json({ error: "Could not update profile" });
+  }
+});

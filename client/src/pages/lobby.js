@@ -5,6 +5,10 @@ import UserCard from "../reusableComponents/usercard";
 import Chat from "../reusableComponents/chat";
 import "./lobby.css";
 
+/* NEW: DiceBear for inline avatars (no UI change elsewhere) */
+import { createAvatar } from "@dicebear/core";
+import * as Dice from "@dicebear/collection";
+
 const Lobby = () => {
   const { roomId } = useParams();
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -26,8 +30,8 @@ const Lobby = () => {
   const isHost = myUserId === hostId;
 
   // for checking if both teams have enough players or not
-  const redTeamHasPlayers = teams.Red.length > 0; //have to change this to 1 to allow starting with 2 players on each team
-  const blueTeamHasPlayers = teams.Blue.length > 0; //---same change needed as mentioned above
+  const redTeamHasPlayers = teams.Red.length > 0;
+  const blueTeamHasPlayers = teams.Blue.length > 0;
   const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
 
   useEffect(() => {
@@ -97,6 +101,22 @@ const Lobby = () => {
       setTimeLeft(null);
     });
 
+    /* NEW: live profile updates (name/avatar) while in lobby */
+    socket.on("profileUpdated", ({ userId, displayName, avatarSeed, avatarStyle }) => {
+      setOnlineUsers((prev) =>
+        prev.map((u) =>
+          u.userId === userId
+            ? {
+                ...u,
+                ...(displayName !== undefined ? { displayName } : {}),
+                ...(avatarSeed !== undefined ? { avatarSeed } : {}),
+                ...(avatarStyle !== undefined ? { avatarStyle } : {}),
+              }
+            : u
+        )
+      );
+    });
+
     return () => {
       socket.off("lobbyUsers");
       socket.off("userJoinedLobby");
@@ -109,12 +129,24 @@ const Lobby = () => {
       socket.off("roundStarted");
       socket.off("startTimer");
       socket.off("gameEnded");
+      socket.off("profileUpdated"); // NEW off
     };
-  }, [roomId, myUserId, navigate]);
+  }, [roomId, myUserId, navigate, myDisplayName]);
 
   // ------- Team/Users logic -------
   const getDisplayName = (userId) =>
     onlineUsers.find((u) => u.userId === userId)?.displayName || userId;
+
+  /* NEW: make a tiny avatar data URL for a user */
+  const avatarUrlFor = (userId) => {
+    const u = onlineUsers.find((x) => x.userId === userId);
+    const styleName = u?.avatarStyle || "funEmoji";
+    const style = Dice[styleName] || Dice.funEmoji;
+    const seed = u?.avatarSeed || u?.displayName || u?.userId || "player";
+    const svg = createAvatar(style, { seed }).toString();
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
+
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId)
@@ -124,21 +156,44 @@ const Lobby = () => {
     : teams.Blue.includes(myUserId)
     ? "Blue"
     : null;
+
+  /* NEW: leave team helper */
+  const handleLeaveTeam = () => {
+    socket.emit("leaveTeam", { roomId, userId: myUserId });
+  };
+
   const renderStyledName = (userId) => {
     const name = getDisplayName(userId);
     const isHostUser = userId === hostId;
     let color = "#222";
     if (teams.Red.includes(userId)) color = "crimson";
     if (teams.Blue.includes(userId)) color = "royalblue";
+
+    /* NEW: small inline avatar chip (keeps layout intact) */
+    const avatarSrc = avatarUrlFor(userId);
+
     return (
-      <span style={{ fontWeight: isHostUser ? "bold" : "normal", color }}>
-        {name}
-        {isHostUser && (
-          <span title="Host" style={{ marginLeft: 3, color: "#e3aa13" }}>
-            {" "}
-            👑
-          </span>
-        )}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color }}>
+        <img
+          src={avatarSrc}
+          alt=""
+          className="user-avatar avatar-anim"
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            verticalAlign: "middle",
+          }}
+        />
+        <span style={{ fontWeight: isHostUser ? "bold" : "normal" }}>
+          {name}
+          {isHostUser && (
+            <span title="Host" style={{ marginLeft: 3, color: "#e3aa13" }}>
+              {" "}
+              👑
+            </span>
+          )}
+        </span>
       </span>
     );
   };
@@ -234,7 +289,20 @@ const Lobby = () => {
               <p style={{ color: "#999" }}>No players</p>
             ) : (
               teams.Red.map((uid) => (
-                <div key={uid}>{renderStyledName(uid)}</div>
+                <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {renderStyledName(uid)}
+                  {/* NEW: my actions when inside a team */}
+                  {uid === myUserId && (
+                    <span style={{ marginLeft: 8 }}>
+                      <button onClick={handleLeaveTeam} style={{ marginRight: 6 }}>
+                        Leave
+                      </button>
+                      <button onClick={() => handleJoinTeam("Blue")}>
+                        Switch to Blue
+                      </button>
+                    </span>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -244,7 +312,20 @@ const Lobby = () => {
               <p style={{ color: "#999" }}>No players</p>
             ) : (
               teams.Blue.map((uid) => (
-                <div key={uid}>{renderStyledName(uid)}</div>
+                <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {renderStyledName(uid)}
+                  {/* NEW: my actions when inside a team */}
+                  {uid === myUserId && (
+                    <span style={{ marginLeft: 8 }}>
+                      <button onClick={handleLeaveTeam} style={{ marginRight: 6 }}>
+                        Leave
+                      </button>
+                      <button onClick={() => handleJoinTeam("Red")}>
+                        Switch to Red
+                      </button>
+                    </span>
+                  )}
+                </div>
               ))
             )}
           </div>

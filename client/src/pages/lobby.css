@@ -160,3 +160,122 @@
   font-size: 14px;
   color: #333;
 }
+
+/* === Avatar chip + subtle float === */
+:root {
+  --float-dur: 1.6s;   /* smaller = faster */
+  --float-amp: 10px;   /* bigger = more bounce */
+}
+
+.user-avatar {
+  display: inline-block;
+  width: 24px;             /* defaults (your inline size can override) */
+  height: 24px;
+  border-radius: 50%;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.avatar-anim {
+  animation: float var(--float-dur) ease-in-out infinite;
+}
+
+@keyframes float {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(calc(-1 * var(--float-amp))); }
+  100% { transform: translateY(0); }
+}
+
+/* Optional: tiny crown nudge if you add a .crown span near host names */
+.crown { margin-left: 4px; color: #e3aa13; }
+
+/* === Layout safety + responsiveness (prevents overflow on small screens) === */
+.lobby-content {
+  flex-wrap: wrap;                /* allow columns to wrap if narrow */
+  align-items: flex-start;        /* keep tops aligned */
+  row-gap: 28px;                  /* extra vertical breathing room when wrapped */
+}
+
+/* Keep lists tidy even for long display names */
+.user-list {
+  word-break: break-word;
+}
+.user-list h2 { margin-top: 0; }
+
+/* Make game settings adapt without exploding layout */
+@media (max-width: 1100px) {
+  .game-settings { width: 360px; }
+}
+
+@media (max-width: 900px) {
+  .lobby-content {
+    gap: 24px;                    /* slightly smaller gaps on tablet */
+  }
+  .game-settings,
+  .user-list {
+    width: 100%;                  /* stack as full-width cards */
+  }
+}
+
+/* On phones, stack everything in a clean column */
+@media (max-width: 680px) {
+  .lobby-url {
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+  }
+  .game-status { width: 100%; }
+}
+
+/* === Small utility (optional) === */
+/* Faster / bigger float (use alongside the class if you want a variant)
+   <img class="user-avatar avatar-anim fast-float" ... />
+*/
+.fast-float { animation-duration: 1.2s; }
+.big-float  { --float-amp: 14px; }
+
+/* Online Users row layout */
+.online-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.online-row + .online-row { margin-top: 6px; }
+
+.online-row-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Actions to the right */
+.user-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* Join buttons */
+.join-btn {
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+}
+
+.join-red  { color: #c62828; border-color: #f0b3b3; }
+.join-blue { color: #2962ff; border-color: #b7c8ff; }
+
+.join-btn:hover { background: #fffaf0; }
+
+/* Avatar (uses the float animation you already have) */
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px; /* square-ish like your example */
+}

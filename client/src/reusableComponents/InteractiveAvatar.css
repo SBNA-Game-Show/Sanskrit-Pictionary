@@ -1,0 +1,60 @@
+/* client/src/components/InteractiveAvatar.css */
+
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
+}
+
+/* Floating animation */
+.avatar-anim {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Glow on hover */
+.avatar-wrap:hover .user-avatar {
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.8),
+              0 0 24px rgba(0, 191, 255, 0.6);
+  transform: scale(1.05);
+}
+
+/* Pop effect when clicked */
+.pop {
+  transform: scale(1.25) !important;
+}
+
+/* Sparkles */
+.sparkle {
+  position: absolute;
+  font-size: 14px;
+  animation: sparkleFade 1s forwards;
+  pointer-events: none;
+}
+
+@keyframes sparkleFade {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5) translateY(-10px);
+  }
+}

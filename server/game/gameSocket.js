@@ -1,40 +1,40 @@
 const gameSessionManager = require("../game/gameSessionManager");
+const User = require("../models/User"); // ⬅️ import User model
 const activeTimers = {};
 
 function createGameSocket(io) {
   io.on("connection", (socket) => {
-    socket.on("registerLobby", ({ userId, displayName, roomId }) => {
-      console.log("[socket] registerLobby received:", {
-        socketId: socket.id,
-        userId,
-        displayName,
-        roomId,
-      });
+    // Register lobby
+    socket.on("registerLobby", async ({ userId, displayName, roomId }) => {
+      console.log("[socket] registerLobby:", { socketId: socket.id, userId, roomId });
+
       socket.userId = userId;
       socket.displayName = displayName;
       socket.join(roomId);
+
+      try {
+        // 🔹 Fetch full profile (avatar + name) from DB
+        const userDoc = await User.findById(userId).select("displayName avatarSeed avatarStyle");
+        if (userDoc) {
+          const payload = {
+            userId: userDoc._id.toString(),
+            displayName: userDoc.displayName,
+            avatarSeed: userDoc.avatarSeed,
+            avatarStyle: userDoc.avatarStyle,
+          };
+          // send to everyone in room
+          io.to(roomId).emit("userJoinedLobby", payload);
+        }
+      } catch (err) {
+        console.error("Error loading user profile in registerLobby:", err);
+      }
     });
 
+    // other existing events (unchanged)...
     socket.on("getGameState", ({ roomId }) => {
-      console.log(
-        "[socket] getGameState requested for roomId:",
-        roomId,
-        "by socket",
-        socket.id,
-        "userId",
-        socket.userId
-      );
       const session = gameSessionManager.getSession(roomId);
       if (session) {
-        const {
-          players,
-          currentPlayerIndex,
-          currentRound,
-          totalRounds,
-          timer,
-          currentFlashcard,
-          scores,
-        } = session;
+        const { players, currentPlayerIndex, currentRound, totalRounds, timer, currentFlashcard, scores } = session;
         const drawer = players[currentPlayerIndex];
         socket.emit("gameState", {
           players,
@@ -50,14 +50,6 @@ function createGameSocket(io) {
     });
 
     socket.on("startGame", ({ gameId, totalRounds, timer, difficulty }) => {
-      console.log("[socket] startGame requested:", {
-        gameId,
-        totalRounds,
-        timer,
-        difficulty,
-        requestedBy: socket.id,
-        userId: socket.userId,
-      });
       const players = [];
       const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
       if (socketsInRoom) {
@@ -72,18 +64,9 @@ function createGameSocket(io) {
           }
         }
       }
-      gameSessionManager.createSession(
-        gameId,
-        players,
-        totalRounds,
-        timer,
-        difficulty
-      );
+      gameSessionManager.createSession(gameId, players, totalRounds, timer, difficulty);
       gameSessionManager.startRound(gameId, io);
-      io.to(gameId).emit(
-        "updatePlayers",
-        gameSessionManager.getPlayersWithScores(gameId)
-      );
+      io.to(gameId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(gameId));
       startSynchronizedTimer(io, gameId, timer);
     });
 
@@ -102,9 +85,7 @@ function createGameSocket(io) {
       const player = session.players.find((p) => p.userId === userId);
       if (!player) return;
       if (player.team !== drawer.team || player.userId === drawer.userId) {
-        socket.emit("answerRejected", {
-          message: "It's not your team's turn to guess!",
-        });
+        socket.emit("answerRejected", { message: "It's not your team's turn to guess!" });
         return;
       }
       gameSessionManager.handleAnswer(gameId, userId, answer, io);
@@ -133,7 +114,6 @@ function createGameSocket(io) {
     });
 
     socket.on("getRoomPlayers", ({ roomId }) => {
-      // for scoreboard consistency
       const session = gameSessionManager.getSession(roomId);
       if (session) {
         io.to(roomId).emit("roomPlayers", { players: session.players });

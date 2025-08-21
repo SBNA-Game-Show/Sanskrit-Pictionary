@@ -1,143 +1,129 @@
-/* ===== Wrapper (tabs live inside) ===== */
+/* client/src/pages/profile.css */
+
 .profile-container {
-  background: rgba(242, 210, 182);
-  max-width: 1000px;               /* slightly wider so things breathe */
-  margin: 4rem auto;
+  max-width: 800px;
+  margin: 2rem auto;
+  background: #f4d4b0;
   padding: 2rem;
   border-radius: 12px;
-  text-align: center;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* ===== Tabs ===== */
-.profile-tabs { display:flex; gap:.5rem; margin-bottom:1rem; }
-.tab-btn { flex:1; padding:.6rem 1rem; border:1px solid #ccc; border-radius:8px; background:#f7f7f7; }
-.tab-btn.active { background:#fff; border-color:#222; font-weight:600; }
-
-/* ===== Generic panel + form bits ===== */
-.panel { text-align:left; background:#f3d8bf; border-radius:12px; padding:1rem; }
-.label { display:block; margin:.5rem 0 .25rem; font-weight:600; }
-.input { width:100%; padding:.6rem .8rem; border:1px solid #ccc; border-radius:8px; }
-.form { display:grid; gap:.6rem; }
-
-.actions { margin-top:1rem; }
-.btn { padding:.7rem 1rem; border:none; border-radius:8px; cursor:pointer; font-weight:700; }
-.btn.primary { background:#222; color:#fff; }
-.btn.primary:hover { background:#333; }     /* <-- FIX: hover now works */
-.btn.subtle { background:#eee; }
-.btn.danger { background:#d9534f; color:#fff; margin-top:1rem; }
-
-.notice { background:#fff1c1; border:1px solid #f1d98a; padding:.5rem .75rem; border-radius:8px; }
-
-/* ===== Avatar area (spacious, centered, responsive) ===== */
-.profile-panel { max-width: 980px; margin: 0 auto; }
-
-.profile-panel .avatar-row {
+.profile-tabs {
   display: flex;
-  align-items: center;
-  gap: 36px;
-  flex-wrap: wrap;       /* stacks on small screens */
-  margin-top: 12px;
+  margin-bottom: 1.5rem;
 }
 
-.profile-panel .avatar-preview {
-  flex: 0 0 220px;       /* preview column */
-  display: grid;
-  place-items: center;
-}
-
-.profile-panel .avatar-preview .avatar-preview-img {
-  width: 180px;
-  height: 180px;
-  object-fit: contain;
-  border-radius: 999px;  /* keep your round preview */
-}
-
-.profile-panel .avatar-controls {
-  flex: 1 1 420px;
-  min-width: 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.profile-panel .label { margin: 6px 0 6px; }
-
-/* style row: select + dice */
-.profile-panel .avatar-style-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 520px;
-}
-
-.profile-panel .dice-btn {
-  height: 44px;
-  width: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-  background: #fff;
+.tab-btn {
+  flex: 1;
+  padding: 0.8rem;
+  border: none;
+  background: #f1f1f1;
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  transition: transform .1s ease, box-shadow .15s ease;
-}
-.profile-panel .dice-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  font-weight: 500;
+  border-radius: 8px 8px 0 0;
+  transition: background 0.2s ease;
 }
 
-/* quick picks grid */
-.profile-panel .avatar-grid {
+.tab-btn.active {
+  background: white;
+  font-weight: bold;
+  border-bottom: 3px solid #222;
+}
+
+.profile-settings h2 {
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.profile-avatar-preview {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
 }
-.profile-panel .avatar-cell {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: #fff;
-  border: 2px solid transparent;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
-  transition: transform .1s ease, box-shadow .15s ease, border-color .15s ease;
-}
-.profile-panel .avatar-cell:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(0,0,0,.08);
-}
-.profile-panel .avatar-cell.selected { border-color: #ff9800; }
-.profile-panel .avatar-cell img { width: 38px; height: 38px; }
 
-/* ===== keep select + dice aligned globally as well (safe) ===== */
+.profile-settings label {
+  display: block;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.profile-settings input[type="text"],
+.profile-settings select {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin-top: 0.3rem;
+  font-size: 1rem;
+}
+
 .avatar-style-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  max-width: 560px;
+  gap: 0.5rem;
 }
-.dice-btn {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-  background: #fff;
+
+.avatar-style-row select {
+  flex: 1;
+}
+
+.avatar-style-row button {
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  background: #eee;
   cursor: pointer;
-  line-height: 1;
-  font-size: 18px;
-  transition: transform .1s ease, box-shadow .15s ease;
-}
-.dice-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-
-/* ===== Responsive ===== */
-@media (max-width: 780px) {
-  .profile-panel .avatar-row { align-items: flex-start; }
-  .profile-panel .avatar-preview { margin-inline: auto; }
-  .profile-panel .avatar-controls { min-width: 100%; }
 }
 
+.avatar-style-row button:hover {
+  background: #ddd;
+}
 
+.quick-picks {
+  margin: 1.5rem 0;
+}
+
+.quick-picks p {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.quick-row {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.quick-avatar {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: pointer;
+  transition: border 0.2s ease;
+}
+
+.quick-avatar:hover {
+  border: 2px solid #aaa;
+}
+
+.quick-avatar.active {
+  border: 2px solid #222;
+}
+
+.save-btn {
+  display: inline-block;
+  padding: 0.8rem 1.4rem;
+  background: #222;
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.save-btn:hover {
+  background: #444;
+}

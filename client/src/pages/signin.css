@@ -65,3 +65,39 @@
   text-decoration: underline;
   font-weight: bold;
 }
+
+
+/* Keep the little toggle inside the input */
+.input-wrap {
+  position: relative;
+}
+.input-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 72px; /* space for the button */
+}
+
+/* Reset any big form button styles and restyle the toggle */
+.signinForm .reveal-btn,
+.signupForm .reveal-btn {
+  all: unset;                   /* kill inherited large button rules */
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #444;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.signinForm .reveal-btn:hover,
+.signupForm .reveal-btn:hover {
+  background: #f3f3f3;
+}

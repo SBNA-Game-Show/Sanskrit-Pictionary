@@ -13,6 +13,10 @@ function Signup() {
     confirmPassword: ''
   });
 
+  // NEW: show/hide toggles
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const handleChange = (e) => {
     setFormData(prev => ({
       ...prev,
@@ -56,16 +60,64 @@ function Signup() {
         <h2>Create Account</h2>
 
         <label htmlFor="displayName">Username</label>
-        <input type="text" id="displayName" placeholder="Enter username" required onChange={handleChange} />
+        <input
+          type="text"
+          id="displayName"
+          placeholder="Enter username"
+          required
+          onChange={handleChange}
+        />
 
         <label htmlFor="email">Email</label>
-        <input type="email" id="email" placeholder="Enter email" required onChange={handleChange} />
+        <input
+          type="email"
+          id="email"
+          placeholder="Enter email"
+          required
+          onChange={handleChange}
+        />
 
         <label htmlFor="password">Password</label>
-        <input type="password" id="password" placeholder="Enter password" required onChange={handleChange} />
+        {/* NEW: show/hide wrapper */}
+        <div className="input-wrap">
+          <input
+            type={showPw ? "text" : "password"}
+            id="password"
+            placeholder="Enter password"
+            required
+            onChange={handleChange}
+          />
+          <button
+            type="button"
+            className="reveal-btn"
+            onClick={() => setShowPw(v => !v)}
+            aria-label={showPw ? "Hide password" : "Show password"}
+            title={showPw ? "Hide password" : "Show password"}
+          >
+            {showPw ? "Hide" : "Show"}
+          </button>
+        </div>
 
         <label htmlFor="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" placeholder="Confirm password" required onChange={handleChange} />
+        {/* NEW: show/hide wrapper for confirm */}
+        <div className="input-wrap">
+          <input
+            type={showConfirm ? "text" : "password"}
+            id="confirmPassword"
+            placeholder="Confirm password"
+            required
+            onChange={handleChange}
+          />
+          <button
+            type="button"
+            className="reveal-btn"
+            onClick={() => setShowConfirm(v => !v)}
+            aria-label={showConfirm ? "Hide password" : "Show password"}
+            title={showConfirm ? "Hide password" : "Show password"}
+          >
+            {showConfirm ? "Hide" : "Show"}
+          </button>
+        </div>
 
         <button type="submit">Sign Up</button>
 

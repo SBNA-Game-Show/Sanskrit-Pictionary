@@ -11,6 +11,9 @@ function Signin() {
     password: ''
   });
 
+  // NEW: show/hide password state
+  const [showPw, setShowPw] = useState(false);
+
   const handleChange = (e) => {
     setFormData(prev => ({
       ...prev,
@@ -63,13 +66,25 @@ function Signin() {
         />
 
         <label htmlFor="password">Password</label>
-        <input
-          type="password"
-          id="password"
-          placeholder="Enter password"
-          required
-          onChange={handleChange}
-        />
+        {/* NEW: wrap with show/hide control */}
+        <div className="input-wrap">
+          <input
+            type={showPw ? "text" : "password"}
+            id="password"
+            placeholder="Enter password"
+            required
+            onChange={handleChange}
+          />
+          <button
+            type="button"
+            className="reveal-btn"
+            onClick={() => setShowPw(v => !v)}
+            aria-label={showPw ? "Hide password" : "Show password"}
+            title={showPw ? "Hide password" : "Show password"}
+          >
+            {showPw ? "Hide" : "Show"}
+          </button>
+        </div>
 
         <button type="submit">Sign in</button>
 

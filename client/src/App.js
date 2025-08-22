@@ -1,5 +1,3 @@
-
-
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./reusableComponents/navbar";
@@ -18,7 +16,6 @@ import Play from "./pages/play";
 // NEW profile page with tabs
 import ProfilePage from "./pages/ProfilePage";
 
-
 // keep a single ProtectedRoute import
 import ProtectedRoute from "./reusableComponents/ProtectedRoute";
 
@@ -35,11 +32,19 @@ function App() {
             <Route path="/signin" element={<Signin />} />
             <Route path="/tutorialrules" element={<TutorialRules />} />
             <Route path="/test" element={<Test />} />
-            <Route path="/play" element={<Play />} />
+            {/* Redirect bare /play to the lobby (prevents mounting Play without a roomId) */}
+            <Route path="/play" element={<Navigate to="/lobby" replace />} />
+            {/* ✅ REQUIRED: dynamic play route */}
+            <Route
+              path="/play/:roomId"
+              element={
+                <ProtectedRoute>
+                  <Play />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/end" element={<End />} />
             <Route path="/profile" element={<ProfilePage />} />
-
-
 
             <Route path="/lobby" element={<LobbyMenu />} />
             <Route

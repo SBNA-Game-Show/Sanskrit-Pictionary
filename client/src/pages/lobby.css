@@ -275,3 +275,22 @@
   .user-list { width: 230px; }
   .team-card { min-width: 220px; }
 }
+
+
+/* Ensure selected buttons stay visually selected */
+.option-buttons button.active,
+.option-buttons button[aria-pressed="true"] {
+  background: #ff8a3d !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+/* Keep same on hover/focus so it doesn't flip back */
+.option-buttons button.active:hover,
+.option-buttons button[aria-pressed="true"]:hover,
+.option-buttons button.active:focus,
+.option-buttons button[aria-pressed="true"]:focus {
+  background: #ff8a3d !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}

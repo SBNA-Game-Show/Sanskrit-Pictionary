@@ -173,11 +173,11 @@ function createLobbyManager(io, UserModel) {
       if (
         !room ||
         socket.userId !== room.hostId ||
-        room.teams.Red.length === 0 ||
-        room.teams.Blue.length === 0
+        room.teams.Red.length < 2 ||
+        room.teams.Blue.length < 2
       ) {
         io.to(socket.id).emit("startGameError", {
-          message: "Only the host can start, and both teams must have players.",
+          message: "Only the host can start, and both teams must have at least 2 players.",
         });
         return;
       }

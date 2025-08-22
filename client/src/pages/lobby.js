@@ -116,8 +116,8 @@ const Lobby = () => {
   }, [teams, myUserId]);
 
   const isHost = myUserId === hostId;
-  const redTeamHasPlayers = teams.Red.length > 0;
-  const blueTeamHasPlayers = teams.Blue.length > 0;
+  const redTeamHasPlayers = teams.Red.length > 1;
+  const blueTeamHasPlayers = teams.Blue.length > 1;
   const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
 
   useEffect(() => {
@@ -424,7 +424,7 @@ const Lobby = () => {
           )}
           {isHost && (!redTeamHasPlayers || !blueTeamHasPlayers) && (
             <small style={{ color: "crimson" }}>
-              Both teams must have at least one player to start the game.
+              Both teams must have at least two players to start the game.
             </small>
           )}
         </div>

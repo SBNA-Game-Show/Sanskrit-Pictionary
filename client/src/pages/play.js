@@ -54,7 +54,7 @@ const Play = () => {
   const handleSubmitAnswer = () => {
     if (answer.trim() === "" || !canAnswer) return;
     socket.emit("submitAnswer", {
-      roomId,
+      gameId: roomId,
       userId: sessionStorage.getItem("userId"),
       answer: answer.trim(),
     });

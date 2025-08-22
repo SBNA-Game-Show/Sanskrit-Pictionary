@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { socket } from "./socket";
 import { createAvatar } from "@dicebear/core";
 import * as Dice from "@dicebear/collection";
+import Chat from "../reusableComponents/chat";
 import "./lobby.css";
 
 /** Inline interactive DiceBear avatar (no extra files) */
@@ -28,22 +29,20 @@ function InteractiveAvatar({
     const el = wrapRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width; // 0..1
-    const y = (e.clientY - r.top) / r.height; // 0..1
-    const dx = (x - 0.5) * 2; // -1..1
-    const dy = (y - 0.5) * 2; // -1..1
-    const maxShift = 4; // px
-    const maxRot = 6;   // deg
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    const dx = (x - 0.5) * 2;
+    const dy = (y - 0.5) * 2;
+    const maxShift = 4;
+    const maxRot = 6;
     setTilt({ tx: dx * maxShift, ty: dy * maxShift, rot: dx * -maxRot });
   };
 
   const onPointerLeave = () => setTilt({ tx: 0, ty: 0, rot: 0 });
-
   const onClick = () => {
     setPop(true);
     setTimeout(() => setPop(false), 240);
   };
-
   const onDoubleClick = () => {
     const now = Date.now();
     const burst = Array.from({ length: 7 }).map((_, i) => ({
@@ -93,15 +92,22 @@ const Lobby = () => {
   const [teams, setTeams] = useState({ Red: [], Blue: [] });
 
   const myUserId = sessionStorage.getItem("userId");
+  const myDisplayName = sessionStorage.getItem("displayName");
   const navigate = useNavigate();
 
-  // quick lookup by id
+  // game settings
+  const [selectedRounds, setSelectedRounds] = useState(1);
+  const [selectedTimer, setSelectedTimer] = useState(30);
+  const [selectedDifficulty, setSelectedDifficulty] = useState("Easy");
+  const [currentRound, setCurrentRound] = useState(null);
+  const [currentPlayer, setCurrentPlayer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(null);
+
   const byId = useMemo(
     () => Object.fromEntries(onlineUsers.map((u) => [u.userId, u])),
     [onlineUsers]
   );
 
-  // which team am *I* in?
   const myTeam = useMemo(() => {
     if (!myUserId) return null;
     if ((teams.Red || []).includes(myUserId)) return "Red";
@@ -109,14 +115,21 @@ const Lobby = () => {
     return null;
   }, [teams, myUserId]);
 
+  const isHost = myUserId === hostId;
+  const redTeamHasPlayers = teams.Red.length > 0;
+  const blueTeamHasPlayers = teams.Blue.length > 0;
+  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
+
   useEffect(() => {
     if (!myUserId || !roomId) return;
 
-    // enter the lobby & request current state
-    socket.emit("registerLobby", { userId: myUserId, roomId });
+    socket.emit("registerLobby", { 
+      userId: myUserId, 
+      displayName: myDisplayName, 
+      roomId 
+    });
     socket.emit("requestLobbyUsers", { roomId });
 
-    // presence
     socket.on("lobbyUsers", setOnlineUsers);
     socket.on("userJoinedLobby", (user) => {
       setOnlineUsers((prev) =>
@@ -127,25 +140,25 @@ const Lobby = () => {
       setOnlineUsers((prev) => prev.filter((u) => u.userId !== userId));
     });
 
-    // live profile updates (name/avatar)
-    socket.on(
-      "profileUpdated",
-      ({ userId, displayName, avatarSeed, avatarStyle }) => {
-        setOnlineUsers((prev) =>
-          prev.map((u) =>
-            u.userId === userId
-              ? { ...u, displayName, avatarSeed, avatarStyle }
-              : u
-          )
-        );
-      }
-    );
+    socket.on("profileUpdated", ({ userId, displayName, avatarSeed, avatarStyle }) => {
+      setOnlineUsers((prev) =>
+        prev.map((u) =>
+          u.userId === userId
+            ? { ...u, displayName, avatarSeed, avatarStyle }
+            : u
+        )
+      );
+    });
 
-    // room meta
     socket.on("hostSet", setHostId);
     socket.on("teamsUpdate", setTeams);
 
-    // kick flow
+    socket.on("gameSettingsUpdate", (settings) => {
+      setSelectedRounds(settings.rounds);
+      setSelectedTimer(settings.timer);
+      setSelectedDifficulty(settings.difficulty);
+    });
+
     socket.on("userKicked", ({ userId }) => {
       if (userId === myUserId) {
         alert("You were kicked from the lobby.");
@@ -157,13 +170,34 @@ const Lobby = () => {
       navigate("/lobby");
     });
 
-    // optional ack for leaveTeam debugging
+    socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
+      setCurrentRound(currentRound);
+      setCurrentPlayer(currentPlayer);
+      setTimeLeft(timer);
+      navigate(`/play/${roomId}`);
+    });
+
+    socket.on("startTimer", ({ duration }) => {
+      setTimeLeft(duration);
+      const timerInterval = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    });
+
+    socket.on("gameEnded", () => {
+      alert("Game Over!");
+      setCurrentRound(null);
+      setTimeLeft(null);
+    });
+
     socket.on("leftTeam", (res) => {
-      if (!res?.ok) {
-        console.warn("leftTeam failed", res?.error);
-      } else {
-        console.log("leftTeam ok");
-      }
+      if (!res?.ok) console.warn("leftTeam failed", res?.error);
     });
 
     return () => {
@@ -173,43 +207,54 @@ const Lobby = () => {
       socket.off("profileUpdated");
       socket.off("hostSet");
       socket.off("teamsUpdate");
+      socket.off("gameSettingsUpdate");
       socket.off("userKicked");
       socket.off("kicked");
+      socket.off("roundStarted");
+      socket.off("startTimer");
+      socket.off("gameEnded");
       socket.off("leftTeam");
     };
-  }, [roomId, myUserId, navigate]);
+  }, [roomId, myUserId, myDisplayName, navigate]); // ✅ fixed deps
 
-  // helpers
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter((u) => !inAnyTeam.includes(u.userId));
 
   const handleJoinTeam = (teamColor) => {
     socket.emit("joinTeam", { roomId, teamColor, userId: myUserId });
   };
-
   const handleLeaveTeam = () => {
-    console.log("emit leaveTeam", { roomId, userId: myUserId });
     socket.emit("leaveTeam", { roomId, userId: myUserId });
+  };
+
+  const handleSettingsChange = (setting, value) => {
+    if (!isHost) return;
+    let updatedSettings = {
+      rounds: selectedRounds,
+      timer: selectedTimer,
+      difficulty: selectedDifficulty,
+    };
+    if (setting === "rounds") updatedSettings.rounds = value;
+    if (setting === "timer") updatedSettings.timer = value;
+    if (setting === "difficulty") updatedSettings.difficulty = value;
+    setSelectedRounds(updatedSettings.rounds);
+    setSelectedTimer(updatedSettings.timer);
+    setSelectedDifficulty(updatedSettings.difficulty);
+    socket.emit("updateGameSettings", { roomId, newSettings: updatedSettings });
   };
 
   const renderUserRow = (userId) => {
     const user = byId[userId] || { userId, displayName: userId };
-    const isHost = userId === hostId;
+    const isHostUser = userId === hostId;
     const isMe = userId === myUserId;
 
-    // decide which action(s) to show for ME
     let actions = null;
     if (isMe) {
       if (myTeam === "Red") {
         actions = (
           <span className="user-actions">
-            <button className="leave-btn" onClick={handleLeaveTeam}>
-              Leave team
-            </button>
-            <button
-              className="join-btn join-blue"
-              onClick={() => handleJoinTeam("Blue")}
-            >
+            <button className="leave-btn" onClick={handleLeaveTeam}>Leave team</button>
+            <button className="join-btn join-blue" onClick={() => handleJoinTeam("Blue")}>
               Switch to Blue
             </button>
           </span>
@@ -217,13 +262,8 @@ const Lobby = () => {
       } else if (myTeam === "Blue") {
         actions = (
           <span className="user-actions">
-            <button className="leave-btn" onClick={handleLeaveTeam}>
-              Leave team
-            </button>
-            <button
-              className="join-btn join-red"
-              onClick={() => handleJoinTeam("Red")}
-            >
+            <button className="leave-btn" onClick={handleLeaveTeam}>Leave team</button>
+            <button className="join-btn join-red" onClick={() => handleJoinTeam("Red")}>
               Switch to Red
             </button>
           </span>
@@ -231,18 +271,8 @@ const Lobby = () => {
       } else {
         actions = (
           <span className="user-actions">
-            <button
-              className="join-btn join-red"
-              onClick={() => handleJoinTeam("Red")}
-            >
-              Join Red
-            </button>
-            <button
-              className="join-btn join-blue"
-              onClick={() => handleJoinTeam("Blue")}
-            >
-              Join Blue
-            </button>
+            <button className="join-btn join-red" onClick={() => handleJoinTeam("Red")}>Join Red</button>
+            <button className="join-btn join-blue" onClick={() => handleJoinTeam("Blue")}>Join Blue</button>
           </span>
         );
       }
@@ -253,19 +283,13 @@ const Lobby = () => {
         <InteractiveAvatar
           avatarStyle={user.avatarStyle}
           avatarSeed={user.avatarSeed || user.displayName || user.userId}
-          size={44} // keep in sync with --avatar-size if you like
-          className="avatar-anim" // you can add avatar-bounce/avatar-fast classes in CSS if desired
+          size={44}
+          className="avatar-anim"
         />
-
-        <span className={`user-name ${isHost ? "host" : ""}`}>
+        <span className={`user-name ${isHostUser ? "host" : ""}`}>
           {user.displayName}
-          {isHost && (
-            <span title="Host" className="crown" aria-label="Host">
-              👑
-            </span>
-          )}
+          {isHostUser && <span title="Host" className="crown">👑</span>}
         </span>
-
         {actions}
       </div>
     );
@@ -274,9 +298,7 @@ const Lobby = () => {
   return (
     <div className="lobby-container">
       <div className="lobby-url">
-        <span>
-          <strong>Game Lobby ID:</strong> {roomId}
-        </span>
+        <span><strong>Game Lobby ID:</strong> {roomId}</span>
         <button
           className="copy-button"
           onClick={() => {
@@ -289,71 +311,97 @@ const Lobby = () => {
       </div>
 
       <div className="lobby-content">
-        {/* ONLINE USERS */}
         <div className="user-list">
           <h2>Online Users</h2>
-          {unassignedUsers.length === 0 ? (
-            <p>No users online.</p>
-          ) : (
-            unassignedUsers.map((u) => renderUserRow(u.userId))
-          )}
+          {unassignedUsers.length === 0 ? <p>No users online.</p> : unassignedUsers.map((u) => renderUserRow(u.userId))}
         </div>
 
-        {/* TEAMS */}
         <div className="teams-col">
           <div className="team-card red">
             <h3>Red Team</h3>
-            {teams.Red.length === 0 ? (
-              <p className="muted">No players</p>
-            ) : (
-              teams.Red.map((uid) => renderUserRow(uid))
-            )}
+            {teams.Red.length === 0 ? <p className="muted">No players</p> : teams.Red.map((uid) => renderUserRow(uid))}
           </div>
-
           <div className="team-card blue">
             <h3>Blue Team</h3>
-            {teams.Blue.length === 0 ? (
-              <p className="muted">No players</p>
-            ) : (
-              teams.Blue.map((uid) => renderUserRow(uid))
-            )}
+            {teams.Blue.length === 0 ? <p className="muted">No players</p> : teams.Blue.map((uid) => renderUserRow(uid))}
           </div>
         </div>
 
-        {/* SETTINGS (placeholder UI) */}
         <div className="game-settings">
           <h2>Game Settings</h2>
-
           <div className="setting-section">
             <h3>Select Rounds</h3>
             <div className="option-buttons">
-              {[1, 2, 3, 4, 5].map((round) => (
-                <button key={round}>{round}</button>
+              {[1,2,3,4,5].map((round) => (
+                <button
+                  key={round}
+                  className={selectedRounds === round ? "active" : ""}
+                  onClick={() => handleSettingsChange("rounds", round)}
+                  disabled={!isHost}
+                >{round}</button>
               ))}
             </div>
           </div>
-
           <div className="setting-section">
             <h3>Select Timer</h3>
             <div className="option-buttons">
-              {[30, 45, 60, 75, 90].map((sec) => (
-                <button key={sec}>{sec}s</button>
+              {[30,45,60,75,90,100000].map((sec) => (
+                <button
+                  key={sec}
+                  className={selectedTimer === sec ? "active" : ""}
+                  onClick={() => handleSettingsChange("timer", sec)}
+                  disabled={!isHost}
+                >{sec}s</button>
               ))}
             </div>
           </div>
-
           <div className="setting-section">
             <h3>Select Difficulty</h3>
             <div className="option-buttons">
-              {["Easy", "Medium", "Hard"].map((level) => (
-                <button key={level}>{level}</button>
+              {["Easy","Medium","Hard"].map((level) => (
+                <button
+                  key={level}
+                  className={selectedDifficulty === level ? "active" : ""}
+                  onClick={() => handleSettingsChange("difficulty", level)}
+                  disabled={!isHost}
+                >{level}</button>
               ))}
             </div>
           </div>
+          <button
+            className="start-game-button"
+            onClick={() => {
+              if (isHost) {
+                socket.emit("startGame", {
+                  gameId: roomId,
+                  totalRounds: selectedRounds,
+                  timer: selectedTimer,
+                  difficulty: selectedDifficulty,
+                });
+              }
+            }}
+            disabled={!canStartGame}
+          >
+            Start Game
+          </button>
+          {!isHost && <small style={{ color: "#999" }}>Only the host can start the game.</small>}
+          {isHost && (!redTeamHasPlayers || !blueTeamHasPlayers) && (
+            <small style={{ color: "crimson" }}>Both teams must have at least one player to start the game.</small>
+          )}
+        </div>
 
-          <button className="start-game-button">Start Game</button>
+        <div style={{ minWidth: 280, flex: "0 0 280px" }}>
+          <Chat myUserId={myUserId} myDisplayName={myDisplayName} myTeam={myTeam} />
         </div>
       </div>
+
+      {currentRound && (
+        <div className="game-status">
+          <h3>Round: {currentRound}</h3>
+          <p>Current Player: {currentPlayer?.displayName || currentPlayer}</p>
+          <p>Time Left: {timeLeft}s</p>
+        </div>
+      )}
     </div>
   );
 };

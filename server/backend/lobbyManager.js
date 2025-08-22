@@ -1,12 +1,11 @@
+// lobbyManager.js
 const mongoose = require("mongoose");
-const rooms = {}; // Map of roomId => {hostId, settings, teams, chat}
+const rooms = {}; // roomId => {hostId, settings, teams, chat}
 
 function createLobbyManager(io, UserModel) {
   // Helper: find socket by userId
   function findSocketByUserId(userId) {
-    for (let [, socket] of io.sockets.sockets) {
-      if (socket.userId === userId) return socket;
-    }
+    for (let [, s] of io.sockets.sockets) if (s.userId === userId) return s;
     return null;
   }
 
@@ -14,7 +13,7 @@ function createLobbyManager(io, UserModel) {
     console.log("Socket connected:", socket.id);
 
     // --- REGISTER LOBBY ---
-    socket.on("registerLobby", async ({ userId, roomId, displayName }) => {
+    socket.on("registerLobby", async ({ userId, roomId }) => {
       socket.userId = userId;
       socket.roomId = roomId;
       socket.join(roomId);
@@ -24,7 +23,7 @@ function createLobbyManager(io, UserModel) {
           hostId: userId,
           settings: { rounds: 3, timer: 60, difficulty: "Medium" },
           teams: { Red: [], Blue: [] },
-          chat: []
+          chat: [],
         };
       }
 
@@ -40,7 +39,9 @@ function createLobbyManager(io, UserModel) {
         if (user) {
           io.to(roomId).emit("userJoinedLobby", {
             userId: user._id.toString(),
-            displayName: user.displayName
+            displayName: user.displayName,
+            avatarSeed: user.avatarSeed,
+            avatarStyle: user.avatarStyle,
           });
         }
       }
@@ -48,11 +49,21 @@ function createLobbyManager(io, UserModel) {
 
     // --- JOIN TEAM ---
     socket.on("joinTeam", ({ roomId, teamColor, userId }) => {
-      if (!rooms[roomId] || !rooms[roomId].teams || !['Red', 'Blue'].includes(teamColor)) return;
-      rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter(uid => uid !== userId);
-      rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter(uid => uid !== userId);
+      if (!rooms[roomId] || !["Red", "Blue"].includes(teamColor)) return;
+      rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter((id) => id !== userId);
+      rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter((id) => id !== userId);
       rooms[roomId].teams[teamColor].push(userId);
       io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
+    });
+
+    // --- LEAVE TEAM ---
+    socket.on("leaveTeam", ({ roomId, userId }) => {
+      const room = rooms[roomId];
+      if (!room) return;
+      room.teams.Red = room.teams.Red.filter((id) => String(id) !== String(userId));
+      room.teams.Blue = room.teams.Blue.filter((id) => String(id) !== String(userId));
+      io.to(roomId).emit("teamsUpdate", room.teams);
+      socket.emit("leftTeam", { ok: true });
     });
 
     // --- REQUEST USERS IN LOBBY ---
@@ -67,7 +78,9 @@ function createLobbyManager(io, UserModel) {
             if (user) {
               users.push({
                 userId: user._id.toString(),
-                displayName: user.displayName
+                displayName: user.displayName,
+                avatarSeed: user.avatarSeed,
+                avatarStyle: user.avatarStyle,
               });
             }
           }
@@ -77,9 +90,7 @@ function createLobbyManager(io, UserModel) {
     });
 
     socket.on("getHost", ({ roomId }) => {
-      if (rooms[roomId]) {
-        socket.emit("hostSet", rooms[roomId].hostId);
-      }
+      if (rooms[roomId]) socket.emit("hostSet", rooms[roomId].hostId);
     });
 
     // --- TEAM INVITES ---
@@ -92,7 +103,7 @@ function createLobbyManager(io, UserModel) {
       if (target) {
         target.emit("teamInviteReceived", {
           fromUserId: socket.userId,
-          teamName
+          teamName,
         });
       } else {
         socket.emit("inviteFailed", { targetUserId });
@@ -102,82 +113,88 @@ function createLobbyManager(io, UserModel) {
     socket.on("acceptTeamInvite", ({ roomId, teamName }) => {
       io.to(roomId).emit("userJoinedTeam", {
         userId: socket.userId,
-        teamName
+        teamName,
       });
+    });
+
+    // --- PROFILE UPDATES ---
+    socket.on("updateProfile", async ({ displayName, avatarSeed, avatarStyle }) => {
+      try {
+        if (!socket.userId) return;
+        await UserModel.findByIdAndUpdate(socket.userId, {
+          ...(displayName && { displayName }),
+          ...(avatarSeed && { avatarSeed }),
+          ...(avatarStyle && { avatarStyle }),
+        });
+        const payload = {
+          userId: socket.userId,
+          ...(displayName && { displayName }),
+          ...(avatarSeed && { avatarSeed }),
+          ...(avatarStyle && { avatarStyle }),
+        };
+        if (socket.roomId) io.to(socket.roomId).emit("profileUpdated", payload);
+        else socket.emit("profileUpdated", payload);
+      } catch (e) {
+        console.error("updateProfile error", e);
+      }
     });
 
     // --- LEAVE LOBBY ---
     socket.on("leaveLobby", async () => {
       const { userId, roomId } = socket;
-      if (!roomId || !userId || !rooms[roomId] || !rooms[roomId].teams) return;
-
-      rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter(uid => uid !== userId);
-      rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter(uid => uid !== userId);
-      io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
-      io.to(roomId).emit("userLeftLobby", { userId });
-
-      if (rooms[roomId].hostId === userId) {
-        const sockets = io.sockets.adapter.rooms.get(roomId);
-        let newHostId = null;
-        if (sockets && sockets.size > 0) {
-          for (const sid of sockets) {
-            const s = io.sockets.sockets.get(sid);
-            if (s && s.userId && s.userId !== userId) {
-              newHostId = s.userId;
-              break;
-            }
-          }
-          if (newHostId) {
-            rooms[roomId].hostId = newHostId;
-            io.to(roomId).emit("hostSet", newHostId);
-          } else {
-            delete rooms[roomId];
-          }
-        } else {
-          delete rooms[roomId];
+      if (roomId && userId) {
+        if (rooms[roomId]) {
+          rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter((id) => id !== userId);
+          rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter((id) => id !== userId);
+          io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
         }
-      }
-      socket.leave(roomId);
-      socket.roomId = null;
+        io.to(roomId).emit("userLeftLobby", { userId });
 
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-        await UserModel.findByIdAndUpdate(userId, { isOnline: false });
+        if (rooms[roomId] && rooms[roomId].hostId === userId) {
+          const sockets = io.sockets.adapter.rooms.get(roomId);
+          let newHostId = null;
+          if (sockets && sockets.size > 0) {
+            for (const sid of sockets) {
+              const s = io.sockets.sockets.get(sid);
+              if (s && s.userId && s.userId !== userId) { newHostId = s.userId; break; }
+            }
+            if (newHostId) { rooms[roomId].hostId = newHostId; io.to(roomId).emit("hostSet", newHostId); }
+            else { delete rooms[roomId]; }
+          } else { delete rooms[roomId]; }
+        }
+
+        socket.leave(roomId);
+        socket.roomId = null;
+      }
+      if (socket.userId && mongoose.Types.ObjectId.isValid(socket.userId)) {
+        await UserModel.findByIdAndUpdate(socket.userId, { isOnline: false });
       }
     });
 
     // --- DISCONNECT ---
     socket.on("disconnect", async () => {
       const { userId, roomId } = socket;
-      if (!roomId || !userId || !rooms[roomId] || !rooms[roomId].teams) return;
-
-      io.to(roomId).emit("userLeftLobby", { userId });
-      rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter(uid => uid !== userId);
-      rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter(uid => uid !== userId);
-      io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
-
-      if (rooms[roomId].hostId === userId) {
-        const sockets = io.sockets.adapter.rooms.get(roomId);
-        let newHostId = null;
-        if (sockets && sockets.size > 0) {
-          for (const sid of sockets) {
-            const s = io.sockets.sockets.get(sid);
-            if (s && s.userId && s.userId !== userId) {
-              newHostId = s.userId;
-              break;
+      if (roomId && userId) {
+        io.to(roomId).emit("userLeftLobby", { userId });
+        if (rooms[roomId]) {
+          rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter((id) => id !== userId);
+          rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter((id) => id !== userId);
+          io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
+        }
+        if (rooms[roomId] && rooms[roomId].hostId == userId) {
+          const sockets = io.sockets.adapter.rooms.get(roomId);
+          let newHostId = null;
+          if (sockets && sockets.size > 0) {
+            for (const sid of sockets) {
+              const s = io.sockets.sockets.get(sid);
+              if (s && s.userId && s.userId !== userId) { newHostId = s.userId; break; }
             }
-          }
-          if (newHostId) {
-            rooms[roomId].hostId = newHostId;
-            io.to(roomId).emit("hostSet", newHostId);
-          } else {
-            delete rooms[roomId];
-          }
-        } else {
-          delete rooms[roomId];
+            if (newHostId) { rooms[roomId].hostId = newHostId; io.to(roomId).emit("hostSet", newHostId); }
+            else { delete rooms[roomId]; }
+          } else { delete rooms[roomId]; }
         }
       }
-
-      if (mongoose.Types.ObjectId.isValid(userId)) {
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
       }
       console.log("❌ Socket disconnected:", socket.id);
@@ -195,9 +212,9 @@ function createLobbyManager(io, UserModel) {
     socket.on("randomizeTeams", ({ roomId }) => {
       if (rooms[roomId] && rooms[roomId].teams && socket.userId === rooms[roomId].hostId) {
         const userIds = Array.from(io.sockets.adapter.rooms.get(roomId) || [])
-          .map(sid => io.sockets.sockets.get(sid))
-          .filter(s => s && s.userId)
-          .map(s => s.userId);
+          .map((sid) => io.sockets.sockets.get(sid))
+          .filter((s) => s && s.userId)
+          .map((s) => s.userId);
         let shuffled = userIds.slice().sort(() => Math.random() - 0.5);
         const mid = Math.ceil(shuffled.length / 2);
         rooms[roomId].teams.Red = shuffled.slice(0, mid);
@@ -209,8 +226,8 @@ function createLobbyManager(io, UserModel) {
     socket.on("kickUser", ({ roomId, targetUserId }) => {
       if (!rooms[roomId] || !rooms[roomId].teams) return;
       if (socket.userId === rooms[roomId].hostId && targetUserId) {
-        rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter(uid => uid !== targetUserId);
-        rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter(uid => uid !== targetUserId);
+        rooms[roomId].teams.Red = rooms[roomId].teams.Red.filter((id) => id !== targetUserId);
+        rooms[roomId].teams.Blue = rooms[roomId].teams.Blue.filter((id) => id !== targetUserId);
         io.to(roomId).emit("userKicked", { userId: targetUserId });
 
         const targetSocket = findSocketByUserId(targetUserId);
@@ -222,7 +239,7 @@ function createLobbyManager(io, UserModel) {
       }
     });
 
-    // --- HOST: UPDATE SETTINGS (host only) ---
+    // --- HOST SETTINGS ---
     socket.on("updateGameSettings", ({ roomId, newSettings }) => {
       if (rooms[roomId] && socket.userId === rooms[roomId].hostId) {
         rooms[roomId].settings = { ...rooms[roomId].settings, ...newSettings };
@@ -230,7 +247,7 @@ function createLobbyManager(io, UserModel) {
       }
     });
 
-    // --- Prevent non-host or empty teams from starting the game
+    // --- GAME START VALIDATION ---
     socket.on("startGame", ({ gameId, totalRounds, timer, difficulty }) => {
       if (
         !rooms[gameId] ||
@@ -238,26 +255,24 @@ function createLobbyManager(io, UserModel) {
         rooms[gameId].teams.Red.length === 0 ||
         rooms[gameId].teams.Blue.length === 0
       ) {
-        io.to(socket.id).emit("startGameError", { 
-          message: "Only the host can start, and both teams must have players." 
+        io.to(socket.id).emit("startGameError", {
+          message: "Only the host can start, and both teams must have players.",
         });
         return;
       }
-      // ...continue with starting game logic if valid...
+      // TODO: start game logic here
     });
 
     // --- CHAT ---
     socket.on("chat", ({ roomId, userId, displayName, team, message }) => {
-      if (!rooms[roomId]) {
-        rooms[roomId] = { chat: [], teams: { Red: [], Blue: [] } };
-      }
+      if (!rooms[roomId]) rooms[roomId] = { chat: [], teams: { Red: [], Blue: [] } };
       if (!rooms[roomId].chat) rooms[roomId].chat = [];
       const msgObj = {
         userId,
         displayName,
         team,
         message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       rooms[roomId].chat.push(msgObj);
       io.to(roomId).emit("chat", msgObj);
@@ -266,11 +281,9 @@ function createLobbyManager(io, UserModel) {
     socket.on("getChatHistory", ({ roomId }) => {
       socket.emit("chatHistory", rooms[roomId]?.chat || []);
     });
-
   });
 
   return { findSocketByUserId };
 }
 
 module.exports = createLobbyManager;
-

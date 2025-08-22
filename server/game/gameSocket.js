@@ -152,6 +152,7 @@ function startSynchronizedTimer(io, gameId, duration) {
     io.to(gameId).emit("timerUpdate", { secondsLeft });
     if (secondsLeft <= 0) {
       clearInterval(intervalId);
+      io.to(gameId).emit("clear-canvas");
       delete activeTimers[gameId];
       const nextRoundInfo = gameSessionManager.nextRound(gameId);
       if (nextRoundInfo) {

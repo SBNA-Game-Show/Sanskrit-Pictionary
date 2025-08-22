@@ -229,6 +229,7 @@ class GameSessionManager {
         if (!next) {
           io.to(gameId).emit("gameEnded");
         } else {
+          io.to(gameId).emit("clear-canvas");
           this.startRound(gameId, io);
         }
       }, 1500);

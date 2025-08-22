@@ -37,9 +37,7 @@ export default function ProfileSettings() {
   const [avatarSeed, setAvatarSeed] = useState("player");
   const [avatarStyle, setAvatarStyle] = useState("funEmoji");
 
-  // optional raw image upload (no extra libs)
-  const [uploadDataUrl, setUploadDataUrl] = useState(null);
-
+  const [uploadDataUrl, setUploadDataUrl] = useState(null); // optional raw image
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -50,12 +48,11 @@ export default function ProfileSettings() {
     if (local.avatarSeed) setAvatarSeed(local.avatarSeed);
     if (local.avatarStyle) setAvatarStyle(local.avatarStyle);
 
-    // fallback to session storage name if needed
     const ssName = sessionStorage.getItem("displayName");
     if (!local.displayName && ssName) setDisplayName(ssName);
   }, []);
 
-  // live DiceBear SVG (transparent)
+  // live DiceBear SVG
   const diceSvg = useMemo(() => {
     const style = stylesMap[avatarStyle] || funEmoji;
     return createAvatar(style, { seed: avatarSeed }).toString();
@@ -75,10 +72,9 @@ export default function ProfileSettings() {
       const userId = sessionStorage.getItem("userId");
       if (!userId) throw new Error("No userId in sessionStorage");
 
-      // avatar image we show locally (DiceBear SVG or uploaded file)
       const avatarData = uploadDataUrl || svgToDataUrl(diceSvg);
 
-      // 1) persist locally so navbar/profile reflect instantly
+      // 1) local save
       const existing = JSON.parse(localStorage.getItem("user") || "{}");
       localStorage.setItem(
         "user",
@@ -87,13 +83,13 @@ export default function ProfileSettings() {
           displayName,
           avatarSeed,
           avatarStyle,
-          avatarData, // not stored on server; local convenience
+          avatarData, // local only
         })
       );
       sessionStorage.setItem("displayName", displayName);
       window.dispatchEvent(new Event("displayNameChanged"));
 
-      // 2) persist on the server so lobbies read the new values
+      // 2) save on backend
       await axios.put("/api/users/me/profile", {
         userId,
         displayName,
@@ -101,8 +97,13 @@ export default function ProfileSettings() {
         avatarStyle,
       });
 
-      // 3) notify current lobby (if in one) so everyone sees it live
-      socket.emit("updateProfile", { displayName, avatarSeed, avatarStyle });
+      // 3) notify lobby (must include userId so others update correctly)
+      socket.emit("updateProfile", {
+        userId,
+        displayName,
+        avatarSeed,
+        avatarStyle,
+      });
 
       setMsg("Saved ✓");
     } catch (err) {
@@ -114,10 +115,9 @@ export default function ProfileSettings() {
     }
   };
 
-  const quickSeeds = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot",];
+  const quickSeeds = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"];
   const styleKeys = Object.keys(stylesMap);
 
-  // 👉 Randomize only the seed (keeps current style). Also clears upload preview.
   const randomizeSeed = () => {
     setAvatarSeed(Math.random().toString(36).slice(2));
     setUploadDataUrl(null);
@@ -137,7 +137,6 @@ export default function ProfileSettings() {
       />
 
       <div className="avatar-row">
-        {/* Preview with soft chip background; avatar itself stays transparent */}
         <div className="avatar-preview">
           {uploadDataUrl ? (
             <img
@@ -158,7 +157,6 @@ export default function ProfileSettings() {
           )}
         </div>
 
-        {/* Controls */}
         <div className="avatar-controls">
           <div className="control-group">
             <label className="label">Avatar Style</label>
@@ -174,14 +172,11 @@ export default function ProfileSettings() {
                   </option>
                 ))}
               </select>
-
-              {/* NEW: Randomize seed button */}
               <button
                 type="button"
                 className="dice-btn"
                 onClick={randomizeSeed}
                 title="Randomize avatar"
-                aria-label="Randomize avatar"
               >
                 🎲
               </button>
@@ -200,9 +195,8 @@ export default function ProfileSettings() {
                     className={`avatar-cell ${avatarSeed === seed ? "selected" : ""}`}
                     onClick={() => {
                       setAvatarSeed(seed);
-                      setUploadDataUrl(null); // back to generated
+                      setUploadDataUrl(null);
                     }}
-                    aria-label={`Choose avatar ${seed}`}
                   >
                     <img alt="" src={svgToDataUrl(svg)} />
                   </button>

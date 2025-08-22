@@ -1,8 +1,9 @@
-// client/src/components/InteractiveAvatar.js
+
 import React, { useRef, useState, useMemo } from "react";
 import { createAvatar } from "@dicebear/core";
 import * as Dice from "@dicebear/collection";
-import "./InteractiveAvatar.css"; // optional for styling
+
+const svgToDataUrl = (svg) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
 export default function InteractiveAvatar({
   avatarStyle = "funEmoji",
@@ -13,53 +14,50 @@ export default function InteractiveAvatar({
   const wrapRef = useRef(null);
   const [pop, setPop] = useState(false);
   const [sparkles, setSparkles] = useState([]);
+  const [tilt, setTilt] = useState({ tx: 0, ty: 0, rot: 0 }); // translate + rotateZ
 
   const dataUrl = useMemo(() => {
     const style = Dice[avatarStyle] || Dice.funEmoji;
-    const svg = createAvatar(style, { seed: avatarSeed }).toString();
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    return svgToDataUrl(createAvatar(style, { seed: avatarSeed }).toString());
   }, [avatarStyle, avatarSeed]);
 
+  const onPointerMove = (e) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;   // 0..1
+    const y = (e.clientY - r.top) / r.height;   // 0..1
+    const dx = (x - 0.5) * 2;                   // -1..1
+    const dy = (y - 0.5) * 2;                   // -1..1
+    const maxShift = 4;  // px
+    const maxRot = 6;    // deg
+    setTilt({
+      tx: dx * maxShift,
+      ty: dy * maxShift,
+      rot: dx * -maxRot, // rotate opposite for a nice tilt
+    });
+  };
+
+  const onPointerLeave = () => setTilt({ tx: 0, ty: 0, rot: 0 });
+
   const onClick = () => {
-    const now = Date.now();
-    const burst = Array.from({ length: 4 }).map((_, i) => ({
-      id: `${now}-${i}`,
-      left: 10 + Math.random() * (size - 20),
-      top: 10 + Math.random() * (size - 20),
-      emoji: ["✨", "★", "✦", "✳︎", "❈"][Math.floor(Math.random() * 5)],
-      color: ["gold", "deepskyblue", "violet", "lime", "orange"][
-        Math.floor(Math.random() * 5)
-      ],
-    }));
-    setSparkles((prev) => [...prev, ...burst]);
-    setTimeout(() => {
-      setSparkles((prev) =>
-        prev.filter((s) => !burst.find((b) => b.id === s.id))
-      );
-    }, 900);
     setPop(true);
     setTimeout(() => setPop(false), 240);
   };
 
   const onDoubleClick = () => {
+    // burst a few sparkles that auto-fade
     const now = Date.now();
-    const burst = Array.from({ length: 15 }).map((_, i) => ({
+    const burst = Array.from({ length: 7 }).map((_, i) => ({
       id: `${now}-${i}`,
-      left: Math.random() * size,
-      top: Math.random() * size,
-      emoji: ["✨", "★", "✦", "✳︎", "❈", "❇︎", "✺", "✶"][
-        Math.floor(Math.random() * 8)
-      ],
-      color: ["gold", "deepskyblue", "violet", "lime", "orange", "hotpink"][
-        Math.floor(Math.random() * 6)
-      ],
+      left: 40 + Math.random() * (size - 80), // keep near center
+      top:  40 + Math.random() * (size - 80),
+      emoji: ["✨", "★", "✦", "✳︎", "❈"][Math.floor(Math.random()*5)],
     }));
     setSparkles((prev) => [...prev, ...burst]);
     setTimeout(() => {
-      setSparkles((prev) =>
-        prev.filter((s) => !burst.find((b) => b.id === s.id))
-      );
-    }, 1200);
+      setSparkles((prev) => prev.filter(s => !burst.find(b => b.id === s.id)));
+    }, 700);
   };
 
   return (
@@ -67,20 +65,25 @@ export default function InteractiveAvatar({
       ref={wrapRef}
       className={`avatar-wrap ${className}`}
       style={{ width: size, height: size }}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      title="Click or double-click me ✨"
+      title="Drag, click, or double-click me ✨"
     >
       <img
-        alt="avatar"
-        className={`user-avatar avatar-anim ${pop ? "pop" : ""}`}
+        alt=""
+        className={`user-avatar avatar-anim avatar-interactive ${pop ? "pop" : ""}`}
         src={dataUrl}
+        style={{
+          transform: `translate(${tilt.tx}px, ${tilt.ty}px) rotate(${tilt.rot}deg)`
+        }}
       />
       {sparkles.map((s) => (
         <span
           key={s.id}
           className="sparkle"
-          style={{ left: s.left, top: s.top, color: s.color }}
+          style={{ left: s.left, top: s.top }}
         >
           {s.emoji}
         </span>

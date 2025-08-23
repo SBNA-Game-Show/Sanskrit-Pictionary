@@ -5,7 +5,7 @@ const teamSchema = new mongoose.Schema({
   teamLeader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   chatChannelId: { type: String },
   constraints: {
-    minPlayersPerTeam: { type: Number, default: 2 },
+    minPlayersPerTeam: { type: Number, default: 1 },
     maxPlayersPerTeam: { type: Number, default: 4 }
   },
   teamMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]

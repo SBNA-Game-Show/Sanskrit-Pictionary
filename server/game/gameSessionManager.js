@@ -1,7 +1,6 @@
-const { v4: uuidv4 } = require("uuid");
-
+// server/game/gameSessionManager.js
+// GameSessionManager - manages in-memory game sessions and fetches flashcards from MongoDB
 const Flashcard = require("../models/Flashcard");
-const User = require("../models/User"); // NEW: Import the User model
 
 // ========== helpers: normalization & synonyms ==========
 function normDeva(s) {
@@ -31,9 +30,7 @@ function stripCommonEndings(s) {
 function toArray(v) {
   if (!v) return [];
   if (Array.isArray(v)) return v;
-  return String(v)
-    .split(/[\/,;|、，\s]+/)
-    .filter(Boolean);
+  return String(v).split(/[\/,;|、，\s]+/).filter(Boolean);
 }
 
 function pushManyDeva(set, raw) {
@@ -48,25 +45,14 @@ class GameSessionManager {
   constructor() {
     this.sessions = new Map();
   }
-  // NEW: Method to reset scores in the database
-  async resetScoresForSession(players) {
-    try {
-      const userIds = players.map((p) => p.userId); // CHANGED: Use 'score' field
-      await User.updateMany({ userId: { $in: userIds } }, { score: 0 });
-      console.log(
-        `[resetScoresForSession] Reset scores for ${userIds.length} players.`
-      );
-    } catch (err) {
-      console.error("[resetScoresForSession] Error resetting scores:", err);
-    }
-  }
 
-  async createSession(gameId, players, totalRounds, timer, difficulty) {
+  createSession(gameId, players, totalRounds, timer, difficulty) {
     // shuffle players and assign teams (even/odd)
     const shuffled = players.slice().sort(() => Math.random() - 0.5);
     shuffled.forEach((p, i) => {
       p.team = i % 2 === 0 ? "Red" : "Blue";
     });
+
     // make sure the first drawer is on Red team if available
     let firstDrawerIndex = shuffled.findIndex((p) => p.team === "Red");
     if (firstDrawerIndex === -1) firstDrawerIndex = 0;
@@ -78,11 +64,15 @@ class GameSessionManager {
       currentPlayerIndex: firstDrawerIndex,
       timer,
       difficulty,
-      roundInProgress: false, // Removed in-memory scores, they will be fetched from DB
+      roundInProgress: false,
+      scores: {},
       currentFlashcard: null,
     });
-    // NEW: Reset scores for all players in the session
-    await this.resetScoresForSession(shuffled);
+
+    // init scores
+    shuffled.forEach((p) => {
+      this.sessions.get(gameId).scores[p.userId] = 0;
+    });
 
     console.log(
       `[createSession] gameId=${gameId} players=${shuffled.length} timer=${timer} difficulty=${difficulty}`
@@ -98,7 +88,6 @@ class GameSessionManager {
    * - Uses case-insensitive matching for difficulty
    * - Falls back to any random flashcard if none for given difficulty
    */
-
   async getRandomFlashcard(difficulty) {
     try {
       let query = {};
@@ -165,13 +154,14 @@ class GameSessionManager {
     console.log(
       `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`
     );
+
     // Send flashcard privately to drawer
     io.to(currentPlayer.socketId).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
-      hint: flashcard.translation,
-      image: flashcard.imageSrc || "",
-      audio: flashcard.audioSrc || "",
+      translation: flashcard.translation,
+      imageSrc: flashcard.imageSrc || "",
+      audioSrc: flashcard.audioSrc || "",
       difficulty: flashcard.difficulty || session.difficulty || "unknown",
     });
 
@@ -189,7 +179,7 @@ class GameSessionManager {
     });
 
     io.to(gameId).emit("gameState", {
-      players: await this.getPlayersWithScores(gameId), // CHANGED to await
+      players: this.getPlayersWithScores(gameId),
       currentPlayerIndex: session.currentPlayerIndex,
       drawer: {
         userId: currentPlayer.userId,
@@ -201,7 +191,7 @@ class GameSessionManager {
       totalRounds: session.totalRounds,
       timer: session.timer,
       currentFlashcard: null, // drawer-only
-      scores: null, // Removed in-memory scores
+      scores: session.scores,
     });
 
     session.players.forEach((p) => {
@@ -210,7 +200,7 @@ class GameSessionManager {
   }
 
   nextRound(gameId) {
-    const session = this.getSession(gameId);
+    const session = this.sessions.get(gameId);
     if (!session) return null;
     if (session.currentRound >= session.totalRounds) return null;
 
@@ -228,7 +218,7 @@ class GameSessionManager {
   }
 
   // NOTE: include remainingSeconds for time-based scoring
-  async handleAnswer(gameId, userId, answer, io, remainingSeconds = 0) {
+  handleAnswer(gameId, userId, answer, io, remainingSeconds = 0) {
     const session = this.getSession(gameId);
     if (!session || !session.currentFlashcard || !session.roundInProgress) {
       return { allSubmitted: false };
@@ -245,16 +235,21 @@ class GameSessionManager {
       });
       return { allSubmitted: false };
     }
+
     // ----- correctness (Devanagari + english + transliteration + synonyms) -----
     const submittedRaw = answer;
+
     const subDeva = normDeva(submittedRaw);
     const subLat = normLatin(submittedRaw);
+
     const corWord = session.currentFlashcard.word;
     const traWord = session.currentFlashcard.translation;
     const romWord = session.currentFlashcard.transliteration;
+
     const corDeva = normDeva(corWord);
     const traLat = normLatin(traWord);
     const romLat = normLatin(romWord);
+
     // synonyms/aliases/altWords supported if provided by DB
     const acceptDeva = new Set();
     pushManyDeva(acceptDeva, corWord);
@@ -283,51 +278,18 @@ class GameSessionManager {
       const gained = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * ratio);
 
       player.hasAnswered = true;
+      session.scores[userId] = (session.scores[userId] || 0) + gained;
 
-      // NEW: Add points to the drawer as well
-      const drawerId = session.players[session.currentPlayerIndex].userId;
-      const drawerPoints = Math.floor(gained / 2); // Drawer gets half points
-      await User.findByIdAndUpdate(
-        drawerId,
-        { $inc: { score: drawerPoints } },
-        { new: true }
-      );
-
-      // FIX: Using findByIdAndUpdate to correctly query by MongoDB's _id
-      // and return the updated document in a single call.
-      const updatedUser = await User.findByIdAndUpdate(
-        userId,
-        { $inc: { score: gained } },
-        { new: true } // Return the updated document
-      );
-
-      if (!updatedUser) {
-        console.warn(
-          `User with ID ${userId} not found in DB after update attempt. Answer ignored.`
-        );
-        return { allSubmitted: false };
-      }
-
-      console.log(
-        `[handleAnswer] Emitting correctAnswer for userId: ${updatedUser.userId}, points: ${updatedUser.score}, gained: ${gained}`
-      );
       io.to(gameId).emit("correctAnswer", {
-        userId: updatedUser.userId, // Use the custom userId from the found document
+        userId,
         displayName: player.displayName,
-        points: updatedUser.score,
+        points: session.scores[userId],
         scoreGained: gained,
         remainingSeconds: remain,
       });
 
-      // Re-fetch players to ensure we have the most up-to-date scores
-      const updatedPlayers = await this.getPlayersWithScores(gameId);
+      io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
 
-      console.log(
-        "[handleAnswer] Emitting updatePlayers. First player's score:",
-        updatedPlayers[0]?.score
-      );
-      // CHANGED: Get players with scores from the DB before broadcasting
-      io.to(gameId).emit("updatePlayers", updatedPlayers);
       // check if all teammates (excluding drawer) already answered
       const drawer = session.players[session.currentPlayerIndex];
       const teammates = session.players.filter(
@@ -335,6 +297,7 @@ class GameSessionManager {
       );
       const everyoneCorrect =
         teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
+
       // DO NOT start next round here; let socket layer decide using this flag
       return { allSubmitted: Boolean(everyoneCorrect) };
     }
@@ -352,45 +315,29 @@ class GameSessionManager {
     if (session) session.roundInProgress = false;
   }
 
-  async addPlayer(gameId, player) {
+  addPlayer(gameId, player) {
     const session = this.getSession(gameId);
     if (session && !session.players.find((p) => p.userId === player.userId)) {
       session.players.push(player);
-      // NEW: Ensure the new player has a score field in the DB
-      // CHANGED: Use 'score' field
-      await User.findOneAndUpdate(
-        { userId: player.userId },
-        { $setOnInsert: { score: 0 } },
-        { upsert: true }
-      );
+      session.scores[player.userId] = 0;
     }
   }
-  // This method is now unused, as score is handled in handleAnswer
-  // updateScore(gameId, userId, points) {
-  //   const session = this.getSession(gameId);
-  //   if (session) {
-  //     session.scores[userId] = (session.scores[userId] || 0) + points;
-  //   }
-  // }
 
-  async getPlayersWithScores(gameId) {
+  updateScore(gameId, userId, points) {
+    const session = this.getSession(gameId);
+    if (session) {
+      session.scores[userId] = (session.scores[userId] || 0) + points;
+    }
+  }
+
+  getPlayersWithScores(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return [];
-    // CHANGED: Fetch scores from MongoDB
-    const playerIds = session.players.map((p) => p.userId);
-    const dbUsers = await User.find({ userId: { $in: playerIds } });
-    const userMap = new Map(dbUsers.map((u) => [u.userId, u.score || 0]));
-
-    console.log(
-      "[getPlayersWithScores] Fetched scores from DB:",
-      Array.from(userMap.entries())
-    );
-
     return session.players.map((p) => ({
       displayName: p.displayName,
       userId: p.userId,
       team: p.team,
-      score: userMap.get(p.userId) || 0, // Get the score from the DB
+      points: session.scores[p.userId] || 0,
       imageSrc: p.imageSrc || "",
     }));
   }

@@ -110,3 +110,62 @@
 .input-area2 button:hover {
   background-color: #e65100;
 }
+
+
+/* === Clean user list chips with avatars === */
+.user-list {
+  background: #f0d2b8;
+  border-radius: 16px;
+  padding: 16px 14px;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.06);
+}
+
+.user-panel-title {
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.team-block { margin-top: 8px; }
+.team-title { margin: 6px 0 8px; font-weight: 800; }
+.team-title.red { color: crimson; }
+.team-title.blue { color: royalblue; }
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: #fffdf8;
+  border: 2px solid transparent;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.user-chip .avatar-wrap { width: 36px; height: 36px; }
+.user-chip .chip-name { font-weight: 700; line-height: 1; }
+
+.user-chip .chip-pen { margin-left: auto; }
+
+.user-chip.chip-red { border-color: #d62a2a; }
+.user-chip.chip-blue { border-color: #3f6fe0; }
+
+.user-chip.is-drawer {
+  background: #fff6e3; /* subtle highlight for the active drawer */
+}
+
+/* round result mini modal (top-left) – already in your file; keep if present */
+.round-result-modal {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 30;
+}
+.round-result-modal .modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}

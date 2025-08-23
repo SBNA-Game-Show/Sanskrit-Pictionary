@@ -1,0 +1,69 @@
+/* client/src/reusableComponents/roundPopups.css */
+
+.rp2-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 9999;
+  animation: rp2FadeIn 120ms ease-out;
+}
+
+.rp2-card {
+  pointer-events: auto;
+  min-width: 320px;
+  max-width: min(90vw, 560px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 16px;
+  border: 2px solid rgba(0,0,0,0.08);
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.18),
+    0 6px 10px rgba(0,0,0,0.08);
+  padding: 16px 20px;
+  transform: translateY(10px) scale(0.98);
+  animation: rp2SlideUp 200ms ease-out forwards;
+}
+
+/* team-colored outlines */
+.rp2-card.rp2-red {
+  border-color: #d7263d;
+  box-shadow:
+    0 12px 34px rgba(215, 38, 61, 0.35),
+    0 6px 12px rgba(215, 38, 61, 0.20);
+}
+.rp2-card.rp2-blue {
+  border-color: #2a64db;
+  box-shadow:
+    0 12px 34px rgba(42, 100, 219, 0.35),
+    0 6px 12px rgba(42, 100, 219, 0.20);
+}
+
+.rp2-title {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  font-size: 20px;
+  line-height: 1.25;
+  color: #1b1b1b;
+}
+
+.rp2-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #4a4a4a;
+}
+
+/* subtle entrance */
+@keyframes rp2SlideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes rp2FadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+

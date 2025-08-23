@@ -4,6 +4,8 @@ import { useParams } from "react-router-dom";
 import "./play.css";
 import Chat from "../reusableComponents/chat";
 import Flashcard from "../reusableComponents/flashcard";
+import RoundPopups from "../reusableComponents/RoundPopups";
+import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
 import { ReactSketchCanvas } from "react-sketch-canvas";
 import { socket } from "./socket";
 
@@ -25,6 +27,9 @@ const Play = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
+
+   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
+  const [profiles, setProfiles] = useState({});
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
@@ -99,6 +104,37 @@ const Play = () => {
     // Ask server for current state
     socket.emit("getGameState", { roomId });
     console.log("[Play] emitted getGameState", { roomId });
+
+    // Also grab profiles using the existing lobby event (no server changes)
+    socket.emit("requestLobbyUsers", { roomId });
+
+    const onLobbyUsers = (users) => {
+      // users: [{userId, displayName, avatarSeed, avatarStyle}, ...]
+      const map = {};
+      users.forEach((u) => {
+        map[u.userId] = {
+          displayName: u.displayName,
+          avatarSeed: u.avatarSeed,
+          avatarStyle: u.avatarStyle,
+        };
+      });
+      setProfiles(map);
+    };
+
+    socket.on("lobbyUsers", onLobbyUsers);
+
+    // keep avatars/names in sync with profileUpdated
+    const onProfileUpdated = ({ userId, displayName, avatarSeed, avatarStyle }) => {
+      setProfiles((prev) => ({
+        ...prev,
+        [userId]: {
+          displayName: displayName ?? prev[userId]?.displayName,
+          avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
+          avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
+        },
+      }));
+    };
+    socket.on("profileUpdated", onProfileUpdated);
 
     // -------- core state sync --------
     socket.on("gameState", (state) => {
@@ -229,6 +265,10 @@ const Play = () => {
 
     // cleanup on unmount
     return () => {
+      //added
+      socket.off("lobbyUsers", onLobbyUsers);
+      //added
+      socket.off("profileUpdated", onProfileUpdated);
       socket.off("gameState");
       socket.off("updatePlayers");
       socket.off("drawerChanged");
@@ -246,7 +286,30 @@ const Play = () => {
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
 
+  const renderUserChip = (user) => {
+  const prof = profiles[user.userId] || {};
+  const displayName = prof.displayName || user.displayName || user.userId;
+  const seed = prof.avatarSeed || displayName || user.userId;
+  const style = prof.avatarStyle;
+
+  const chipClass =
+    "user-chip " +
+    (user.team === "Red" ? "chip-red" : "chip-blue") +
+    (user.userId === drawerId ? " is-drawer" : "");
+
   return (
+    <div className={chipClass} key={user.userId}>
+      <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
+      <span className="chip-name">{displayName}</span>
+      {user.userId === drawerId && <span className="chip-pen" title="Drawing now">✏️</span>}
+    </div>
+  );
+};
+
+
+  return (
+    <>
+    <RoundPopups />
     <div className="play-grid">
       {/* Round result modal (very minimal) */}
       {roundResult && (
@@ -296,50 +359,28 @@ const Play = () => {
       {/* Drawer sees the full flashcard. Use isDrawer (reliable) */}
       {flashcard && isDrawer && <Flashcard items={[flashcard]} />}
 
-      <div className="user-list">
-        <h3 style={{ color: "crimson", marginBottom: 4 }}>Red Team</h3>
-        {redTeam.length === 0 ? (
-          <p style={{ color: "#999" }}>No players</p>
-        ) : (
-          redTeam.map((user) => (
-            <div
-              key={user.userId}
-              style={{
-                color: "crimson",
-                fontWeight: user.userId === drawerId ? "bold" : "normal",
-                marginBottom: 2,
-              }}
-            >
-              {user.displayName}
-              {user.userId === drawerId && (
-                <span style={{ marginLeft: 6 }}>✏️</span>
-              )}
-            </div>
-          ))
-        )}
-        <h3 style={{ color: "royalblue", marginBottom: 4, marginTop: 16 }}>
-          Blue Team
-        </h3>
-        {blueTeam.length === 0 ? (
-          <p style={{ color: "#999" }}>No players</p>
-        ) : (
-          blueTeam.map((user) => (
-            <div
-              key={user.userId}
-              style={{
-                color: "royalblue",
-                fontWeight: user.userId === drawerId ? "bold" : "normal",
-                marginBottom: 2,
-              }}
-            >
-              {user.displayName}
-              {user.userId === drawerId && (
-                <span style={{ marginLeft: 6 }}>✏️</span>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+      {/* Clean “User List” with avatars */}
+        <div className="user-list">
+          <div className="user-panel-title">User List</div>
+
+          <div className="team-block">
+            <h3 className="team-title red">Red Team</h3>
+            {redTeam.length === 0 ? (
+              <p className="muted">No players</p>
+            ) : (
+              redTeam.map(renderUserChip)
+            )}
+          </div>
+
+          <div className="team-block">
+            <h3 className="team-title blue">Blue Team</h3>
+            {blueTeam.length === 0 ? (
+              <p className="muted">No players</p>
+            ) : (
+              blueTeam.map(renderUserChip)
+            )}
+          </div>
+        </div>
 
       <div style={{ textAlign: "center", marginBottom: "5px" }}>
         <strong>Drawing by:</strong>{" "}
@@ -449,6 +490,7 @@ const Play = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

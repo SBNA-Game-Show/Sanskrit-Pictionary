@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  score: { type: Number, default: 0 },
    // NEW — used by lobby to draw the avatar
   avatarSeed:  { type: String, default: "player" },
   avatarStyle: { type: String, default: "funEmoji" },

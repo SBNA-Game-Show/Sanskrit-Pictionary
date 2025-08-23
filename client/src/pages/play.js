@@ -1,6 +1,6 @@
 // src/pages/Play.jsx
 import { useState, useRef, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import "./play.css";
 import Chat from "../reusableComponents/chat";
 import Flashcard from "../reusableComponents/flashcard";
@@ -10,6 +10,13 @@ import { socket } from "./socket";
 const Play = () => {
   const canvasRef = useRef(null);
   const { roomId } = useParams();
+  const navigate = useNavigate();
+
+  // Load initial score from sessionStorage or default to 0
+  const initialScore = parseInt(
+    sessionStorage.getItem("playerScore") || "0",
+    10
+  );
 
   // UI / game states
   const [players, setPlayers] = useState([]);
@@ -25,6 +32,8 @@ const Play = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
+  // NEW: Add a dedicated state for the current player's score
+  const [myScore, setMyScore] = useState(initialScore);
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
@@ -86,12 +95,13 @@ const Play = () => {
   };
 
   // ---------- Socket setup ----------
-  // inside useEffect(...) — replace the socket handler block with this
-
   useEffect(() => {
     const userId = sessionStorage.getItem("userId");
     setCurrentUserId(userId || "");
-
+    if (!userId) {
+      navigate("/");
+      return;
+    }
     console.log("[Play] mounting | roomId=", roomId, "userId=", userId);
 
     if (!roomId) return;
@@ -110,7 +120,15 @@ const Play = () => {
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
       console.log("[Play] serverFlash (currentFlashcard):", serverFlash);
 
+      // NEW: Update players list AND the user's personal score
       setPlayers(state.players || []);
+      const me = (state.players || []).find((p) => p.userId === userId);
+      setMyTeam(me?.team || "");
+      if (me?.score !== undefined) {
+        setMyScore(me.score);
+        sessionStorage.setItem("playerScore", me.score.toString());
+      }
+
       setDrawerId(state.drawer?.userId || null);
       setDrawerTeam(state.drawer?.team || "");
       setCurrentPlayerName(state.drawer?.displayName || "");
@@ -120,17 +138,26 @@ const Play = () => {
       if (serverFlash) {
         setFlashcard(serverFlash);
       }
-
-      // Determine my team from state players
-      const me = (state.players || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
     });
 
-    socket.on("updatePlayers", (list) => {
-      setPlayers(list || []);
-      const me = (list || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
-    });
+socket.on("updatePlayers", (list) => {
+      // --- START DEBUGGING LOGS ---
+      console.log("updatePlayers event received:", list);
+      // --- END DEBUGGING LOGS ---
+      // NEW: Update players list AND the user's personal score
+      setPlayers(list || []);
+      const me = (list || []).find((p) => p.userId === userId);
+      setMyTeam(me?.team || "");
+      // --- START DEBUGGING LOGS ---
+      console.log("My player object:", me);
+      console.log("My new score should be:", me?.score);
+      // --- END DEBUGGING LOGS ---
+      // FIX: Change me?.points to me?.score
+      if (me?.score !== undefined) {
+        setMyScore(me.score);
+        sessionStorage.setItem("playerScore", me.score.toString());
+      }
+    });
 
     // drawerChanged: when drawer rotates
     socket.on("drawerChanged", ({ userId: newDrawerId, displayName, team }) => {
@@ -183,8 +210,8 @@ const Play = () => {
       });
 
       // Normalize currentPlayer — it can be either:
-      //  - a string (displayName)
-      //  - an object { userId, displayName, ... }
+      //  - a string (displayName)
+      //  - an object { userId, displayName, ... }
       let cpName = "";
       if (typeof currentPlayer === "string") {
         cpName = currentPlayer;
@@ -200,15 +227,25 @@ const Play = () => {
       setTimeLeft(timer || 0);
     });
 
-    socket.on("correctAnswer", ({ userId: correctUserId, displayName }) => {
-      console.log("[Play] correctAnswer", { correctUserId, displayName });
-      setRoundResult({
-        type: "correct",
-        displayName: displayName || "Someone",
-      });
-      setTimeout(() => setRoundResult(null), 1500);
-      socket.emit("getGameState", { roomId });
-    });
+    socket.on(
+      "correctAnswer",
+      ({ userId: correctUserId, displayName, points, scoreGained }) => {
+        console.log("[Play] correctAnswer", {
+          correctUserId,
+          displayName,
+          points,
+          scoreGained,
+        });
+        setRoundResult({
+          type: "correct",
+          displayName: displayName || "Someone",
+        });
+        setTimeout(() => setRoundResult(null), 1500);
+        // The `gameState` and `updatePlayers` handlers below will handle the score update
+        // so we can remove the extra `getGameState` emit here to avoid a race condition.
+        // socket.emit("getGameState", { roomId });
+      }
+    );
 
     // clear canvas broadcast
     socket.on("clear-canvas", () => {
@@ -236,7 +273,7 @@ const Play = () => {
       socket.off("clear-canvas");
       socket.off("gameEnded");
     };
-  }, [roomId]); // keep dependency as roomId
+  }, [roomId, navigate]); // keep dependency as roomId
 
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
@@ -266,7 +303,7 @@ const Play = () => {
         <strong>Score: </strong>
         <a>
           <label htmlFor="score">
-            {players.find((p) => p.userId === currentUserId)?.points || 0}
+            {myScore} {/* REPLACED with the new myScore state */}
           </label>{" "}
           pts
         </a>
@@ -426,23 +463,6 @@ const Play = () => {
             Send
           </button>
         </div>
-        {!canAnswer && (
-          <small style={{ color: "#c00" }}>
-            Only the {drawerTeam} team can answer, and not the drawer.
-            <button
-              onClick={() =>
-                console.log("DBG state", {
-                  currentUserId: sessionStorage.getItem("userId"),
-                  drawerId,
-                  isDrawer,
-                  flashcard,
-                })
-              }
-            >
-              DEBUG
-            </button>
-          </small>
-        )}
       </div>
     </div>
   );

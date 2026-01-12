@@ -1,0 +1,9 @@
+Pictionary Hardening to-do List
+  Refactoring large files into smaller, SRP-compliant modules.
+  Stability fixes and polishing the gameplay flow.
+  Implementing solo mode matchmaking (random online users).
+  Resetting drawing data after each turn switch.
+  Adjusting the team-switch buffer for smoother transitions.
+  Setting up AWS-based CI/CD pipelines.
+  (Optional) Enhancements such as word history save mode or AI-generated hints for flashcards, leveraging a free AI API where possible.
+These tasks are primarily focused on refinement, deployment, and long-term maintainability rather than building features from scratch.

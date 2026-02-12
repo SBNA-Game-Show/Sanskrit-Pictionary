@@ -46,7 +46,7 @@ Create a `.env` file inside `/server` with:
 ```
 MONGO_URI=your_mongo_connection_string
 JWT_SECRET=your_jwt_secret
-PORT=5000
+PORT=5005
 ```
 
 Then:
@@ -55,7 +55,7 @@ Then:
 npm start
 ```
 
-This starts the backend at `http://localhost:5000`
+This starts the backend at `http://localhost:5005`
 
 ---
 
@@ -69,7 +69,7 @@ npm install
 In `/client/package.json`, add this line:
 
 ```json
-"proxy": "http://localhost:5000"
+"proxy": "http://localhost:5005"
 ```
 
 Then:

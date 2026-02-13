@@ -67,6 +67,7 @@ class GameSessionManager {
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
+      status: "playing", // "playing" or "ended"
     });
 
     // init scores
@@ -136,39 +137,43 @@ class GameSessionManager {
     const session = this.getSession(gameId);
     if (!session || !session.players.length) return;
 
-    session.roundInProgress = true;
+    // 【核心修复 4】清空画布路径缓存
+    session.canvasPaths = [];
+    
+    // 1. 【核心修复：获取最新 SocketId】
+    // 永远从 session.players 中根据当前的 index 实时获取最新的对象
+    const currentPlayer = session.players[session.currentPlayerIndex]; 
+    if (!currentPlayer) return;
 
+    // 2. 【核心修复：先抽题，后发送】
+    // 必须等待题目拿到并存入 session 后，再通知前端
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
-      io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
-      return;
+        io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
+        return;
     }
-    session.currentFlashcard = flashcard;
+    
+    // 将新题目持久化到 session，这样刷新后的 getGameState 才能抓到它
+    session.currentFlashcard = flashcard; 
+    session.roundInProgress = true;
 
-    const currentPlayer = session.players[session.currentPlayerIndex];
-    if (!currentPlayer) {
-      console.warn("[startRound] no currentPlayer for session", gameId);
-      return;
-    }
+    console.log(`[startRound] Game: ${gameId}, Round: ${session.currentRound + 1}, Drawer: ${currentPlayer.displayName}, Socket: ${currentPlayer.socketId}`);
 
-    console.log(
-      `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`
-    );
-
-    // Send flashcard privately to drawer
+    // 3. 使用最新的 socketId 发送私密题目给画手
     io.to(currentPlayer.socketId).emit("newFlashcard", {
-      word: flashcard.word,
-      transliteration: flashcard.transliteration,
-      translation: flashcard.translation,
-      imageSrc: flashcard.imageSrc || "",
-      audioSrc: flashcard.audioSrc || "",
-      difficulty: flashcard.difficulty || session.difficulty || "unknown",
+        word: flashcard.word,
+        transliteration: flashcard.transliteration,
+        translation: flashcard.translation,
+        imageSrc: flashcard.imageSrc || "",
+        audioSrc: flashcard.audioSrc || "",
+        difficulty: flashcard.difficulty || session.difficulty || "unknown",
     });
 
+    // 4. 广播给所有人：谁在画画（不带题目）
     io.to(gameId).emit("drawerChanged", {
-      userId: currentPlayer.userId,
-      displayName: currentPlayer.displayName,
-      team: currentPlayer.team,
+        userId: currentPlayer.userId,
+        displayName: currentPlayer.displayName,
+        team: currentPlayer.team,
     });
 
     io.to(gameId).emit("roundStarted", {
@@ -178,21 +183,21 @@ class GameSessionManager {
       timer: session.timer,
     });
 
-    io.to(gameId).emit("gameState", {
-      players: this.getPlayersWithScores(gameId),
-      currentPlayerIndex: session.currentPlayerIndex,
-      drawer: {
-        userId: currentPlayer.userId,
-        displayName: currentPlayer.displayName,
-        team: currentPlayer.team,
-        socketId: currentPlayer.socketId,
-      },
-      currentRound: session.currentRound + 1,
-      totalRounds: session.totalRounds,
-      timer: session.timer,
-      currentFlashcard: null, // drawer-only
-      scores: session.scores,
-    });
+    // io.to(gameId).emit("gameState", {
+    //   players: this.getPlayersWithScores(gameId),
+    //   currentPlayerIndex: session.currentPlayerIndex,
+    //   drawer: {
+    //     userId: currentPlayer.userId,
+    //     displayName: currentPlayer.displayName,
+    //     team: currentPlayer.team,
+    //     socketId: currentPlayer.socketId,
+    //   },
+    //   currentRound: session.currentRound + 1,
+    //   totalRounds: session.totalRounds,
+    //   timer: session.timer,
+    //   currentFlashcard: null, // drawer-only
+    //   scores: session.scores,
+    // });
 
     session.players.forEach((p) => {
       p.hasAnswered = false;
@@ -202,12 +207,16 @@ class GameSessionManager {
   nextRound(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
-    if (session.currentRound >= session.totalRounds) return null;
+    if (session.currentRound >= session.totalRounds) {
+        session.status = "ended"; // 这样 getGameState 就能抓到这个状态了
+        return null; 
+    }
 
     session.currentRound++;
     session.currentPlayerIndex =
       (session.currentPlayerIndex + 1) % session.players.length;
     session.roundInProgress = true;
+    session.status = "playing"; // 确保每轮开始时状态是 playing
 
     return {
       currentRound: session.currentRound,

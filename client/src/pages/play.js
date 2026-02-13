@@ -28,6 +28,7 @@ function maskPhraseToUnderscores(phrase) {
 const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // ✅ holds freshest players for end screen
+  const lastRoundRef = useRef(0); // 用于追踪上一次同步的轮次
   const { roomId } = useParams();
   const navigate = useNavigate(); // ✅ for /end navigation
 
@@ -84,13 +85,23 @@ const Play = () => {
   };
 
   // Emit drawing updates only if you're the drawer
+  const lastEmit = useRef(0);
   const handleCanvasChange = (paths) => {
     if (isDrawer) {
-      socket.emit("drawing-data", {
-        gameId: roomId,
-        userId: sessionStorage.getItem("userId"),
-        data: paths,
-      });
+      const now = Date.now();
+      if (now - lastEmit.current > 30) {
+        socket.emit("drawing-data", {
+          gameId: roomId,
+          userId: sessionStorage.getItem("userId"),
+          data: paths,
+        });
+        lastEmit.current = now;
+      }
+      // socket.emit("drawing-data", {
+      //   gameId: roomId,
+      //   userId: sessionStorage.getItem("userId"),
+      //   data: paths,
+      // });
     }
   };
 
@@ -116,8 +127,8 @@ const Play = () => {
     if (!roomId) return;
 
     // Ask server for current state
-    socket.emit("getGameState", { roomId });
-    console.log("[Play] emitted getGameState", { roomId });
+    socket.emit("getGameState", { roomId , userId });
+    console.log("[Play] emitted getGameState", { roomId , userId});
 
     // Also grab profiles using the existing lobby event (no server changes)
     socket.emit("requestLobbyUsers", { roomId });
@@ -150,6 +161,64 @@ const Play = () => {
     // -------- core state sync --------
     socket.on("gameState", (state) => {
       console.log("[Play] received gameState:", state);
+
+      // 1. 恢复基础信息
+      setPlayers(state.players || []);
+      playersRef.current = state.players || [];
+      setTimeLeft(state.timer || 0);
+
+      // 2. 恢复画手身份
+      const currentDrawerId = state.drawer?.userId || state.players[state.currentPlayerIndex]?.userId;
+      setDrawerId(currentDrawerId);
+      setDrawerTeam(state.drawer?.team || state.players[state.currentPlayerIndex]?.team || "");
+      setCurrentPlayerName(state.drawer?.displayName || state.players[state.currentPlayerIndex]?.displayName || "");
+
+      // 3. 【核心修复 5】恢复画布内容
+      if (state.canvasPaths && state.canvasPaths.length > 0) {
+        console.log("正在通过 gameState 恢复画布内容...");
+        // 延迟一小会儿执行，确保 ReactSketchCanvas 已经加载完成
+        setTimeout(() => {
+          canvasRef.current?.loadPaths(state.canvasPaths);
+        }, 100);
+      }
+      
+      // 3. 【核心修复】恢复题目
+      // 如果我是画手，从 state.currentFlashcard 恢复题目
+      if (currentDrawerId === sessionStorage.getItem("userId")) {
+        if (state.currentFlashcard) {
+          console.log("恢复画手题目:", state.currentFlashcard);
+          setFlashcard(state.currentFlashcard);
+        }
+      }
+
+      // 4. 强制清理画布（防止上一轮的残留在刷新后还显示）
+      if (state.currentRound !== lastRoundRef.current) {
+        canvasRef.current?.clearCanvas();
+        lastRoundRef.current = state.currentRound;
+      }
+
+      // 1. 同步玩家列表和分数
+      setPlayers(state.players);
+      playersRef.current = state.players;
+
+      // 如果后端告知游戏已结束，立即重定向到排行榜
+    if (state.status === "ended" || state.isGameOver) {
+      // 这里的 logic 要和你 gameEnded 事件里的处理保持一致
+      const base = state.players || [];
+      const withAvatars = base.map((p) => {
+        const prof = profiles[p.userId] || {};
+        const seed = prof.avatarSeed || p.displayName || p.userId || "player";
+        const style = prof.avatarStyle || "funEmoji";
+        return {
+          ...p,
+          avatar: makeAvatarDataUrl(style, seed), 
+        };
+      });
+      
+      navigate("/end", { state: { players: withAvatars } });
+      return; // 阻止后续设置状态的逻辑
+    }
+
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
       setPlayers(state.players || []);
@@ -235,7 +304,7 @@ const Play = () => {
         displayName: displayName || "Someone",
       });
       setTimeout(() => setRoundResult(null), 1500);
-      socket.emit("getGameState", { roomId });
+      socket.emit("getGameState", { roomId , userId: sessionStorage.getItem("userId") }); // Refresh state to get updated scores
     });
 
     // clear canvas broadcast
@@ -246,20 +315,28 @@ const Play = () => {
     });
 
     // ✅ game ended -> go to /end with final players
-    socket.on("gameEnded", () => {
+    socket.on("gameEnded", (data) => {
       setRoundResult({ type: "gameEnded" });
-      const base = Array.isArray(playersRef.current) ? playersRef.current : players;
+
+      // 1. 确定数据源：优先使用后端传来的 data，其次用本地缓存的 playersRef.current
+      const sourceData = (Array.isArray(data) && data.length > 0) ? data : playersRef.current;
+
+      // 2. 【修正点】直接使用 sourceData，不要再加 .current
+      const base = Array.isArray(sourceData) ? sourceData : [];
+
+      console.log("DEBUG: Final players for leaderboard:", base);
+
       const withAvatars = base.map((p) => {
         const prof = profiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
         const style = prof.avatarStyle || "funEmoji";
         return {
           ...p,
-          avatar: makeAvatarDataUrl(style, seed), 
-          avatarSeed: seed,                           
-          avatarStyle: style,                     
+          points: Number(p.points ?? p.score ?? 0),
+          avatar: makeAvatarDataUrl(style, seed),                   
         };
       });
+
       setTimeout(() => {
         setRoundResult(null);
         navigate("/end", { state: { players: withAvatars } });

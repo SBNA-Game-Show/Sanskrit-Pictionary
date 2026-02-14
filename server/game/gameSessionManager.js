@@ -136,30 +136,27 @@ class GameSessionManager {
   async startRound(gameId, io) {
     const session = this.getSession(gameId);
     if (!session || !session.players.length) return;
-
-    // 【核心修复 4】清空画布路径缓存
-    session.canvasPaths = [];
     
-    // 1. 【核心修复：获取最新 SocketId】
-    // 永远从 session.players 中根据当前的 index 实时获取最新的对象
-    const currentPlayer = session.players[session.currentPlayerIndex]; 
-    if (!currentPlayer) return;
+    session.roundInProgress = true;
 
-    // 2. 【核心修复：先抽题，后发送】
-    // 必须等待题目拿到并存入 session 后，再通知前端
+    // Get flashcard and store in session before emitting any event, 
+    // to ensure it's ready when drawer receives the gameState
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
         io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
         return;
     }
-    
-    // 将新题目持久化到 session，这样刷新后的 getGameState 才能抓到它
     session.currentFlashcard = flashcard; 
-    session.roundInProgress = true;
+    
+    session.canvasPaths = [];    // Reset canvas paths
+
+    // Get the current drawer's latest socketId from session.
+    const currentPlayer = session.players[session.currentPlayerIndex]; 
+    if (!currentPlayer) return;
 
     console.log(`[startRound] Game: ${gameId}, Round: ${session.currentRound + 1}, Drawer: ${currentPlayer.displayName}, Socket: ${currentPlayer.socketId}`);
 
-    // 3. 使用最新的 socketId 发送私密题目给画手
+    // Send flashcard to the drawer using the latest socketId
     io.to(currentPlayer.socketId).emit("newFlashcard", {
         word: flashcard.word,
         transliteration: flashcard.transliteration,
@@ -169,7 +166,6 @@ class GameSessionManager {
         difficulty: flashcard.difficulty || session.difficulty || "unknown",
     });
 
-    // 4. 广播给所有人：谁在画画（不带题目）
     io.to(gameId).emit("drawerChanged", {
         userId: currentPlayer.userId,
         displayName: currentPlayer.displayName,
@@ -183,22 +179,6 @@ class GameSessionManager {
       timer: session.timer,
     });
 
-    // io.to(gameId).emit("gameState", {
-    //   players: this.getPlayersWithScores(gameId),
-    //   currentPlayerIndex: session.currentPlayerIndex,
-    //   drawer: {
-    //     userId: currentPlayer.userId,
-    //     displayName: currentPlayer.displayName,
-    //     team: currentPlayer.team,
-    //     socketId: currentPlayer.socketId,
-    //   },
-    //   currentRound: session.currentRound + 1,
-    //   totalRounds: session.totalRounds,
-    //   timer: session.timer,
-    //   currentFlashcard: null, // drawer-only
-    //   scores: session.scores,
-    // });
-
     session.players.forEach((p) => {
       p.hasAnswered = false;
     });
@@ -208,7 +188,7 @@ class GameSessionManager {
     const session = this.sessions.get(gameId);
     if (!session) return null;
     if (session.currentRound >= session.totalRounds) {
-        session.status = "ended"; // 这样 getGameState 就能抓到这个状态了
+        session.status = "ended"; // Update status to ended if max rounds reached
         return null; 
     }
 
@@ -216,7 +196,7 @@ class GameSessionManager {
     session.currentPlayerIndex =
       (session.currentPlayerIndex + 1) % session.players.length;
     session.roundInProgress = true;
-    session.status = "playing"; // 确保每轮开始时状态是 playing
+    session.status = "playing"; // Update status to playing for the new round
 
     return {
       currentRound: session.currentRound,

@@ -16,47 +16,40 @@ function createGameSocket(io) {
     socket.on("getGameState", ({ roomId, userId }) => {
       const session = gameSessionManager.getSession(roomId);
       if (session) {
-        // 【核心修复 1】必须让新 Socket 重新进入房间，否则收不到后续 io.to(gameId).emit 的广播
+        // Get player join the room after refresh the page
         socket.join(roomId);
 
         const {
           players, currentPlayerIndex, currentRound, totalRounds, timer, currentFlashcard, scores, 
-          // yue
+          // Added status for recovering game state after refresh
           status
         } = session;
 
-        // --- 【核心修复：更新 Socket ID】 ---
-        // 在 session 的玩家列表里找到当前发请求的人
+        // Update player's socketId in session in case of refresh
         const player = players.find(p => p.userId === userId);
         if (player) {
           console.log(`[Sync] User ${player.displayName} reconnected. Updating SocketID: ${player.socketId} -> ${socket.id}`);
-          player.socketId = socket.id; // 更新为当前最新的 Socket ID
+          player.socketId = socket.id; 
         }
-        // ----------------------------------
         
         const drawer = session.players[session.currentPlayerIndex];
         const isDrawer = userId === drawer?.userId;
 
-        // 把分数塞进每个 player 对象里再发给前端
-        const playersWithScores = players.map(p => ({
-          ...p,
-          points: scores[p.userId] || 0 
-        }));
         socket.emit("gameState", {
-          players: playersWithScores, // 发送带分数的玩家列表,
-          currentPlayerIndex: session.currentPlayerIndex,
+          // Put scores into players array for recovering after refresh
+          players,
+          currentPlayerIndex,
           drawer,
-          currentRound: session.currentRound,
-          totalRounds: session.totalRounds,
-          timer: session.timer,
-          currentFlashcard: isDrawer ? session.currentFlashcard : null, // 👈 只给画手题目
-          // 【核心修复 2】将 session 中存好的画布路径发给刷新的玩家
-          canvasPaths: session.canvasPaths || [],
-          roundInProgress: session.roundInProgress,
+          currentRound,
+          totalRounds,
+          timer,
+          // Only render flashcard to the drawer
+          currentFlashcard: isDrawer ? session.currentFlashcard : null, 
           scores,
-          // yue
+          // Render canvas paths to everyone for recovering after refresh
+          canvasPaths: session.canvasPaths || [],
+          // Added status for recovering game state after refresh
           status: status || (timer <= 0 && currentRound >= totalRounds ? "ended" : "playing"), 
-          isGameOver: status === "ended"
         });
       }
     });
@@ -91,7 +84,7 @@ function createGameSocket(io) {
       const drawerId = session.players[session.currentPlayerIndex]?.userId;
       if (userId !== drawerId) return;
 
-      // 存储路径到 session 中，供刷新的人加载
+      // Store canvas paths in session for refreshing players
       session.canvasPaths = data;
       socket.to(gameId).emit("drawing-data", data);
     });
@@ -190,9 +183,6 @@ function clearActiveTimer(gameId) {
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
 function proceedToNextRound(io, gameId) {
-  // 1. 检查锁：看看函数是否因为 advancingRounds 提前退出了
-  console.log(`[Debug] proceedToNextRound called for room: ${gameId}. Current locks:`, Array.from(advancingRounds));
-
   if (advancingRounds.has(gameId)) {
     console.log(`[Debug] Blocked by lock for room: ${gameId}`);
     return; 
@@ -205,33 +195,29 @@ function proceedToNextRound(io, gameId) {
     if (nextRoundInfo) {
       console.log("Next Round Info:", nextRoundInfo);
 
-      // startRound is responsible for: sending a new Flashcard to the questioner, broadcasting drawerChanged/roundStarted, and updating gameState
+      // startRound is responsible for: sending a new Flashcard to the questioner, 
+      // broadcasting drawerChanged/roundStarted, and updating gameState
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
     } else {
-      // 1. 获取当前房间的 session
+
       const session = gameSessionManager.getSession(gameId);
-      
-      // 2. 准备结算数据：将 scores 对象里的分数合并到 players 数组中
-      const finalPlayers = session ? session.players.map(p => ({
-        ...p,
-        points: session.scores[p.userId] || 0
-      })) : [];
 
-      // 3. 标记 session 状态为已结束（确保刷新后的 getGameState 也能拿到）
-      if (session) session.status = "ended";
+      // Added scores into session for recovering game state after refresh
+      if (session) {
+        session.status = "ended";
+        const finalPlayers = session.players.map(p => ({
+          ...p,
+          points: session.scores[p.userId] || 0
+        }));
 
-      // 4. 【关键】广播给所有人，并带上 finalPlayers 数据
-      console.log(`[GameEnded] Sending final scores for room ${gameId}`);
+      // Send gameEnded event with final players and scores for leaderboard display
+      // console.log(`[GameEnded] Sending final scores for room ${gameId}`);
       io.to(gameId).emit("gameEnded", finalPlayers); 
-      
+      }
       clearActiveTimer(gameId);
-
-
-      // io.to(gameId).emit("gameEnded");
-      // clearActiveTimer(gameId);
     }
   } finally {
     advancingRounds.delete(gameId);

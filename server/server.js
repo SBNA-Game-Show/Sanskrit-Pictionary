@@ -8,7 +8,16 @@ const { Server } = require("socket.io");
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "sanskrit-pictionary.vercel.app"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const authRoutes = require("./routes/auth.routes");
@@ -29,10 +38,14 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: [
+      "http://localhost:3000",
+      "sanskrit-pictionary.vercel.app"
+    ],
     methods: ["GET", "POST"],
   },
 });
+
 
 const User = require("./models/User");
 

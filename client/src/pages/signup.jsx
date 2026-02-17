@@ -3,6 +3,9 @@ import './signup.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
+
+
 function Signup() {
   const navigate = useNavigate();
 
@@ -41,7 +44,7 @@ function Signup() {
     }
 
     try {
-      await axios.post('/api/auth/register', {
+      await axios.post(`${API_BASE}/api/auth/register`, {
         displayName: formData.displayName,
         email: formData.email,
         password: formData.password

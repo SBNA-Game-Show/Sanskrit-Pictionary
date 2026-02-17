@@ -3,6 +3,8 @@ import './signin.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
+
 function Signin() {
   const navigate = useNavigate();
 
@@ -28,7 +30,7 @@ function Signin() {
       // Always clear session on login attempt (prevents "sticking")
       sessionStorage.clear();
 
-      const res = await axios.post('/api/auth/login', {
+      const res = await axios.post(`${API_BASE}/api/auth/login`, {
         email: formData.email,
         password: formData.password
       });

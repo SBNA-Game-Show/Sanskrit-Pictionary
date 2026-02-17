@@ -12,7 +12,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://YOUR-VERCEL-APP.vercel.app"
+      "sanskrit-pictionary.vercel.app"
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
@@ -40,7 +40,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:3000",
-      "https://YOUR-VERCEL-APP.vercel.app"
+      "sanskrit-pictionary.vercel.app"
     ],
     methods: ["GET", "POST"],
   },

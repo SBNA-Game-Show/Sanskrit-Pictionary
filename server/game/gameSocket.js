@@ -91,7 +91,6 @@ function createGameSocket(io) {
 
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
-      console.log(`[YUE]Answer submitted in game ${gameId} by user ${userId}:`, answer);
       const session = gameSessionManager.getSession(gameId);
       if (!session) return;
 
@@ -183,18 +182,13 @@ function clearActiveTimer(gameId) {
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
 function proceedToNextRound(io, gameId) {
-  if (advancingRounds.has(gameId)) {
-    console.log(`[Debug] Blocked by lock for room: ${gameId}`);
-    return; 
-  } // Prevent repeated entry into the next round
+  if (advancingRounds.has(gameId)) return; // Prevent repeated entry into the next round
   advancingRounds.add(gameId);
 
   try {
     const nextRoundInfo = gameSessionManager.nextRound(gameId);
 
     if (nextRoundInfo) {
-      console.log("Next Round Info:", nextRoundInfo);
-
       // startRound is responsible for: sending a new Flashcard to the questioner, 
       // broadcasting drawerChanged/roundStarted, and updating gameState
       gameSessionManager.startRound(gameId, io);

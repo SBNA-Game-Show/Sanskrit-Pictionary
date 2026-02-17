@@ -136,18 +136,16 @@ class GameSessionManager {
   async startRound(gameId, io) {
     const session = this.getSession(gameId);
     if (!session || !session.players.length) return;
-    
     session.roundInProgress = true;
 
     // Get flashcard and store in session before emitting any event, 
     // to ensure it's ready when drawer receives the gameState
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
-        io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
-        return;
+      io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
+      return;
     }
     session.currentFlashcard = flashcard; 
-    
     session.canvasPaths = [];    // Reset canvas paths
 
     // Get the current drawer's latest socketId from session.
@@ -158,18 +156,18 @@ class GameSessionManager {
 
     // Send flashcard to the drawer using the latest socketId
     io.to(currentPlayer.socketId).emit("newFlashcard", {
-        word: flashcard.word,
-        transliteration: flashcard.transliteration,
-        translation: flashcard.translation,
-        imageSrc: flashcard.imageSrc || "",
-        audioSrc: flashcard.audioSrc || "",
-        difficulty: flashcard.difficulty || session.difficulty || "unknown",
+      word: flashcard.word,
+      transliteration: flashcard.transliteration,
+      translation: flashcard.translation,
+      imageSrc: flashcard.imageSrc || "",
+      audioSrc: flashcard.audioSrc || "",
+      difficulty: flashcard.difficulty || session.difficulty || "unknown",
     });
 
     io.to(gameId).emit("drawerChanged", {
-        userId: currentPlayer.userId,
-        displayName: currentPlayer.displayName,
-        team: currentPlayer.team,
+      userId: currentPlayer.userId,
+      displayName: currentPlayer.displayName,
+      team: currentPlayer.team,
     });
 
     io.to(gameId).emit("roundStarted", {

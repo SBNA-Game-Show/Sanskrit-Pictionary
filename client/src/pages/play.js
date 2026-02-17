@@ -84,18 +84,13 @@ const Play = () => {
   };
 
   // Emit drawing updates only if you're the drawer
-  const lastEmit = useRef(0);
   const handleCanvasChange = (paths) => {
     if (isDrawer) {
-      const now = Date.now();
-      if (now - lastEmit.current > 30) {
-        socket.emit("drawing-data", {
-          gameId: roomId,
-          userId: sessionStorage.getItem("userId"),
-          data: paths,
-        });
-        lastEmit.current = now;
-      }
+      socket.emit("drawing-data", {
+        gameId: roomId,
+        userId: sessionStorage.getItem("userId"),
+        data: paths,
+      });
     }
   };
 
@@ -165,7 +160,6 @@ const Play = () => {
       setDrawerTeam(state.drawer?.team || state.players[state.currentPlayerIndex]?.team || "");
       setCurrentPlayerName(state.drawer?.displayName || state.players[state.currentPlayerIndex]?.displayName || "");
       if (state.canvasPaths && state.canvasPaths.length > 0) {
-        console.log("Recovering canvas paths...");
         // Ensure ReactSketchCanvas completely loads before trying to set paths
         setTimeout(() => {
           canvasRef.current?.loadPaths(state.canvasPaths);
@@ -175,7 +169,6 @@ const Play = () => {
       // Recovering flashcard for drawer after refresh
       if (currentDrawerId === sessionStorage.getItem("userId")) {
         if (state.currentFlashcard) {
-          console.log("Recovering drawer's flashcard:", state.currentFlashcard);
           setFlashcard(state.currentFlashcard);
         }
       }
@@ -284,10 +277,7 @@ const Play = () => {
     // ✅ game ended -> go to /end with final players
     socket.on("gameEnded", (data) => {
       setRoundResult({ type: "gameEnded" });
-      
       const base = Array.isArray(playersRef.current) ? playersRef.current : players;
-      console.log("DEBUG: Final players for leaderboard:", base);
-
       const withAvatars = base.map((p) => {
         const prof = profiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";

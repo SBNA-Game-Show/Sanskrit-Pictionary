@@ -1,11 +1,20 @@
 import axios from "axios";
-import { saveUserData, clearUserData } from "./authStorage";
+import { saveUserData, clearUserData, getUserData } from "./authStorage";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
 
 // Configure axios to send cookies
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = API_BASE;
+
+// Interceptor to attach token to all requests
+axios.interceptors.request.use((config) => {
+  const userData = getUserData();
+  if (userData?.token) {
+    config.headers.Authorization = `Bearer ${userData.token}`;
+  }
+  return config;
+});
 
 export async function loginUser(email, password) {
   try {
@@ -14,10 +23,10 @@ export async function loginUser(email, password) {
       password,
     });
 
-    const { user } = response.data;
+    const { user, token } = response.data; // extract token
 
-    // Save user data to localStorage (JWT is in HTTP-only cookie)
-    saveUserData(user.userId, user.displayName, user.email);
+    // Save token along with user data
+    saveUserData(user.userId, user.displayName, user.email, token);
 
     return { success: true, user };
   } catch (error) {
@@ -36,7 +45,6 @@ export async function logoutUser() {
     return { success: true };
   } catch (error) {
     console.error("Logout error:", error);
-    // Clear data even if API call fails
     clearUserData();
     return { success: false };
   }
@@ -47,9 +55,10 @@ export async function verifyAuth() {
     const response = await axios.get(`${API_BASE}/api/auth/verify`);
 
     if (response.data.valid) {
-      // Update localStorage in case data changed
       const { user } = response.data;
-      saveUserData(user.userId, user.displayName, user.email);
+      const userData = getUserData(); // Get existing data
+      // Preserve token when updating
+      saveUserData(user.userId, user.displayName, user.email, userData?.token);
       return { valid: true, user };
     }
 

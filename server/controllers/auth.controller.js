@@ -40,16 +40,17 @@ exports.login = async (req, res) => {
       { expiresIn: "7d" },
     );
 
-    // Set HTTP-only cookie
+    // Set HTTP-only cookie with cross-origin support
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true, // Always true (requires HTTPS)
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // "none" for cross-origin
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
       success: true,
+      token, // Also send token in response body as fallback
       user: {
         userId: user._id,
         displayName: user.displayName,
@@ -65,11 +66,11 @@ exports.login = async (req, res) => {
 // Logout endpoint
 exports.logout = async (req, res) => {
   try {
-    // Clear the cookie
+    // Clear the cookie with same settings
     res.clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     });
 
     res.status(200).json({ message: "Logged out successfully" });

@@ -292,7 +292,6 @@ const Play = () => {
           avatar: makeAvatarDataUrl(style, seed),                   
         };
       });
-
       setTimeout(() => {
         setRoundResult(null);
         navigate("/end", { state: { players: withAvatars } });

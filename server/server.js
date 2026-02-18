@@ -5,6 +5,10 @@ const dotenv = require("dotenv");
 const http = require("http");
 const { Server } = require("socket.io");
 
+// DNS override (uncomment if running into querySrv ECONNREFUSED errors)
+// const { setServers } = require("node:dns/promises");
+// setServers(["1.1.1.1", "8.8.8.8"]);
+
 dotenv.config();
 
 const app = express();

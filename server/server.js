@@ -4,6 +4,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const http = require("http");
 const { Server } = require("socket.io");
+const cookieParser = require("cookie-parser");
 
 // DNS override (uncomment if running into querySrv ECONNREFUSED errors)
 // const { setServers } = require("node:dns/promises");
@@ -17,14 +18,15 @@ app.use(
     origin: [
       "http://localhost:3000",
       "https://sanskrit-pictionary.vercel.app",
-      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app"
-
+      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app",
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
-  })
+  }),
 );
+
 app.use(express.json());
+app.use(cookieParser());
 
 const authRoutes = require("./routes/auth.routes");
 app.use("/api/auth", authRoutes);
@@ -47,12 +49,12 @@ const io = new Server(server, {
     origin: [
       "http://localhost:3000",
       "https://sanskrit-pictionary.vercel.app",
-      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app"
+      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app",
     ],
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
-
 
 const User = require("./models/User");
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { clearUserData } from "../../src/utils/authStorage";
 
 export default function AccountSettings() {
   const [email, setEmail] = useState("");
@@ -22,7 +23,8 @@ export default function AccountSettings() {
   const changePassword = async (e) => {
     e.preventDefault();
     setMsg("");
-    if (newPw.length < 8) return setMsg("New password must be at least 8 characters.");
+    if (newPw.length < 8)
+      return setMsg("New password must be at least 8 characters.");
     if (newPw !== confirm) return setMsg("Passwords don’t match.");
 
     try {
@@ -33,7 +35,9 @@ export default function AccountSettings() {
         newPassword: newPw,
       });
       setMsg("Password changed ✓");
-      setOldPw(""); setNewPw(""); setConfirm("");
+      setOldPw("");
+      setNewPw("");
+      setConfirm("");
     } catch (err) {
       setMsg(err?.response?.data?.error || "Couldn’t change password.");
     } finally {
@@ -43,7 +47,8 @@ export default function AccountSettings() {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    sessionStorage.clear();
+    // sessionStorage.clear();
+    clearUserData();
     window.location.href = "/signin";
   };
 
@@ -129,7 +134,9 @@ export default function AccountSettings() {
         </button>
       </form>
 
-      <button className="btn danger" onClick={handleLogout}>Log Out</button>
+      <button className="btn danger" onClick={handleLogout}>
+        Log Out
+      </button>
     </div>
   );
 }

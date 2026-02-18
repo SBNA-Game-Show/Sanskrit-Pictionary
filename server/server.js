@@ -12,7 +12,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "sanskrit-pictionary.vercel.app",
+      "https://sanskrit-pictionary.vercel.app",
       "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app"
 
     ],
@@ -42,7 +42,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:3000",
-      "sanskrit-pictionary.vercel.app",
+      "https://sanskrit-pictionary.vercel.app",
       "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app"
     ],
     methods: ["GET", "POST"],

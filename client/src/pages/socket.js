@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
-export const socket = io("http://localhost:5005");
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
+export const socket = io(API_BASE);
 
 socket.on("connect", () => {
   console.log("🔗 client socket connected:", socket.id);

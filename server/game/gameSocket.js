@@ -19,6 +19,9 @@ function createGameSocket(io) {
         // Get player join the room after refresh the page
         socket.join(roomId);
 
+        // Get players with scores for recovering game state after refresh
+        const playersWithScores = gameSessionManager.getPlayersWithScores(roomId);
+
         const {
           players, currentPlayerIndex, currentRound, totalRounds, timer, currentFlashcard, scores, 
           // Added status for recovering game state after refresh
@@ -37,7 +40,7 @@ function createGameSocket(io) {
 
         socket.emit("gameState", {
           // Put scores into players array for recovering after refresh
-          players,
+          players: playersWithScores,
           currentPlayerIndex,
           drawer,
           currentRound,

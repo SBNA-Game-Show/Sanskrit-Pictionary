@@ -52,7 +52,7 @@ export function clearUserData() {
   }
 }
 
-// Get individual values (for components that use sessionStorage.getItem)
+// Get individual values for components that use sessionStorage.getItem
 export function getUserId() {
   return localStorage.getItem(STORAGE_KEYS.USER_ID);
 }

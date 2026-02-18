@@ -1,6 +1,5 @@
-// src/pages/Play.jsx
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // added useNavigate
+import { useParams, useNavigate } from "react-router-dom";
 import "./play.css";
 import Chat from "../reusableComponents/chat";
 import Flashcard from "../reusableComponents/flashcard";
@@ -28,9 +27,9 @@ function maskPhraseToUnderscores(phrase) {
 
 const Play = () => {
   const canvasRef = useRef(null);
-  const playersRef = useRef([]); // ✅ holds freshest players for end screen
+  const playersRef = useRef([]); // holds freshest players for end screen
   const { roomId } = useParams();
-  const navigate = useNavigate(); // ✅ for /end navigation
+  const navigate = useNavigate(); // for /end navigation
 
   // UI / game states
   const [players, setPlayers] = useState([]);
@@ -54,9 +53,7 @@ const Play = () => {
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
 
   // Derived booleans
-  const isDrawer =
-    // (sessionStorage.getItem("userId") || currentUserId) === drawerId;
-    (getUserId() || currentUserId) === drawerId;
+  const isDrawer = (getUserId() || currentUserId) === drawerId;
   const canAnswer = myTeam === drawerTeam && !isDrawer;
 
   // ---------- UI helpers ----------
@@ -79,7 +76,6 @@ const Play = () => {
     if (answer.trim() === "" || !canAnswer) return;
     socket.emit("submitAnswer", {
       gameId: roomId,
-      // userId: sessionStorage.getItem("userId"),
       userId: getUserId(),
       answer: answer.trim(),
     });
@@ -91,7 +87,6 @@ const Play = () => {
     if (isDrawer) {
       socket.emit("drawing-data", {
         gameId: roomId,
-        // userId: sessionStorage.getItem("userId"),
         userId: getUserId(),
         data: paths,
       });
@@ -106,7 +101,6 @@ const Play = () => {
     if (isDrawer) {
       socket.emit("clear-canvas", {
         gameId: roomId,
-        // userId: sessionStorage.getItem("userId"),
         userId: getUserId(),
       });
     }
@@ -114,7 +108,6 @@ const Play = () => {
 
   // ---------- Socket setup ----------
   useEffect(() => {
-    // const userId = sessionStorage.getItem("userId");
     const userId = getUserId();
     setCurrentUserId(userId || "");
 
@@ -189,7 +182,6 @@ const Play = () => {
         newDrawerId,
         displayName,
         team,
-        // clientUserId: sessionStorage.getItem("userId"),
         clientUserId: getUserId(),
       });
       setDrawerId(newDrawerId);
@@ -215,7 +207,6 @@ const Play = () => {
     socket.on("newFlashcard", (data) => {
       console.log("[Play] received newFlashcard (drawer-only):", {
         data,
-        // clientUserId: sessionStorage.getItem("userId"),
         clientUserId: getUserId(),
         drawerId,
         translation: data.translation ?? data.hint ?? "",
@@ -504,7 +495,6 @@ const Play = () => {
               <button
                 onClick={() =>
                   console.log("DBG state", {
-                    // currentUserId: sessionStorage.getItem("userId"),
                     currentUserId: getUserId(),
                     drawerId,
                     isDrawer,

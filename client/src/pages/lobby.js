@@ -1,4 +1,3 @@
-// client/src/pages/lobby.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { socket } from "./socket";
@@ -98,8 +97,6 @@ const Lobby = () => {
   const [hostId, setHostId] = useState(null);
   const [teams, setTeams] = useState({ Red: [], Blue: [] });
 
-  // const myUserId = sessionStorage.getItem("userId");
-  // const myDisplayName = sessionStorage.getItem("displayName");
   const myUserId = getUserId();
   const myDisplayName = getDisplayName();
   const navigate = useNavigate();

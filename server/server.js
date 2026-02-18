@@ -15,16 +15,11 @@ dotenv.config();
 const app = express();
 app.use(
   cors({
-<<<<<<< HEAD
     origin: [
       "http://localhost:3000",
       "https://sanskrit-pictionary.vercel.app",
-      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app"
-
+      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app",
     ],
-=======
-    origin: ["http://localhost:3000", "sanskrit-pictionary.vercel.app"],
->>>>>>> cbdc966 (Implement persistent login with JWT in HTTP-only cookies)
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   }),
@@ -51,15 +46,11 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-<<<<<<< HEAD
     origin: [
       "http://localhost:3000",
       "https://sanskrit-pictionary.vercel.app",
-      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app"
+      "https://sanskrit-pictionary-3z505xgeb-gita-sbusas-projects.vercel.app",
     ],
-=======
-    origin: ["http://localhost:3000", "sanskrit-pictionary.vercel.app"],
->>>>>>> cbdc966 (Implement persistent login with JWT in HTTP-only cookies)
     methods: ["GET", "POST"],
     credentials: true,
   },

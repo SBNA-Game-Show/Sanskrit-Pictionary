@@ -118,7 +118,8 @@ const Lobby = () => {
   const isHost = myUserId === hostId;
   const redTeamHasPlayers = teams.Red.length > 1;
   const blueTeamHasPlayers = teams.Blue.length > 1;
-  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
+  const evenTeams = Math.abs(teams.Red.length - teams.Blue.length) <= 1;
+  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
   useEffect(() => {
     if (!myUserId || !roomId) return;
@@ -303,7 +304,7 @@ const Lobby = () => {
           {user.displayName}
           {isHostUser && <span title="Host" className="crown">👑</span>}
         </span>
-        {actions}
+        {!isHostUser && actions}
       </div>
     );
   };
@@ -400,22 +401,26 @@ const Lobby = () => {
             </div>
           </div>
 
-          <button
-            className="start-game-button"
-            onClick={() => {
-              if (isHost) {
-                socket.emit("startGame", {
-                  gameId: roomId,
-                  totalRounds: selectedRounds,
-                  timer: selectedTimer,
-                  difficulty: selectedDifficulty,
-                });
-              }
-            }}
-            disabled={!canStartGame}
-          >
-            Start Game
-          </button>
+          {isHost && (
+            <button
+              className="start-game-button"
+              onClick={() => {
+                if (isHost) {
+                  socket.emit("startGame", {
+                    gameId: roomId,
+                    totalRounds: selectedRounds,
+                    timer: selectedTimer,
+                    difficulty: selectedDifficulty,
+                    hostId: hostId,
+                    teams: teams,
+                  });
+                }
+              }}
+              disabled={!canStartGame}
+            >
+              Start Game
+            </button>
+          )}
 
           {!isHost && (
             <small style={{ color: "#999" }}>

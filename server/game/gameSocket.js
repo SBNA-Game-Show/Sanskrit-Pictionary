@@ -34,21 +34,20 @@ function createGameSocket(io) {
     });
 
     // ---- start game ----
-    socket.on("startGame", ({ gameId, totalRounds, timer, difficulty }) => {
+    socket.on("startGame", ({ gameId, totalRounds, timer, difficulty, hostId, teams }) => {
       console.log("[socket] startGame:", { gameId, totalRounds, timer, difficulty, by: socket.id, userId: socket.userId });
-
       const players = [];
       const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
       if (socketsInRoom) {
         for (const sid of socketsInRoom) {
           const s = io.sockets.sockets.get(sid);
-          if (s?.userId && s?.displayName) {
+          if (s?.userId && s?.displayName && s.userId !== hostId) {
             players.push({ userId: s.userId, displayName: s.displayName, socketId: s.id });
           }
         }
       }
 
-      gameSessionManager.createSession(gameId, players, totalRounds, timer, difficulty);
+      gameSessionManager.createSession(gameId, players, totalRounds, timer, difficulty, teams);
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(gameId));

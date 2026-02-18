@@ -1,18 +1,21 @@
 const jwt = require("jsonwebtoken");
 
 exports.verifyToken = (req, res, next) => {
-  // Try cookie first for web browsers, then Authorization header for API clients
-  let token = req.cookies.token;
+  let token = null;
 
-  // If no cookie, check Authorization header
+  // Try cookie first
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
+
+  // Fallback to Authorization header
   if (!token) {
-    const header = req.headers["authorization"];
-    if (header) {
-      token = header.split(" ")[1]; // Extract token from "Bearer <token>"
+    const authHeader = req.headers["authorization"];
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
     }
   }
 
-  // If still no token found
   if (!token) {
     return res.status(401).json({ error: "No token provided" });
   }

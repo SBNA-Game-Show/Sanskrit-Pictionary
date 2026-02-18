@@ -82,14 +82,8 @@ exports.logout = async (req, res) => {
 // Verify token endpoint
 exports.verifyToken = async (req, res) => {
   try {
-    const token = req.cookies.token;
-
-    if (!token) {
-      return res.status(401).json({ valid: false, error: "No token" });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select(
+    // Token already verified by middleware, req.userId is available
+    const user = await User.findById(req.userId).select(
       "displayName email _id",
     );
 
@@ -107,6 +101,6 @@ exports.verifyToken = async (req, res) => {
     });
   } catch (error) {
     console.error("Token verification error:", error);
-    res.status(401).json({ valid: false, error: "Invalid token" });
+    res.status(500).json({ valid: false, error: "Server error" });
   }
 };

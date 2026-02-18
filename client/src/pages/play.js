@@ -84,13 +84,18 @@ const Play = () => {
   };
 
   // Emit drawing updates only if you're the drawer
+  const lastEmit = useRef(0);
   const handleCanvasChange = (paths) => {
     if (isDrawer) {
-      socket.emit("drawing-data", {
-        gameId: roomId,
-        userId: sessionStorage.getItem("userId"),
-        data: paths,
-      });
+      const now = Date.now();
+      if (now - lastEmit.current > 100) { // Throttle emits to every 100ms
+        socket.emit("drawing-data", {
+          gameId: roomId,
+          userId: sessionStorage.getItem("userId"),
+          data: paths,
+        });
+        lastEmit.current = now;
+      }
     }
   };
 
@@ -152,8 +157,8 @@ const Play = () => {
       console.log("[Play] received gameState:", state);
 
       // Recovering game infomation after refreshed
-      setPlayers(state.players || []);
-      playersRef.current = state.players || [];
+      setPlayers(state.players); 
+      playersRef.current = state.players;
       setTimeLeft(state.timer || 0);
       const currentDrawerId = state.drawer?.userId || state.players[state.currentPlayerIndex]?.userId;
       setDrawerId(currentDrawerId);
@@ -264,7 +269,6 @@ const Play = () => {
         displayName: displayName || "Someone",
       });
       setTimeout(() => setRoundResult(null), 1500);
-      socket.emit("getGameState", { roomId , userId: sessionStorage.getItem("userId") }); // Refresh state to get updated scores
     });
 
     // clear canvas broadcast

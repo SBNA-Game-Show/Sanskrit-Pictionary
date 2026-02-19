@@ -125,3 +125,6 @@ export async function registerUser(displayName, email, password) {
     };
   }
 }
+
+// Export apiClient so other files can use it
+export { apiClient };

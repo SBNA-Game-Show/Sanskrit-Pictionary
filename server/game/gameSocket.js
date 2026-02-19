@@ -92,6 +92,15 @@ function createGameSocket(io) {
       socket.to(gameId).emit("drawing-data", data);
     });
 
+    // ---- clear board ----
+    socket.on("clear-canvas", ({ gameId, userId }) => {
+      const session = gameSessionManager.getSession(gameId);
+      if (!session) return;
+      const drawerId = session.players[session.currentPlayerIndex]?.userId;
+      if (userId !== drawerId) return;
+      socket.to(gameId).emit("clear-canvas")
+    })
+
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
       const session = gameSessionManager.getSession(gameId);

@@ -37,14 +37,70 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" },
     );
+
+    // Set HTTP-only cookie with cross-origin support
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true, // Always true (requires HTTPS)
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // "none" for cross-origin
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     res.status(200).json({
-      token,
-      displayName: user.displayName,
-      userId: user._id
+      success: true,
+      token, // Also send token in response body as fallback
+      user: {
+        userId: user._id,
+        displayName: user.displayName,
+        email: user.email,
+      },
     });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Logout endpoint
+exports.logout = async (req, res) => {
+  try {
+    // Clear the cookie with same settings
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    });
+
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Verify token endpoint
+exports.verifyToken = async (req, res) => {
+  try {
+    // Token already verified by middleware, req.userId is available
+    const user = await User.findById(req.userId).select(
+      "displayName email _id",
+    );
+
+    if (!user) {
+      return res.status(404).json({ valid: false, error: "User not found" });
+    }
+
+    res.status(200).json({
+      valid: true,
+      user: {
+        userId: user._id,
+        displayName: user.displayName,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(500).json({ valid: false, error: "Server error" });
   }
 };

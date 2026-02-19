@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { getEmail } from "../utils/authStorage";
+import { logoutUser } from "../utils/authAPI";
 
 export default function AccountSettings() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -15,42 +19,53 @@ export default function AccountSettings() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    const local = JSON.parse(localStorage.getItem("user") || "{}");
-    if (local.email) setEmail(local.email);
+    const userEmail = getEmail();
+    if (userEmail) {
+      setEmail(userEmail);
+    }
   }, []);
 
   const changePassword = async (e) => {
     e.preventDefault();
     setMsg("");
-    if (newPw.length < 8) return setMsg("New password must be at least 8 characters.");
-    if (newPw !== confirm) return setMsg("Passwords don’t match.");
+
+    if (newPw.length < 8)
+      return setMsg("New password must be at least 8 characters.");
+    if (newPw !== confirm) return setMsg("Passwords don't match.");
 
     try {
       setLoading(true);
-      await axios.post("/api/users/change-password", {
-        email,
-        oldPassword: oldPw,
-        newPassword: newPw,
-      });
+      await axios.post(
+        "/api/users/change-password",
+        {
+          email,
+          oldPassword: oldPw,
+          newPassword: newPw,
+        },
+        {
+          withCredentials: true,
+        },
+      );
       setMsg("Password changed ✓");
-      setOldPw(""); setNewPw(""); setConfirm("");
+      setOldPw("");
+      setNewPw("");
+      setConfirm("");
     } catch (err) {
-      setMsg(err?.response?.data?.error || "Couldn’t change password.");
+      setMsg(err?.response?.data?.error || "Couldn't change password.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    sessionStorage.clear();
-    window.location.href = "/signin";
+  const handleLogout = async () => {
+    await logoutUser();
+    window.dispatchEvent(new Event("displayNameChanged"));
+    navigate("/welcome", { replace: true });
   };
 
   return (
     <div className="panel profile-panel">
       <h2>Account</h2>
-
       <form className="form" onSubmit={changePassword} autoComplete="off">
         <label className="label">Email</label>
         <input
@@ -129,7 +144,9 @@ export default function AccountSettings() {
         </button>
       </form>
 
-      <button className="btn danger" onClick={handleLogout}>Log Out</button>
+      <button className="btn danger" onClick={handleLogout}>
+        Log Out
+      </button>
     </div>
   );
 }

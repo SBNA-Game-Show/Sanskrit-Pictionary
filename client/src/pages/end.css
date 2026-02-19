@@ -22,7 +22,8 @@ body { background: var(--bg); color: var(--text); }
   flex-direction: column;
   gap: 16px;
   align-items: center;      
-  text-align: left;         
+  text-align: left;     
+     
 }
 
 @keyframes fadeIn {
@@ -45,7 +46,11 @@ body { background: var(--bg); color: var(--text); }
 .leaderboard-list {
   display: grid;
   grid-template-columns: 1fr;
+ 
   gap: 14px;
+  background: radial-gradient(65% 120% at 10% 0%, rgba(255,255,255,0.8), rgba(255,255,255,0.7)) , var(--panel);
+  
+  
 }
 
 @media (min-width: 700px) {
@@ -59,7 +64,7 @@ body { background: var(--bg); color: var(--text); }
   align-items: center;
   gap: 16px;
   padding: 16px 18px;
-  background: radial-gradient(65% 120% at 10% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0.03)) , var(--panel);
+  background: radial-gradient(65% 120% at 10% 0%, rgba(128, 119, 119, 0.226), rgba(255,255,255,0.03)) , var(--panel);
   border: 1px solid var(--panel-strong);
   border-radius: 18px;
   box-shadow: 0 8px 26px rgba(0,0,0,0.35);
@@ -74,7 +79,7 @@ body { background: var(--bg); color: var(--text); }
   border-color: rgba(255,255,255,0.2);
 }
 
-.leaderboard-card.first { border-color: rgba(247,201,72,0.5); }
+.leaderboard-card.first { border-color: rgba(247,201,72,0.5);}
 .leaderboard-card.second { border-color: rgba(207,216,227,0.45); }
 .leaderboard-card.third { border-color: rgba(215,165,108,0.45); }
 
@@ -128,8 +133,9 @@ body { background: var(--bg); color: var(--text); }
 .team-blue { background: linear-gradient(135deg, #cfe2ff, var(--blue)); }
 
 .player-score {
+
   font-weight: 900;
-  font-size: 22px;
+  font-size: clamp(18px, 3vw, 22px);
   padding: 6px 0 6px 14px;
   border-left: 2px solid rgba(255,255,255,0.1);
 }
@@ -165,4 +171,43 @@ body { background: var(--bg); color: var(--text); }
 
 @media (min-width: 700px) {
   .leaderboard-list { grid-template-columns: 1fr; }
+}
+
+.teamRed{
+  /* background: linear-gradient(135deg, #ffd0d3, var(--red)); */
+  background: radial-gradient(65% 120% at 10% 0%, rgba(206, 64, 64, 0.5), rgba(173, 13, 13, 0.06)) , var(--panel);
+  margin-bottom: 5px;
+  padding:10px;
+  
+
+}
+
+.teamBlue{
+  background: radial-gradient(65% 120% at 10% 0%, rgba(30, 60, 109, 0.3), rgba(13, 49, 173, 0.06)) , var(--panel);
+  padding:10px;
+}
+.team-title{
+  font-size: clamp(18px, 3vw, 25px);
+color:#1b2432;
+padding:5px;
+}
+.team-score{
+  text-align: right;;
+  padding:5px;
+  font-size: clamp(20px, 3vw, 25px);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+#blue{
+  color:#132c91
+}
+#red{
+  color:#77070d
+}
+
+.winning-team{
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }

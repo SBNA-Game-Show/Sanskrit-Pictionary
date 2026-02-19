@@ -7,19 +7,70 @@ function createGameSocket(io) {
   io.on("connection", (socket) => {
     // ---- register / state ----
     socket.on("registerLobby", ({ userId, displayName, roomId }) => {
-      console.log("[socket] registerLobby:", { socketId: socket.id, userId, displayName, roomId });
+      console.log("[socket] registerLobby:", {
+        socketId: socket.id,
+        userId,
+        displayName,
+        roomId,
+      });
+
       socket.userId = userId;
       socket.displayName = displayName;
       socket.join(roomId);
+
+      // Check if this user is reconnecting to an active game
+      const session = gameSessionManager.getSession(roomId);
+      if (session) {
+        const reconnected = gameSessionManager.markPlayerReconnected(
+          roomId,
+          userId,
+          socket.id,
+        );
+
+        if (reconnected) {
+          console.log(
+            `[socket] Player ${userId} reconnected to active game ${roomId}`,
+          );
+
+          // Get canvas data BEFORE sending gameState
+          const canvasData = gameSessionManager.getCanvasData(roomId);
+
+          // Send current game state to reconnected player
+          socket.emit("gameState", {
+            players: session.players,
+            currentPlayerIndex: session.currentPlayerIndex,
+            drawer: session.players[session.currentPlayerIndex],
+            currentRound: session.currentRound,
+            totalRounds: session.totalRounds,
+            timer: activeTimers[roomId]?.secondsLeft || session.timer,
+            currentFlashcard: session.currentFlashcard,
+            scores: session.scores,
+            canvasData: canvasData,
+          });
+
+          // Notify others that player reconnected
+          socket.to(roomId).emit("playerReconnected", {
+            userId,
+            displayName,
+          });
+        }
+      }
     });
 
     socket.on("getGameState", ({ roomId }) => {
       const session = gameSessionManager.getSession(roomId);
       if (session) {
         const {
-          players, currentPlayerIndex, currentRound, totalRounds, timer, currentFlashcard, scores
+          players,
+          currentPlayerIndex,
+          currentRound,
+          totalRounds,
+          timer,
+          currentFlashcard,
+          scores,
         } = session;
         const drawer = players[currentPlayerIndex];
+        const canvasData = gameSessionManager.getCanvasData(roomId);
         socket.emit("gameState", {
           players,
           currentPlayerIndex,
@@ -29,6 +80,7 @@ function createGameSocket(io) {
           timer,
           currentFlashcard,
           scores,
+          canvasData: canvasData,
         });
       }
     });
@@ -50,7 +102,10 @@ function createGameSocket(io) {
       gameSessionManager.createSession(gameId, players, totalRounds, timer, difficulty, teams);
       gameSessionManager.startRound(gameId, io);
 
-      io.to(gameId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(gameId));
+      io.to(gameId).emit(
+        "updatePlayers",
+        gameSessionManager.getPlayersWithScores(gameId),
+      );
       io.to(gameId).emit("startTimer", { duration: timer });
       startSynchronizedTimer(io, gameId, timer);
     });
@@ -61,6 +116,10 @@ function createGameSocket(io) {
       if (!session) return;
       const drawerId = session.players[session.currentPlayerIndex]?.userId;
       if (userId !== drawerId) return;
+      // Store the latest canvas data
+      gameSessionManager.updateCanvasData(gameId, data);
+
+      // Broadcast to others
       socket.to(gameId).emit("drawing-data", data);
     });
 
@@ -70,8 +129,11 @@ function createGameSocket(io) {
       if (!session) return;
       const drawerId = session.players[session.currentPlayerIndex]?.userId;
       if (userId !== drawerId) return;
-      socket.to(gameId).emit("clear-canvas")
-    })
+
+      // Clear stored canvas data
+      gameSessionManager.clearCanvasData(gameId);
+      socket.to(gameId).emit("clear-canvas");
+    });
 
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
@@ -84,7 +146,9 @@ function createGameSocket(io) {
 
       // Only allow teammates of the drawer to answer, and not the drawer themselves
       if (player.team !== drawer.team || player.userId === drawer.userId) {
-        socket.emit("answerRejected", { message: "It's not your team's turn to guess!" });
+        socket.emit("answerRejected", {
+          message: "It's not your team's turn to guess!",
+        });
         return;
       }
 
@@ -96,7 +160,7 @@ function createGameSocket(io) {
         userId,
         answer,
         io,
-        remainingSeconds
+        remainingSeconds,
       );
 
       // All teammates answered correctly -> immediately proceed to the next round
@@ -118,10 +182,77 @@ function createGameSocket(io) {
 
     socket.on("getRoomPlayers", ({ roomId }) => {
       const session = gameSessionManager.getSession(roomId);
-      if (session) io.to(roomId).emit("roomPlayers", { players: session.players });
+      if (session)
+        io.to(roomId).emit("roomPlayers", { players: session.players });
     });
 
-    socket.on("disconnect", () => {});
+    // REPLACE the empty disconnect handler with this:
+    socket.on("disconnect", (reason) => {
+      console.log(
+        `[socket] disconnect: ${socket.id}, reason: ${reason}, userId: ${socket.userId}`,
+      );
+
+      // If user wasn't registered, nothing to do
+      if (!socket.userId) return;
+
+      // Find any game sessions this user was in
+      const sessions = gameSessionManager.getAllSessions();
+
+      for (const [roomId, session] of Object.entries(sessions)) {
+        const playerIndex = session.players.findIndex(
+          (p) => p.userId === socket.userId,
+        );
+
+        if (playerIndex !== -1) {
+          console.log(`[socket] Player ${socket.userId} was in game ${roomId}`);
+
+          // Mark player as disconnected but keep them in the game
+          session.players[playerIndex].disconnected = true;
+          session.players[playerIndex].disconnectTime = Date.now();
+
+          // Notify other players
+          io.to(roomId).emit("playerDisconnected", {
+            userId: socket.userId,
+            displayName: session.players[playerIndex].displayName,
+          });
+
+          // Auto-remove if disconnected for more than 60 seconds
+          setTimeout(() => {
+            const currentSession = gameSessionManager.getSession(roomId);
+            if (currentSession) {
+              const player = currentSession.players.find(
+                (p) => p.userId === socket.userId,
+              );
+
+              if (player && player.disconnected) {
+                console.log(
+                  `[socket] Removing ${socket.userId} after 60s disconnect`,
+                );
+
+                // Only remove if they're still disconnected after 60s
+                const removed = gameSessionManager.removePlayer(
+                  roomId,
+                  socket.userId,
+                );
+
+                if (removed) {
+                  io.to(roomId).emit("playerRemoved", {
+                    userId: socket.userId,
+                    displayName: player.displayName,
+                  });
+
+                  // Update players list for everyone
+                  io.to(roomId).emit(
+                    "updatePlayers",
+                    gameSessionManager.getPlayersWithScores(roomId),
+                  );
+                }
+              }
+            }
+          }, 60000); // 60 seconds grace period
+        }
+      }
+    });
   });
 }
 
@@ -129,7 +260,9 @@ function createGameSocket(io) {
 function startSynchronizedTimer(io, gameId, duration) {
   clearActiveTimer(gameId);
 
-  let secondsLeft = Number.isFinite(duration) ? Math.max(0, Math.floor(duration)) : 0;
+  let secondsLeft = Number.isFinite(duration)
+    ? Math.max(0, Math.floor(duration))
+    : 0;
 
   // Write initial state first, so it's immediately readable from the outside
   activeTimers[gameId] = { intervalId: null, secondsLeft };
@@ -170,6 +303,10 @@ function proceedToNextRound(io, gameId) {
   advancingRounds.add(gameId);
 
   try {
+    // Clear canvas data when moving to next round
+    gameSessionManager.clearCanvasData(gameId);
+    io.to(gameId).emit("clear-canvas");
+
     const nextRoundInfo = gameSessionManager.nextRound(gameId);
 
     if (nextRoundInfo) {

@@ -19,6 +19,9 @@ function createGameSocket(io) {
         // Get player join the room after refresh the page
         socket.join(roomId);
 
+        const drawer = session.players[session.currentPlayerIndex];
+        const isDrawer = userId === drawer?.userId;
+
         // Get players with scores for recovering game state after refresh
         const playersWithScores = gameSessionManager.getPlayersWithScores(roomId);
 
@@ -34,15 +37,12 @@ function createGameSocket(io) {
           console.log(`[Sync] User ${player.displayName} reconnected. Updating SocketID: ${player.socketId} -> ${socket.id}`);
           player.socketId = socket.id; 
         }
-        
-        const drawer = session.players[session.currentPlayerIndex];
-        const isDrawer = userId === drawer?.userId;
 
         socket.emit("gameState", {
           // Put scores into players array for recovering after refresh
           players: playersWithScores,
           currentPlayerIndex,
-          drawer,
+          drawer: drawer,
           currentRound,
           totalRounds,
           timer,
@@ -59,6 +59,11 @@ function createGameSocket(io) {
 
     // ---- start game ----
     socket.on("startGame", ({ gameId, totalRounds, timer, difficulty }) => {
+      // ... 初始化 session ...
+      setTimeout(() => {
+        gameSessionManager.startRound(gameId, io);
+      }, 800);
+
       console.log("[socket] startGame:", { gameId, totalRounds, timer, difficulty, by: socket.id, userId: socket.userId });
 
       const players = [];

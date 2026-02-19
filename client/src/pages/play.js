@@ -162,6 +162,8 @@ const Play = () => {
 
       // Recovering game infomation after refreshed
       setPlayers(state.players); 
+      const me = (state.players || []).find((p) => p.userId === userId);
+      setMyTeam(me?.team || "");
       playersRef.current = state.players;
       setTimeLeft(state.timer || 0);
       const currentDrawerId = state.drawer?.userId || state.players[state.currentPlayerIndex]?.userId;
@@ -198,9 +200,6 @@ const Play = () => {
       navigate("/end", { state: { players: withAvatars } });
       return; 
     }
-
-      const me = (state.players || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
     });
 
     socket.on("updatePlayers", (list) => {

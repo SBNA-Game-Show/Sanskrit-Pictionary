@@ -39,7 +39,7 @@ const End = () => {
   const winningTeam = useMemo(() => {
     if(redPoints > bluePoints) return 'red';
     if(bluePoints > redPoints) return 'blue';
-    return "It's a Tie!";
+    return "tie";
   }, [redPoints, bluePoints]);
 
 

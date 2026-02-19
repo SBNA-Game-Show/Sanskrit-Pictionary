@@ -5,13 +5,31 @@ const STORAGE_KEYS = {
   TOKEN: "sanskrit_pictionary_token",
 };
 
+// Check if localStorage is available
+function isLocalStorageAvailable() {
+  try {
+    const test = "__localStorage_test__";
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Fallback to sessionStorage if localStorage is blocked
+const storage = isLocalStorageAvailable() ? localStorage : sessionStorage;
+
 export function saveUserData(userId, displayName, email, token) {
   try {
-    localStorage.setItem(STORAGE_KEYS.USER_ID, userId);
-    localStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, displayName);
-    if (email) localStorage.setItem(STORAGE_KEYS.EMAIL, email);
-    if (token) localStorage.setItem(STORAGE_KEYS.TOKEN, token);
-    console.log("User data saved to localStorage");
+    storage.setItem(STORAGE_KEYS.USER_ID, userId);
+    storage.setItem(STORAGE_KEYS.DISPLAY_NAME, displayName);
+    if (email) storage.setItem(STORAGE_KEYS.EMAIL, email);
+    if (token) storage.setItem(STORAGE_KEYS.TOKEN, token);
+    console.log(
+      "User data saved to",
+      isLocalStorageAvailable() ? "localStorage" : "sessionStorage",
+    );
     return true;
   } catch (error) {
     console.error("Failed to save user data:", error);
@@ -21,21 +39,16 @@ export function saveUserData(userId, displayName, email, token) {
 
 export function getUserData() {
   try {
-    const userId = localStorage.getItem(STORAGE_KEYS.USER_ID);
-    const displayName = localStorage.getItem(STORAGE_KEYS.DISPLAY_NAME);
-    const email = localStorage.getItem(STORAGE_KEYS.EMAIL);
-    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    const userId = storage.getItem(STORAGE_KEYS.USER_ID);
+    const displayName = storage.getItem(STORAGE_KEYS.DISPLAY_NAME);
+    const email = storage.getItem(STORAGE_KEYS.EMAIL);
+    const token = storage.getItem(STORAGE_KEYS.TOKEN);
 
     if (!userId || !displayName) {
       return null;
     }
 
-    return {
-      userId,
-      displayName,
-      email,
-      token,
-    };
+    return { userId, displayName, email, token };
   } catch (error) {
     console.error("Failed to get user data:", error);
     return null;
@@ -44,30 +57,28 @@ export function getUserData() {
 
 export function clearUserData() {
   try {
-    localStorage.removeItem(STORAGE_KEYS.USER_ID);
-    localStorage.removeItem(STORAGE_KEYS.DISPLAY_NAME);
-    localStorage.removeItem(STORAGE_KEYS.EMAIL);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    console.log("User data cleared from localStorage");
+    storage.removeItem(STORAGE_KEYS.USER_ID);
+    storage.removeItem(STORAGE_KEYS.DISPLAY_NAME);
+    storage.removeItem(STORAGE_KEYS.EMAIL);
+    storage.removeItem(STORAGE_KEYS.TOKEN);
+    console.log("User data cleared");
   } catch (error) {
     console.error("Failed to clear user data:", error);
   }
 }
 
-// Get individual values (for components that use sessionStorage.getItem)
 export function getUserId() {
-  return localStorage.getItem(STORAGE_KEYS.USER_ID);
+  return storage.getItem(STORAGE_KEYS.USER_ID);
 }
 
 export function getDisplayName() {
-  return localStorage.getItem(STORAGE_KEYS.DISPLAY_NAME);
+  return storage.getItem(STORAGE_KEYS.DISPLAY_NAME);
 }
 
 export function getEmail() {
-  return localStorage.getItem(STORAGE_KEYS.EMAIL);
+  return storage.getItem(STORAGE_KEYS.EMAIL);
 }
 
-// Helper to get token
 export function getToken() {
-  return localStorage.getItem(STORAGE_KEYS.TOKEN);
+  return storage.getItem(STORAGE_KEYS.TOKEN);
 }

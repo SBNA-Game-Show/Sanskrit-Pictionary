@@ -18,10 +18,6 @@ apiClient.interceptors.request.use(
     const userData = getUserData();
     if (userData?.token) {
       config.headers.Authorization = `Bearer ${userData.token}`;
-      console.log(
-        "Token attached to request:",
-        userData.token.substring(0, 20) + "...",
-      );
     } else {
       console.warn("⚠️ No token found in localStorage");
     }
@@ -42,17 +38,11 @@ export async function loginUser(email, password) {
     const { user, token } = response.data;
 
     if (!token) {
-      console.error("❌ No token in login response");
       return {
         success: false,
         error: "No token received from server",
       };
     }
-
-    console.log(
-      "Login successful, token received:",
-      token.substring(0, 20) + "...",
-    );
 
     // Save user data + token to localStorage
     saveUserData(user.userId, user.displayName, user.email, token);
@@ -81,24 +71,17 @@ export async function logoutUser() {
 
 export async function verifyAuth() {
   try {
-    console.log("🔍 Verifying auth...");
     const userData = getUserData();
-    console.log(
-      "🔍 Token in localStorage:",
-      userData?.token ? "Present" : "Missing",
-    );
-
     const response = await apiClient.get("/api/auth/verify");
 
     if (response.data.valid) {
       const { user } = response.data;
       // Preserve token when updating
       saveUserData(user.userId, user.displayName, user.email, userData?.token);
-      console.log("Auth verification successful");
       return { valid: true, user };
     }
 
-    console.warn("⚠️ Auth verification failed: invalid response");
+    console.warn("Auth verification failed: invalid response");
     return { valid: false };
   } catch (error) {
     console.error(

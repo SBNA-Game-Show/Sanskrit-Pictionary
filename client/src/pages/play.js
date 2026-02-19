@@ -83,18 +83,13 @@ const Play = () => {
   };
 
   // Emit drawing updates only if you're the drawer
-  const lastEmit = useRef(0);
   const handleCanvasChange = (paths) => {
     if (isDrawer) {
-      const now = Date.now();
-      if (now - lastEmit.current > 100) { // Throttle emits to every 100ms
-        socket.emit("drawing-data", {
-          gameId: roomId,
-          userId: sessionStorage.getItem("userId"),
-          data: paths,
-        });
-        lastEmit.current = now;
-      }
+      socket.emit("drawing-data", {
+        gameId: roomId,
+        userId: getUserId(),
+        data: paths,
+      });
     }
   };
 
@@ -120,8 +115,8 @@ const Play = () => {
     if (!roomId) return;
 
     // Ask server for current state
-    socket.emit("getGameState", { roomId , userId });
-    console.log("[Play] emitted getGameState", { roomId , userId});
+    socket.emit("getGameState", { roomId });
+    console.log("[Play] emitted getGameState", { roomId });
 
     // Also grab profiles using the existing lobby event (no server changes)
     socket.emit("requestLobbyUsers", { roomId });
@@ -159,45 +154,16 @@ const Play = () => {
     // -------- core state sync --------
     socket.on("gameState", (state) => {
       console.log("[Play] received gameState:", state);
+      const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
-      // Recovering game infomation after refreshed
-      setPlayers(state.players); 
-      playersRef.current = state.players;
+      setPlayers(state.players || []);
+      playersRef.current = state.players || []; // ✅ keep ref fresh
+      setDrawerId(state.drawer?.userId || null);
+      setDrawerTeam(state.drawer?.team || "");
+      setCurrentPlayerName(state.drawer?.displayName || "");
       setTimeLeft(state.timer || 0);
-      const currentDrawerId = state.drawer?.userId || state.players[state.currentPlayerIndex]?.userId;
-      setDrawerId(currentDrawerId);
-      setDrawerTeam(state.drawer?.team || state.players[state.currentPlayerIndex]?.team || "");
-      setCurrentPlayerName(state.drawer?.displayName || state.players[state.currentPlayerIndex]?.displayName || "");
-      if (state.canvasPaths && state.canvasPaths.length > 0) {
-        // Ensure ReactSketchCanvas completely loads before trying to set paths
-        setTimeout(() => {
-          canvasRef.current?.loadPaths(state.canvasPaths);
-        }, 100);
-      }
-      
-      // Recovering flashcard for drawer after refresh
-      if (currentDrawerId === sessionStorage.getItem("userId")) {
-        if (state.currentFlashcard) {
-          setFlashcard(state.currentFlashcard);
-        }
-      }
 
-      // Redirect to end screen if game already ended (handles refresh on end screen)
-    if (state.status === "ended" || state.isGameOver) {
-      const base = state.players || [];
-      const withAvatars = base.map((p) => {
-        const prof = profiles[p.userId] || {};
-        const seed = prof.avatarSeed || p.displayName || p.userId || "player";
-        const style = prof.avatarStyle || "funEmoji";
-        return {
-          ...p,
-          avatar: makeAvatarDataUrl(style, seed), 
-        };
-      });
-      
-      navigate("/end", { state: { players: withAvatars } });
-      return; 
-    }
+      if (serverFlash) setFlashcard(serverFlash);
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
@@ -273,6 +239,7 @@ const Play = () => {
         displayName: displayName || "Someone",
       });
       setTimeout(() => setRoundResult(null), 1500);
+      socket.emit("getGameState", { roomId });
     });
 
     // clear canvas broadcast
@@ -283,7 +250,7 @@ const Play = () => {
     });
 
     // ✅ game ended -> go to /end with final players
-    socket.on("gameEnded", (data) => {
+    socket.on("gameEnded", () => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
@@ -294,8 +261,9 @@ const Play = () => {
         const style = prof.avatarStyle || "funEmoji";
         return {
           ...p,
-          points: Number(p.points ?? p.score ?? 0),
-          avatar: makeAvatarDataUrl(style, seed)                 
+          avatar: makeAvatarDataUrl(style, seed),
+          avatarSeed: seed,
+          avatarStyle: style,
         };
       });
       setTimeout(() => {

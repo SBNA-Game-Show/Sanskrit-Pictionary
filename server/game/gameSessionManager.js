@@ -67,7 +67,6 @@ class GameSessionManager {
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
-      status: "playing", // "playing" or "ended"
     });
 
     // init scores
@@ -136,25 +135,27 @@ class GameSessionManager {
   async startRound(gameId, io) {
     const session = this.getSession(gameId);
     if (!session || !session.players.length) return;
+
     session.roundInProgress = true;
 
-    // Get flashcard and store in session before emitting any event, 
-    // to ensure it's ready when drawer receives the gameState
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
       io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
       return;
     }
-    session.currentFlashcard = flashcard; 
-    session.canvasPaths = [];    // Reset canvas paths
+    session.currentFlashcard = flashcard;
 
-    // Get the current drawer's latest socketId from session.
-    const currentPlayer = session.players[session.currentPlayerIndex]; 
-    if (!currentPlayer) return;
+    const currentPlayer = session.players[session.currentPlayerIndex];
+    if (!currentPlayer) {
+      console.warn("[startRound] no currentPlayer for session", gameId);
+      return;
+    }
 
-    console.log(`[startRound] Game: ${gameId}, Round: ${session.currentRound + 1}, Drawer: ${currentPlayer.displayName}, Socket: ${currentPlayer.socketId}`);
+    console.log(
+      `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`
+    );
 
-    // Send flashcard to the drawer using the latest socketId
+    // Send flashcard privately to drawer
     io.to(currentPlayer.socketId).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
@@ -177,6 +178,22 @@ class GameSessionManager {
       timer: session.timer,
     });
 
+    io.to(gameId).emit("gameState", {
+      players: this.getPlayersWithScores(gameId),
+      currentPlayerIndex: session.currentPlayerIndex,
+      drawer: {
+        userId: currentPlayer.userId,
+        displayName: currentPlayer.displayName,
+        team: currentPlayer.team,
+        socketId: currentPlayer.socketId,
+      },
+      currentRound: session.currentRound + 1,
+      totalRounds: session.totalRounds,
+      timer: session.timer,
+      currentFlashcard: null, // drawer-only
+      scores: session.scores,
+    });
+
     session.players.forEach((p) => {
       p.hasAnswered = false;
     });
@@ -185,16 +202,12 @@ class GameSessionManager {
   nextRound(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
-    if (session.currentRound >= session.totalRounds) {
-        session.status = "ended"; // Update status to ended if max rounds reached
-        return null; 
-    }
+    if (session.currentRound >= session.totalRounds) return null;
 
     session.currentRound++;
     session.currentPlayerIndex =
       (session.currentPlayerIndex + 1) % session.players.length;
     session.roundInProgress = true;
-    session.status = "playing"; // Update status to playing for the new round
 
     return {
       currentRound: session.currentRound,

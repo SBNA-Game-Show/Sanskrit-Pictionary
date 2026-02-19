@@ -13,22 +13,46 @@ function createGameSocket(io) {
       socket.join(roomId);
     });
 
-    socket.on("getGameState", ({ roomId }) => {
+    socket.on("getGameState", ({ roomId, userId }) => {
       const session = gameSessionManager.getSession(roomId);
       if (session) {
+        // Get player join the room after refresh the page
+        socket.join(roomId);
+
+        // Get players with scores for recovering game state after refresh
+        const playersWithScores = gameSessionManager.getPlayersWithScores(roomId);
+
         const {
-          players, currentPlayerIndex, currentRound, totalRounds, timer, currentFlashcard, scores
+          players, currentPlayerIndex, currentRound, totalRounds, timer, currentFlashcard, scores, 
+          // Added status for recovering game state after refresh
+          status
         } = session;
-        const drawer = players[currentPlayerIndex];
+
+        // Update player's socketId in session in case of refresh
+        const player = players.find(p => p.userId === userId);
+        if (player) {
+          console.log(`[Sync] User ${player.displayName} reconnected. Updating SocketID: ${player.socketId} -> ${socket.id}`);
+          player.socketId = socket.id; 
+        }
+        
+        const drawer = session.players[session.currentPlayerIndex];
+        const isDrawer = userId === drawer?.userId;
+
         socket.emit("gameState", {
-          players,
+          // Put scores into players array for recovering after refresh
+          players: playersWithScores,
           currentPlayerIndex,
           drawer,
           currentRound,
           totalRounds,
           timer,
-          currentFlashcard,
+          // Only render flashcard to the drawer
+          currentFlashcard: isDrawer ? session.currentFlashcard : null, 
           scores,
+          // Render canvas paths to everyone for recovering after refresh
+          canvasPaths: session.canvasPaths || [],
+          // Added status for recovering game state after refresh
+          status: status || (timer <= 0 && currentRound >= totalRounds ? "ended" : "playing"), 
         });
       }
     });
@@ -62,6 +86,9 @@ function createGameSocket(io) {
       if (!session) return;
       const drawerId = session.players[session.currentPlayerIndex]?.userId;
       if (userId !== drawerId) return;
+
+      // Store canvas paths in session for refreshing players
+      session.canvasPaths = data;
       socket.to(gameId).emit("drawing-data", data);
     });
 
@@ -174,13 +201,28 @@ function proceedToNextRound(io, gameId) {
     const nextRoundInfo = gameSessionManager.nextRound(gameId);
 
     if (nextRoundInfo) {
-      // startRound is responsible for: sending a new Flashcard to the questioner, broadcasting drawerChanged/roundStarted, and updating gameState
+      // startRound is responsible for: sending a new Flashcard to the questioner, 
+      // broadcasting drawerChanged/roundStarted, and updating gameState
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
     } else {
-      io.to(gameId).emit("gameEnded");
+
+      const session = gameSessionManager.getSession(gameId);
+
+      // Added scores into session for recovering game state after refresh
+      if (session) {
+        session.status = "ended";
+        const finalPlayers = session.players.map(p => ({
+          ...p,
+          points: session.scores[p.userId] || 0
+        }));
+
+      // Send gameEnded event with final players and scores for leaderboard display
+      // console.log(`[GameEnded] Sending final scores for room ${gameId}`);
+      io.to(gameId).emit("gameEnded", finalPlayers); 
+      }
       clearActiveTimer(gameId);
     }
   } finally {

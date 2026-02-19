@@ -295,7 +295,7 @@ const Play = () => {
         return {
           ...p,
           points: Number(p.points ?? p.score ?? 0),
-          avatar: makeAvatarDataUrl(style, seed),                   
+          avatar: makeAvatarDataUrl(style, seed)                 
         };
       });
       setTimeout(() => {

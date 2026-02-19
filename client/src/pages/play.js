@@ -33,6 +33,7 @@ const Play = () => {
 
   // UI / game states
   const [players, setPlayers] = useState([]);
+  const [hostData, setHostData] = useState(null);
   const [timeLeft, setTimeLeft] = useState(60);
   const [eraseMode, setEraseMode] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(5);
@@ -178,6 +179,7 @@ const Play = () => {
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
       setPlayers(state.players || []);
+      setHostData(state.hostData || null);
       playersRef.current = state.players || [];
       setDrawerId(state.drawer?.userId || null);
       setDrawerTeam(state.drawer?.team || "");
@@ -337,6 +339,8 @@ const Play = () => {
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
+  const isHost = currentUserId === hostData?.hostId;
+
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
@@ -396,7 +400,7 @@ const Play = () => {
           </div>
         )}
 
-        <div className="score-box">
+        <div className={`score-box ${isHost && "hidden"}`}>
           <strong>Score: </strong>
           <a>
             <label htmlFor="score">
@@ -422,8 +426,8 @@ const Play = () => {
           </label>
         </div>
 
-        {/* Drawer sees the full flashcard */}
-        {flashcard && isDrawer && <Flashcard items={[flashcard]} />}
+        {/* Drawer and host see the full flashcard */}
+        {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
 
         {/* User List */}
         <div className="user-list">
@@ -517,13 +521,16 @@ const Play = () => {
           <Chat
             myUserId={currentUserId}
             myDisplayName={
-              players.find((p) => p.userId === currentUserId)?.displayName || ""
+              isHost
+                ? hostData.hostDisplayName
+                : players.find((p) => p.userId === currentUserId)
+                    ?.displayName || ""
             }
             myTeam={myTeam}
           />
         </div>
 
-        <div className="input-area-wrapper">
+        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input

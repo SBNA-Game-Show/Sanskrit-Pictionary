@@ -48,7 +48,7 @@ class GameSessionManager {
     this.sessions = new Map();
   }
 
-  createSession(gameId, players, totalRounds, timer, difficulty, teams) {
+  createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
     // assign players to selected teams
     players.forEach((p) => {
       if (teams.Red.includes(p.userId)) {
@@ -63,7 +63,8 @@ class GameSessionManager {
     if (firstDrawerIndex === -1) firstDrawerIndex = 0;
 
     this.sessions.set(gameId, {
-      players: players,
+      players,
+      hostData,
       currentRound: 0,
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
@@ -161,8 +162,8 @@ class GameSessionManager {
       `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`,
     );
 
-    // Send flashcard privately to drawer
-    io.to(currentPlayer.socketId).emit("newFlashcard", {
+    // Send flashcard privately to drawer and host
+    io.to([currentPlayer.socketId, session.hostData.hostSocketId]).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
       translation: flashcard.translation,
@@ -186,6 +187,7 @@ class GameSessionManager {
 
     io.to(gameId).emit("gameState", {
       players: this.getPlayersWithScores(gameId),
+      hostData: session.hostData,
       currentPlayerIndex: session.currentPlayerIndex,
       drawer: {
         userId: currentPlayer.userId,

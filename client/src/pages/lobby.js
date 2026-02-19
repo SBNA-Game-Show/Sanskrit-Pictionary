@@ -480,7 +480,7 @@ const Lobby = () => {
                     totalRounds: selectedRounds,
                     timer: selectedTimer,
                     difficulty: selectedDifficulty,
-                    hostId: hostId,
+                    hostData: {hostId, hostDisplayName: myDisplayName, hostSocketId: socket.id},
                     teams: teams,
                   });
                 }

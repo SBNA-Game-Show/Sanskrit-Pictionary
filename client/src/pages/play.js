@@ -1,6 +1,5 @@
-// src/pages/Play.jsx
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // ✅ added useNavigate
+import { useParams, useNavigate } from "react-router-dom";
 import "./play.css";
 import Chat from "../reusableComponents/chat";
 import Flashcard from "../reusableComponents/flashcard";
@@ -10,6 +9,7 @@ import { ReactSketchCanvas } from "react-sketch-canvas";
 import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
+import { getUserId } from "../utils/authStorage";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -27,9 +27,9 @@ function maskPhraseToUnderscores(phrase) {
 
 const Play = () => {
   const canvasRef = useRef(null);
-  const playersRef = useRef([]); // ✅ holds freshest players for end screen
+  const playersRef = useRef([]); // holds freshest players for end screen
   const { roomId } = useParams();
-  const navigate = useNavigate(); // ✅ for /end navigation
+  const navigate = useNavigate(); // for /end navigation
 
   // UI / game states
   const [players, setPlayers] = useState([]);
@@ -53,8 +53,7 @@ const Play = () => {
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
 
   // Derived booleans
-  const isDrawer =
-    (sessionStorage.getItem("userId") || currentUserId) === drawerId;
+  const isDrawer = (getUserId() || currentUserId) === drawerId;
   const canAnswer = myTeam === drawerTeam && !isDrawer;
 
   // ---------- UI helpers ----------
@@ -77,7 +76,7 @@ const Play = () => {
     if (answer.trim() === "" || !canAnswer) return;
     socket.emit("submitAnswer", {
       gameId: roomId,
-      userId: sessionStorage.getItem("userId"),
+      userId: getUserId(),
       answer: answer.trim(),
     });
     setAnswer("");
@@ -107,14 +106,14 @@ const Play = () => {
     if (isDrawer) {
       socket.emit("clear-canvas", {
         gameId: roomId,
-        userId: sessionStorage.getItem("userId"),
+        userId: getUserId(),
       });
     }
   };
 
   // ---------- Socket setup ----------
   useEffect(() => {
-    const userId = sessionStorage.getItem("userId");
+    const userId = getUserId();
     setCurrentUserId(userId || "");
 
     console.log("[Play] mounting | roomId=", roomId, "userId=", userId);
@@ -140,7 +139,12 @@ const Play = () => {
     };
     socket.on("lobbyUsers", onLobbyUsers);
 
-    const onProfileUpdated = ({ userId, displayName, avatarSeed, avatarStyle }) => {
+    const onProfileUpdated = ({
+      userId,
+      displayName,
+      avatarSeed,
+      avatarStyle,
+    }) => {
       setProfiles((prev) => ({
         ...prev,
         [userId]: {
@@ -212,7 +216,7 @@ const Play = () => {
         newDrawerId,
         displayName,
         team,
-        clientUserId: sessionStorage.getItem("userId"),
+        clientUserId: getUserId(),
       });
       setDrawerId(newDrawerId);
       setDrawerTeam(team || "");
@@ -237,11 +241,11 @@ const Play = () => {
     socket.on("newFlashcard", (data) => {
       console.log("[Play] received newFlashcard (drawer-only):", {
         data,
-        clientUserId: sessionStorage.getItem("userId"),
+        clientUserId: getUserId(),
         drawerId,
         translation: data.translation ?? data.hint ?? "",
         imageSrc: data.imageSrc ?? data.image ?? "",
-        audioSrc: data.audioSrc ?? data.audio ?? ""
+        audioSrc: data.audioSrc ?? data.audio ?? "",
       });
       setFlashcard(data);
     });
@@ -281,7 +285,9 @@ const Play = () => {
     // ✅ game ended -> go to /end with final players
     socket.on("gameEnded", (data) => {
       setRoundResult({ type: "gameEnded" });
-      const base = Array.isArray(playersRef.current) ? playersRef.current : players;
+      const base = Array.isArray(playersRef.current)
+        ? playersRef.current
+        : players;
       const withAvatars = base.map((p) => {
         const prof = profiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
@@ -334,18 +340,23 @@ const Play = () => {
       <div className={chipClass} key={user.userId}>
         <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
         <span className="chip-name">{displayName}</span>
-        {user.userId === drawerId && <span className="chip-pen" title="Drawing now">✏️</span>}
+        {user.userId === drawerId && (
+          <span className="chip-pen" title="Drawing now">
+            ✏️
+          </span>
+        )}
       </div>
     );
   };
-
 
   const targetPhrase = flashcard?.transliteration || "";
 
   const hintDisplay = !isDrawer
     ? maskPhraseToUnderscores(targetPhrase)
-    : (flashcard?.word || flashcard?.translation || flashcard?.transliteration || "");
-
+    : flashcard?.word ||
+      flashcard?.translation ||
+      flashcard?.transliteration ||
+      "";
 
   return (
     <>
@@ -389,14 +400,11 @@ const Play = () => {
         <div className="hint-box">
           <strong>Word Hint: </strong>
           <label htmlFor="wordhint">
-                    {flashcard && !isDrawer
-            ? maskPhraseToUnderscores(flashcard.word || "")
-            : "..."}
-
+            {flashcard && !isDrawer
+              ? maskPhraseToUnderscores(flashcard.word || "")
+              : "..."}
           </label>
         </div>
-
-
 
         {/* Drawer sees the full flashcard */}
         {flashcard && isDrawer && <Flashcard items={[flashcard]} />}
@@ -519,7 +527,7 @@ const Play = () => {
               <button
                 onClick={() =>
                   console.log("DBG state", {
-                    currentUserId: sessionStorage.getItem("userId"),
+                    currentUserId: getUserId(),
                     drawerId,
                     isDrawer,
                     flashcard,

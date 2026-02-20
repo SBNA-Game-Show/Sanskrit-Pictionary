@@ -26,10 +26,6 @@ export function saveUserData(userId, displayName, email, token) {
     storage.setItem(STORAGE_KEYS.DISPLAY_NAME, displayName);
     if (email) storage.setItem(STORAGE_KEYS.EMAIL, email);
     if (token) storage.setItem(STORAGE_KEYS.TOKEN, token);
-    console.log(
-      "User data saved to",
-      isLocalStorageAvailable() ? "localStorage" : "sessionStorage",
-    );
     return true;
   } catch (error) {
     console.error("Failed to save user data:", error);
@@ -61,7 +57,6 @@ export function clearUserData() {
     storage.removeItem(STORAGE_KEYS.DISPLAY_NAME);
     storage.removeItem(STORAGE_KEYS.EMAIL);
     storage.removeItem(STORAGE_KEYS.TOKEN);
-    console.log("User data cleared");
   } catch (error) {
     console.error("Failed to clear user data:", error);
   }

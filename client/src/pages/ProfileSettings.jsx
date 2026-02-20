@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { socket } from "./socket";
 import { getUserId, saveUserData, getUserData } from "../utils/authStorage";
+import { apiClient } from "../utils/authAPI";
 import { createAvatar } from "@dicebear/core";
 import {
   funEmoji,
@@ -77,7 +77,12 @@ export default function ProfileSettings() {
 
       // 1) Save display name to centralized auth storage
       const currentUserData = getUserData();
-      saveUserData(userId, displayName, currentUserData?.email);
+      saveUserData(
+        userId,
+        displayName,
+        currentUserData?.email,
+        currentUserData?.token,
+      );
 
       // 2) Save avatar preferences separately (UI-only data)
       localStorage.setItem(
@@ -93,18 +98,12 @@ export default function ProfileSettings() {
       window.dispatchEvent(new Event("displayNameChanged"));
 
       // 3) Save on backend (with credentials for cookie)
-      await axios.put(
-        "/api/users/me/profile",
-        {
-          userId,
-          displayName,
-          avatarSeed,
-          avatarStyle,
-        },
-        {
-          withCredentials: true, // Send HTTP-only cookie
-        },
-      );
+      await apiClient.put("/api/users/me/profile", {
+        userId,
+        displayName,
+        avatarSeed,
+        avatarStyle,
+      });
 
       // 4) Notify lobby via socket
       socket.emit("updateProfile", {

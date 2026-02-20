@@ -129,6 +129,31 @@ const Lobby = () => {
   useEffect(() => {
     if (!myUserId || !roomId) return;
 
+    // unction to rejoin
+    const rejoinLobby = () => {
+      console.log("[Lobby] Rejoining lobby");
+
+      socket.emit("registerLobby", {
+        userId: myUserId,
+        displayName: myDisplayName,
+        roomId,
+      });
+
+      socket.emit("requestLobbyUsers", { roomId });
+      socket.emit("getHost", { roomId });
+    };
+
+    // Initial registration
+    rejoinLobby();
+
+    // Handle reconnection
+    const handleReconnect = () => {
+      console.log("[Lobby] Socket reconnected, rejoining");
+      rejoinLobby();
+    };
+
+    socket.on("connect", handleReconnect);
+
     // 1) Attach listeners FIRST to avoid race conditions
     socket.on("lobbyUsers", setOnlineUsers);
     socket.on("userJoinedLobby", (user) => {
@@ -218,6 +243,7 @@ const Lobby = () => {
 
     return () => {
       // cleanup only what we used
+      socket.off("connect", handleReconnect);
       socket.off("lobbyUsers");
       socket.off("userJoinedLobby");
       socket.off("userLeftLobby");

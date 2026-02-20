@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { apiClient } from "../utils/authAPI";
 import { useNavigate } from "react-router-dom";
 import { getEmail } from "../utils/authStorage";
 import { logoutUser } from "../utils/authAPI";
@@ -35,17 +35,11 @@ export default function AccountSettings() {
 
     try {
       setLoading(true);
-      await axios.post(
-        "/api/users/change-password",
-        {
-          email,
-          oldPassword: oldPw,
-          newPassword: newPw,
-        },
-        {
-          withCredentials: true,
-        },
-      );
+      await apiClient.post("/api/users/change-password", {
+        email,
+        oldPassword: oldPw,
+        newPassword: newPw,
+      });
       setMsg("Password changed ✓");
       setOldPw("");
       setNewPw("");

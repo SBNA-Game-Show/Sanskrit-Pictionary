@@ -30,7 +30,9 @@ function stripCommonEndings(s) {
 function toArray(v) {
   if (!v) return [];
   if (Array.isArray(v)) return v;
-  return String(v).split(/[\/,;|、，\s]+/).filter(Boolean);
+  return String(v)
+    .split(/[\/,;|、，\s]+/)
+    .filter(Boolean);
 }
 
 function pushManyDeva(set, raw) {
@@ -46,19 +48,23 @@ class GameSessionManager {
     this.sessions = new Map();
   }
 
-  createSession(gameId, players, totalRounds, timer, difficulty) {
-    // shuffle players and assign teams (even/odd)
-    const shuffled = players.slice().sort(() => Math.random() - 0.5);
-    shuffled.forEach((p, i) => {
-      p.team = i % 2 === 0 ? "Red" : "Blue";
+  createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
+    // assign players to selected teams
+    players.forEach((p) => {
+      if (teams.Red.includes(p.userId)) {
+        p.team = "Red";
+      } else if (teams.Blue.includes(p.userId)) {
+        p.team = "Blue";
+      }
     });
 
     // make sure the first drawer is on Red team if available
-    let firstDrawerIndex = shuffled.findIndex((p) => p.team === "Red");
+    let firstDrawerIndex = players.findIndex((p) => p.team === "Red");
     if (firstDrawerIndex === -1) firstDrawerIndex = 0;
 
     this.sessions.set(gameId, {
-      players: shuffled,
+      players,
+      hostData,
       currentRound: 0,
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
@@ -67,15 +73,16 @@ class GameSessionManager {
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
+      canvasData: null,
     });
 
     // init scores
-    shuffled.forEach((p) => {
+    players.forEach((p) => {
       this.sessions.get(gameId).scores[p.userId] = 0;
     });
 
     console.log(
-      `[createSession] gameId=${gameId} players=${shuffled.length} timer=${timer} difficulty=${difficulty}`
+      `[createSession] gameId=${gameId} players=${players.length} timer=${timer} difficulty=${difficulty}`
     );
   }
 
@@ -98,12 +105,12 @@ class GameSessionManager {
       const countMatching = await Flashcard.countDocuments(query);
       const totalCount = await Flashcard.countDocuments({});
       console.log(
-        `[getRandomFlashcard] difficulty=${difficulty} matching=${countMatching} total=${totalCount}`
+        `[getRandomFlashcard] difficulty=${difficulty} matching=${countMatching} total=${totalCount}`,
       );
 
       if (countMatching === 0 && totalCount > 0) {
         console.warn(
-          `[getRandomFlashcard] No flashcards found for difficulty "${difficulty}". Falling back to any flashcard.`
+          `[getRandomFlashcard] No flashcards found for difficulty "${difficulty}". Falling back to any flashcard.`,
         );
         const any = await Flashcard.aggregate([{ $sample: { size: 1 } }]);
         return any && any.length ? any[0] : null;
@@ -120,7 +127,7 @@ class GameSessionManager {
       ]);
       if (!res || res.length === 0) {
         console.warn(
-          "[getRandomFlashcard] aggregate returned no results (unexpected)."
+          "[getRandomFlashcard] aggregate returned no results (unexpected).",
         );
         return null;
       }
@@ -152,11 +159,11 @@ class GameSessionManager {
     }
 
     console.log(
-      `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`
+      `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`,
     );
 
-    // Send flashcard privately to drawer
-    io.to(currentPlayer.socketId).emit("newFlashcard", {
+    // Send flashcard privately to drawer and host
+    io.to([currentPlayer.socketId, session.hostData.hostSocketId]).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
       translation: flashcard.translation,
@@ -180,6 +187,7 @@ class GameSessionManager {
 
     io.to(gameId).emit("gameState", {
       players: this.getPlayersWithScores(gameId),
+      hostData: session.hostData,
       currentPlayerIndex: session.currentPlayerIndex,
       drawer: {
         userId: currentPlayer.userId,
@@ -272,7 +280,7 @@ class GameSessionManager {
       const total = Number(session.timer) || 60;
       const remain = Math.max(
         0,
-        Math.min(total, Number(remainingSeconds) || 0)
+        Math.min(total, Number(remainingSeconds) || 0),
       );
       const ratio = total > 0 ? remain / total : 0;
       const gained = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * ratio);
@@ -293,7 +301,7 @@ class GameSessionManager {
       // check if all teammates (excluding drawer) already answered
       const drawer = session.players[session.currentPlayerIndex];
       const teammates = session.players.filter(
-        (p) => p.team === drawer.team && p.userId !== drawer.userId
+        (p) => p.team === drawer.team && p.userId !== drawer.userId,
       );
       const everyoneCorrect =
         teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
@@ -340,6 +348,67 @@ class GameSessionManager {
       points: session.scores[p.userId] || 0,
       imageSrc: p.imageSrc || "",
     }));
+  }
+
+  // ✅ Get all sessions
+  getAllSessions() {
+    return this.sessions;
+  }
+
+  // ✅ Mark player as reconnected
+  markPlayerReconnected(gameId, userId, socketId) {
+    const session = this.sessions[gameId];
+    if (!session) return false;
+
+    const player = session.players.find((p) => p.userId === userId);
+    if (player) {
+      player.disconnected = false;
+      player.socketId = socketId;
+      delete player.disconnectTime;
+      console.log(`[Session] Player ${userId} reconnected to ${gameId}`);
+      return true;
+    }
+    return false;
+  }
+
+  // ✅ Remove player from session
+  removePlayer(gameId, userId) {
+    const session = this.sessions[gameId];
+    if (!session) return false;
+
+    const index = session.players.findIndex((p) => p.userId === userId);
+    if (index !== -1) {
+      session.players.splice(index, 1);
+      console.log(`[Session] Removed player ${userId} from ${gameId}`);
+      return true;
+    }
+    return false;
+  }
+
+  // ✅ ADD: Update canvas data
+  updateCanvasData(gameId, canvasData) {
+    const session = this.sessions.get(gameId);
+    if (session) {
+      session.canvasData = canvasData;
+      return true;
+    }
+    return false;
+  }
+
+  // ✅ ADD: Clear canvas data (called when round changes)
+  clearCanvasData(gameId) {
+    const session = this.sessions.get(gameId);
+    if (session) {
+      session.canvasData = null;
+      return true;
+    }
+    return false;
+  }
+
+  // ✅ ADD: Get canvas data
+  getCanvasData(gameId) {
+    const session = this.sessions.get(gameId);
+    return session?.canvasData || null;
   }
 }
 

@@ -178,3 +178,6 @@
   font-weight: 700;
   align-self: center;
 }
+.hidden {
+  visibility: hidden;
+}

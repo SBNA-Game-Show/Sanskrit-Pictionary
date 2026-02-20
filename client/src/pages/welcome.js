@@ -13,7 +13,6 @@ function Welcome() {
       const result = await verifyAuth();
 
       if (result.valid) {
-        console.log("✅ User already logged in:", result.user.displayName);
         navigate("/lobby");
       } else {
         setChecking(false);

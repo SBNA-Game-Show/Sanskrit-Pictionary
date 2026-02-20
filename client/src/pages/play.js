@@ -9,7 +9,7 @@ import { ReactSketchCanvas } from "react-sketch-canvas";
 import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
-import { getUserId } from "../utils/authStorage";
+import { getUserId, getDisplayName } from "../utils/authStorage";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -33,6 +33,7 @@ const Play = () => {
 
   // UI / game states
   const [players, setPlayers] = useState([]);
+  const [hostData, setHostData] = useState(null);
   const [timeLeft, setTimeLeft] = useState(60);
   const [eraseMode, setEraseMode] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(5);
@@ -110,16 +111,37 @@ const Play = () => {
   useEffect(() => {
     const userId = getUserId();
     setCurrentUserId(userId || "");
-
     console.log("[Play] mounting | roomId=", roomId, "userId=", userId);
     if (!roomId) return;
 
-    // Ask server for current state
-    socket.emit("getGameState", { roomId });
-    console.log("[Play] emitted getGameState", { roomId });
+    // Function to rejoin and sync state
+    const rejoinAndSync = () => {
+      console.log("[Play] Rejoining room and syncing state");
+      socket.emit("registerLobby", {
+        userId,
+        displayName: getDisplayName() || userId,
+        roomId,
+      });
+      socket.emit("getGameState", { roomId });
+      socket.emit("requestLobbyUsers", { roomId });
+    };
 
-    // Also grab profiles using the existing lobby event (no server changes)
-    socket.emit("requestLobbyUsers", { roomId });
+    rejoinAndSync();
+
+    const handleReconnect = () => {
+      console.log("[Play] Socket reconnected, rejoining game");
+      rejoinAndSync();
+    };
+
+    socket.on("connect", handleReconnect);
+
+    socket.on("playerDisconnected", ({ userId, displayName }) => {
+      console.warn(`⚠️ Player ${displayName} disconnected`);
+    });
+
+    socket.on("playerReconnected", ({ userId, displayName }) => {
+      console.log(`✅ Player ${displayName} reconnected`);
+    });
 
     const onLobbyUsers = (users) => {
       const map = {};
@@ -151,13 +173,14 @@ const Play = () => {
     };
     socket.on("profileUpdated", onProfileUpdated);
 
-    // -------- core state sync --------
+    // ✅ UPDATED: gameState with canvas data
     socket.on("gameState", (state) => {
       console.log("[Play] received gameState:", state);
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
       setPlayers(state.players || []);
-      playersRef.current = state.players || []; // ✅ keep ref fresh
+      setHostData(state.hostData || null);
+      playersRef.current = state.players || [];
       setDrawerId(state.drawer?.userId || null);
       setDrawerTeam(state.drawer?.team || "");
       setCurrentPlayerName(state.drawer?.displayName || "");
@@ -167,16 +190,30 @@ const Play = () => {
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
+
+      // ✅ Handle canvas data from gameState
+      if (canvasRef.current) {
+        canvasRef.current.clearCanvas();
+
+        if (state.canvasData && state.canvasData.length > 0) {
+          setTimeout(() => {
+            if (canvasRef.current) {
+              console.log("[Play] Loading canvas data from gameState");
+              canvasRef.current.loadPaths(state.canvasData);
+            }
+          }, 100);
+        }
+      }
     });
 
     socket.on("updatePlayers", (list) => {
       setPlayers(list || []);
-      playersRef.current = list || []; // ✅ keep ref fresh
+      playersRef.current = list || [];
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
     });
 
-    // drawerChanged: when drawer rotates
+    // drawerChanged clears canvas
     socket.on("drawerChanged", ({ userId: newDrawerId, displayName, team }) => {
       console.log("[Play] drawerChanged", {
         newDrawerId,
@@ -184,26 +221,32 @@ const Play = () => {
         team,
         clientUserId: getUserId(),
       });
+
       setDrawerId(newDrawerId);
       setDrawerTeam(team || "");
+
       const name =
         typeof displayName === "string"
           ? displayName
           : displayName?.displayName || displayName?.userId || "";
       setCurrentPlayerName(name);
+
+      // Clear canvas when drawer changes
+      if (canvasRef.current) {
+        canvasRef.current.clearCanvas();
+      }
     });
 
-    // timer updates
     socket.on("timerUpdate", ({ secondsLeft }) => {
       setTimeLeft(secondsLeft);
     });
 
-    // drawing broadcast -> draw on local canvas
     socket.on("drawing-data", (data) => {
-      canvasRef.current?.loadPaths(data);
+      if (canvasRef.current) {
+        canvasRef.current.loadPaths(data);
+      }
     });
 
-    // The server emits this to the drawer (only) when a round starts and a flashcard is selected.
     socket.on("newFlashcard", (data) => {
       console.log("[Play] received newFlashcard (drawer-only):", {
         data,
@@ -216,20 +259,27 @@ const Play = () => {
       setFlashcard(data);
     });
 
-    // round started
+    // roundStarted clears canvas
     socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
       console.log("[Play] roundStarted payload:", {
         currentRound,
         currentPlayer,
         timer,
       });
+
       let cpName = "";
       if (typeof currentPlayer === "string") cpName = currentPlayer;
       else if (currentPlayer && typeof currentPlayer === "object")
         cpName = currentPlayer.displayName || currentPlayer.userId || "";
+
       setCurrentPlayerName(cpName);
       setAnswer("");
-       setTimeLeft(timer || 0); 
+      setTimeLeft(timer || 0);
+
+      // Clear canvas when new round starts
+      if (canvasRef.current) {
+        canvasRef.current.clearCanvas();
+      }
     });
 
     socket.on("correctAnswer", ({ userId: correctUserId, displayName }) => {
@@ -242,14 +292,12 @@ const Play = () => {
       socket.emit("getGameState", { roomId });
     });
 
-    // clear canvas broadcast
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
       canvasRef.current?.eraseMode(false);
       setEraseMode(false);
     });
 
-    // ✅ game ended -> go to /end with final players
     socket.on("gameEnded", () => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
@@ -272,8 +320,10 @@ const Play = () => {
       }, 1200);
     });
 
-    // cleanup on unmount
     return () => {
+      socket.off("connect", handleReconnect);
+      socket.off("playerDisconnected");
+      socket.off("playerReconnected");
       socket.off("lobbyUsers", onLobbyUsers);
       socket.off("profileUpdated", onProfileUpdated);
       socket.off("gameState");
@@ -287,7 +337,9 @@ const Play = () => {
       socket.off("clear-canvas");
       socket.off("gameEnded");
     };
-  }, [roomId, navigate]); // ✅ include navigate to satisfy hooks linting
+  }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  const isHost = currentUserId === hostData?.hostId;
 
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
@@ -348,7 +400,7 @@ const Play = () => {
           </div>
         )}
 
-        <div className="score-box">
+        <div className={`score-box ${isHost && "hidden"}`}>
           <strong>Score: </strong>
           <a>
             <label htmlFor="score">
@@ -374,8 +426,8 @@ const Play = () => {
           </label>
         </div> */}
 
-        {/* Drawer sees the full flashcard */}
-        {flashcard && isDrawer && <Flashcard items={[flashcard]} />}
+        {/* Drawer and host see the full flashcard */}
+        {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
 
         {/* User List */}
         <div className="user-list">
@@ -469,13 +521,16 @@ const Play = () => {
           <Chat
             myUserId={currentUserId}
             myDisplayName={
-              players.find((p) => p.userId === currentUserId)?.displayName || ""
+              isHost
+                ? hostData.hostDisplayName
+                : players.find((p) => p.userId === currentUserId)
+                    ?.displayName || ""
             }
             myTeam={myTeam}
           />
         </div>
 
-        <div className="input-area-wrapper">
+        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input

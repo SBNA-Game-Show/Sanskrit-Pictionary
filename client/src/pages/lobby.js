@@ -124,10 +124,36 @@ const Lobby = () => {
   const isHost = myUserId === hostId;
   const redTeamHasPlayers = teams.Red.length > 1;
   const blueTeamHasPlayers = teams.Blue.length > 1;
-  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers;
+  const evenTeams = Math.abs(teams.Red.length - teams.Blue.length) <= 1;
+  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
   useEffect(() => {
     if (!myUserId || !roomId) return;
+
+    // unction to rejoin
+    const rejoinLobby = () => {
+      console.log("[Lobby] Rejoining lobby");
+
+      socket.emit("registerLobby", {
+        userId: myUserId,
+        displayName: myDisplayName,
+        roomId,
+      });
+
+      socket.emit("requestLobbyUsers", { roomId });
+      socket.emit("getHost", { roomId });
+    };
+
+    // Initial registration
+    rejoinLobby();
+
+    // Handle reconnection
+    const handleReconnect = () => {
+      console.log("[Lobby] Socket reconnected, rejoining");
+      rejoinLobby();
+    };
+
+    socket.on("connect", handleReconnect);
 
     // 1) Attach listeners FIRST to avoid race conditions
     socket.on("lobbyUsers", setOnlineUsers);
@@ -218,6 +244,7 @@ const Lobby = () => {
 
     return () => {
       // cleanup only what we used
+      socket.off("connect", handleReconnect);
       socket.off("lobbyUsers");
       socket.off("userJoinedLobby");
       socket.off("userLeftLobby");
@@ -338,7 +365,7 @@ const Lobby = () => {
             </span>
           )}
         </span>
-        {actions}
+        {!isHostUser && actions}
       </div>
     );
   };
@@ -444,22 +471,26 @@ const Lobby = () => {
             </div>
           </div>
 
-          <button
-            className="start-game-button"
-            onClick={() => {
-              if (isHost) {
-                socket.emit("startGame", {
-                  gameId: roomId,
-                  totalRounds: selectedRounds,
-                  timer: selectedTimer,
-                  difficulty: selectedDifficulty,
-                });
-              }
-            }}
-            disabled={!canStartGame}
-          >
-            Start Game
-          </button>
+          {isHost && (
+            <button
+              className="start-game-button"
+              onClick={() => {
+                if (isHost) {
+                  socket.emit("startGame", {
+                    gameId: roomId,
+                    totalRounds: selectedRounds,
+                    timer: selectedTimer,
+                    difficulty: selectedDifficulty,
+                    hostData: {hostId, hostDisplayName: myDisplayName, hostSocketId: socket.id},
+                    teams: teams,
+                  });
+                }
+              }}
+              disabled={!canStartGame}
+            >
+              Start Game
+            </button>
+          )}
 
           {!isHost && (
             <small style={{ color: "#999" }}>

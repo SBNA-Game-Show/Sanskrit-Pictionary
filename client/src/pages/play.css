@@ -9,14 +9,17 @@
 }
 
 .score-box,
-.time-box,
-.hint-box {
+.time-box {
   background-color: rgba(242, 210, 182);
   border-radius: 15px;
   padding: 10px;
   font-size: 25px;
   text-align: center;
   align-self: center;
+}
+
+.score-box{
+  font-size: 30px;
 }
 
 .flashcard {
@@ -168,4 +171,10 @@
   border-radius: 12px;
   padding: 12px 14px;
   box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}
+
+.drawer-name{
+  font-size: 2.0em;
+  font-weight: 700;
+  align-self: center;
 }

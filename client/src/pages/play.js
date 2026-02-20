@@ -229,7 +229,7 @@ const Play = () => {
         cpName = currentPlayer.displayName || currentPlayer.userId || "";
       setCurrentPlayerName(cpName);
       setAnswer("");
-      setTimeLeft(timer || 0);
+       setTimeLeft(timer || 0); 
     });
 
     socket.on("correctAnswer", ({ userId: correctUserId, displayName }) => {
@@ -319,12 +319,12 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-  const hintDisplay = !isDrawer
+  /* const hintDisplay = !isDrawer
     ? maskPhraseToUnderscores(targetPhrase)
     : flashcard?.word ||
       flashcard?.translation ||
       flashcard?.transliteration ||
-      "";
+      ""; */
 
   return (
     <>
@@ -365,14 +365,14 @@ const Play = () => {
           </a>
         </div>
 
-        <div className="hint-box">
+        {/* <div className="hint-box">
           <strong>Word Hint: </strong>
           <label htmlFor="wordhint">
             {flashcard && !isDrawer
               ? maskPhraseToUnderscores(flashcard.word || "")
               : "..."}
           </label>
-        </div>
+        </div> */}
 
         {/* Drawer sees the full flashcard */}
         {flashcard && isDrawer && <Flashcard items={[flashcard]} />}
@@ -400,7 +400,7 @@ const Play = () => {
           </div>
         </div>
 
-        <div style={{ textAlign: "center", marginBottom: "5px" }}>
+        <div className="drawer-name" style={{ textAlign: "center", marginBottom: "5px" }}>
           <strong>Drawing by:</strong>{" "}
           <span
             style={{

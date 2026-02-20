@@ -4,10 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import './end.css';
 
 
-
-
-
-
 const End = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,9 +70,9 @@ const End = () => {
           <div className={`leaderboard-card ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`} key={player.id}>
             <div className="rank-badge">#{index + 1}</div>
             <img
-              src={player.avatar || '/default-avatar.png'}
+               src={player.avatar || '/default-avatar.png'}
               alt={`${player.name}'s avatar`}
-              className="player-avatar"
+              className="player-avatar" 
               onError={(e) => { e.currentTarget.src = '/default-avatar.png'; }}
             />
             <div className="player-info">

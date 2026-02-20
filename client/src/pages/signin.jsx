@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./signin.css";
 import { useNavigate } from "react-router-dom";
 import { loginUser } from "../utils/authAPI";
+import { toastSuccess, toastError } from "../utils/toast";
 
 function Signin() {
   const navigate = useNavigate();
@@ -30,14 +31,14 @@ function Signin() {
         // Notify navbar to update
         window.dispatchEvent(new Event("displayNameChanged"));
 
-        alert("✅ Login successful!");
+        toastSuccess("Login successful! Welcome back! 🎉");
         navigate("/lobby");
       } else {
-        alert(result.error);
+        toastError(result.error || "Login failed");
       }
     } catch (error) {
       console.error("Login error:", error);
-      alert("An unexpected error occurred");
+      toastError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }

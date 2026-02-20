@@ -264,6 +264,14 @@ const Lobby = () => {
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 
+    const handleBackButton = () => {
+    // Leave the lobby before navigating away
+    if (socket && socket.connected) {
+      socket.emit("leaveLobby", { roomId, userId: myUserId });
+    }
+    navigate('/lobby');
+  };
+  
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId),
@@ -398,6 +406,13 @@ const Lobby = () => {
           ) : (
             unassignedUsers.map((u) => renderUserRow(u.userId))
           )}
+
+          <button 
+              className="copy-button"
+              onClick={handleBackButton}
+              title="Back to main menu"
+            > Back to Main
+            </button>
         </div>
 
         {/* TEAMS */}

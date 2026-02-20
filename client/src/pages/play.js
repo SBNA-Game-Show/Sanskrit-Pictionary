@@ -83,13 +83,18 @@ const Play = () => {
   };
 
   // Emit drawing updates only if you're the drawer
+  const lastEmit = useRef(0);
   const handleCanvasChange = (paths) => {
     if (isDrawer) {
-      socket.emit("drawing-data", {
-        gameId: roomId,
-        userId: getUserId(),
-        data: paths,
-      });
+      const now = Date.now();
+      if (now - lastEmit.current > 100) { // Throttle emits to every 100ms
+        socket.emit("drawing-data", {
+          gameId: roomId,
+          userId: sessionStorage.getItem("userId"),
+          data: paths,
+        });
+        lastEmit.current = now;
+      }
     }
   };
 

@@ -48,19 +48,23 @@ class GameSessionManager {
     this.sessions = new Map();
   }
 
-  createSession(gameId, players, totalRounds, timer, difficulty) {
-    // shuffle players and assign teams (even/odd)
-    const shuffled = players.slice().sort(() => Math.random() - 0.5);
-    shuffled.forEach((p, i) => {
-      p.team = i % 2 === 0 ? "Red" : "Blue";
+  createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
+    // assign players to selected teams
+    players.forEach((p) => {
+      if (teams.Red.includes(p.userId)) {
+        p.team = "Red";
+      } else if (teams.Blue.includes(p.userId)) {
+        p.team = "Blue";
+      }
     });
 
     // make sure the first drawer is on Red team if available
-    let firstDrawerIndex = shuffled.findIndex((p) => p.team === "Red");
+    let firstDrawerIndex = players.findIndex((p) => p.team === "Red");
     if (firstDrawerIndex === -1) firstDrawerIndex = 0;
 
     this.sessions.set(gameId, {
-      players: shuffled,
+      players,
+      hostData,
       currentRound: 0,
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
@@ -73,12 +77,12 @@ class GameSessionManager {
     });
 
     // init scores
-    shuffled.forEach((p) => {
+    players.forEach((p) => {
       this.sessions.get(gameId).scores[p.userId] = 0;
     });
 
     console.log(
-      `[createSession] gameId=${gameId} players=${shuffled.length} timer=${timer} difficulty=${difficulty}`,
+      `[createSession] gameId=${gameId} players=${players.length} timer=${timer} difficulty=${difficulty}`
     );
   }
 
@@ -158,8 +162,8 @@ class GameSessionManager {
       `[startRound] gameId=${gameId} currentPlayer=${currentPlayer.userId} socketId=${currentPlayer.socketId}`,
     );
 
-    // Send flashcard privately to drawer
-    io.to(currentPlayer.socketId).emit("newFlashcard", {
+    // Send flashcard privately to drawer and host
+    io.to([currentPlayer.socketId, session.hostData.hostSocketId]).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
       translation: flashcard.translation,
@@ -183,6 +187,7 @@ class GameSessionManager {
 
     io.to(gameId).emit("gameState", {
       players: this.getPlayersWithScores(gameId),
+      hostData: session.hostData,
       currentPlayerIndex: session.currentPlayerIndex,
       drawer: {
         userId: currentPlayer.userId,

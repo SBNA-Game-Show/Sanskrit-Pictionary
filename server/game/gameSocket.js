@@ -38,6 +38,7 @@ function createGameSocket(io) {
           // Send current game state to reconnected player
           socket.emit("gameState", {
             players: session.players,
+            hostData: session.hostData,
             currentPlayerIndex: session.currentPlayerIndex,
             drawer: session.players[session.currentPlayerIndex],
             currentRound: session.currentRound,
@@ -62,6 +63,7 @@ function createGameSocket(io) {
       if (session) {
         const {
           players,
+          hostData,
           currentPlayerIndex,
           currentRound,
           totalRounds,
@@ -73,6 +75,7 @@ function createGameSocket(io) {
         const canvasData = gameSessionManager.getCanvasData(roomId);
         socket.emit("gameState", {
           players,
+          hostData,
           currentPlayerIndex,
           drawer,
           currentRound,
@@ -86,38 +89,20 @@ function createGameSocket(io) {
     });
 
     // ---- start game ----
-    socket.on("startGame", ({ gameId, totalRounds, timer, difficulty }) => {
-      console.log("[socket] startGame:", {
-        gameId,
-        totalRounds,
-        timer,
-        difficulty,
-        by: socket.id,
-        userId: socket.userId,
-      });
-
+    socket.on("startGame", ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
+      console.log("[socket] startGame:", { gameId, totalRounds, timer, difficulty, by: socket.id, userId: socket.userId });
       const players = [];
       const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
       if (socketsInRoom) {
         for (const sid of socketsInRoom) {
           const s = io.sockets.sockets.get(sid);
-          if (s?.userId && s?.displayName) {
-            players.push({
-              userId: s.userId,
-              displayName: s.displayName,
-              socketId: s.id,
-            });
+          if (s?.userId && s?.displayName && s.userId !== hostData.hostId) {
+            players.push({ userId: s.userId, displayName: s.displayName, socketId: s.id });
           }
         }
       }
 
-      gameSessionManager.createSession(
-        gameId,
-        players,
-        totalRounds,
-        timer,
-        difficulty,
-      );
+      gameSessionManager.createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData);
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit(

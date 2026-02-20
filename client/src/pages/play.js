@@ -83,18 +83,47 @@ const Play = () => {
     setAnswer("");
   };
 
-  // Emit drawing updates only if you're the drawer
-  const handleCanvasChange = (paths) => {
-    if (isDrawer) {
+  // A utility to limit how often we send data (fixes lag)
+  // This ensures we don't spam the server more than once every 'limit' milliseconds
+  function throttle(func, limit) {
+    let lastFunc;
+    let lastRan;
+    return function (...args) {
+      const context = this;
+      if (!lastRan) {
+        func.apply(context, args);
+        lastRan = Date.now();
+      } else {
+        clearTimeout(lastFunc);
+        lastFunc = setTimeout(function () {
+          if (Date.now() - lastRan >= limit) {
+            func.apply(context, args);
+            lastRan = Date.now();
+          }
+        }, limit - (Date.now() - lastRan));
+      }
+    };
+  }
+
+  // It waits 60ms between canvas broadcasts
+  const throttledBroadcast = useRef(
+    throttle((roomId, userId, paths) => {
       socket.emit("drawing-data", {
         gameId: roomId,
-        userId: getUserId(),
+        userId: userId,
         data: paths,
       });
+    }, 60) 
+  ).current;
+
+  // Switched back to receiving real-time paths from onChange
+  // and passing them to the throttled function.
+  const handleCanvasChange = (paths) => {
+    if (isDrawer) {
+      throttledBroadcast(roomId, getUserId(), paths);
     }
   };
 
-  // Clear canvas (drawer triggers broadcast)
   const handleClear = () => {
     canvasRef.current?.clearCanvas();
     canvasRef.current?.eraseMode(false);

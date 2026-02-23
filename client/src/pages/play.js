@@ -232,15 +232,19 @@ const Play = () => {
       setTimeLeft(timer || 0);
     });
 
-    socket.on("correctAnswer", ({ userId: correctUserId, displayName }) => {
-      console.log("[Play] correctAnswer", { correctUserId, displayName });
+    socket.on("correctAnswer", ({
+      userId, displayName, word, transliteration, translation}) => {
       setRoundResult({
         type: "correct",
         displayName: displayName || "Someone",
+        word,
+        transliteration,
+        translation,
       });
-      setTimeout(() => setRoundResult(null), 1500);
-      socket.emit("getGameState", { roomId });
+
+      setTimeout(() => setRoundResult(null), 2500);
     });
+
 
     // clear canvas broadcast
     socket.on("clear-canvas", () => {
@@ -337,8 +341,21 @@ const Play = () => {
               <div className="modal-card">
                 <h3>Correct!</h3>
                 <p>{roundResult.displayName} guessed correctly 🎉</p>
+
+                <div style={{ marginTop: "10px" }}>
+                  <p style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
+                    {roundResult.word}
+                  </p>
+                  <p style={{ fontStyle: "italic" }}>
+                    {roundResult.transliteration}
+                  </p>
+                  <p style={{ opacity: 0.8 }}>
+                    {roundResult.translation}
+                  </p>
+                </div>
               </div>
             )}
+
             {roundResult.type === "gameEnded" && (
               <div className="modal-card">
                 <h3>Game Over</h3>

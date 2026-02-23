@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './end.css';
+import { shapes } from '@dicebear/collection';
 
 
 const End = () => {
@@ -38,6 +39,19 @@ const End = () => {
     return "tie";
   }, [redPoints, bluePoints]);
 
+  
+const winningStyle = (winningTeam) => {
+  if(winningTeam === 'red') {
+    return {color:'red', backgroundColor:'rgba(255, 0, 0, 0.1)'};
+  }
+  else if(winningTeam === 'blue') {
+    return {color:'blue', backgroundColor:'rgba(9, 9, 235, 0.1)'};
+  }else{
+    return {}
+  }
+};
+
+
 
   const handleNewGame = () => navigate('/lobby');
   const handleGoHome = () => navigate('/');
@@ -59,11 +73,11 @@ const End = () => {
   return (
     <div className="gameend-container">
       <h2 className="gameend-title">Leaderboard</h2>
-      <p className="winning-team">{winningTeam  === 'tie'
+      <p className="winning-team" style={winningStyle(winningTeam)}>{winningTeam  === 'tie'
     ? 'It’s a Tie!'
-    : `${winningTeam === 'red' ? 'Red' : 'Blue'} Team Wins!`}</p>
-      <div className="leaderboard-list">
-        <div className="teamRed">
+    : `${winningTeam === 'red' ? 'Red' : 'Blue'} Team Wins!`}  </p>
+      <div className="leaderboard-list" >
+        <div className={`teamRed ${winningTeam === 'red' ? 'winner' : ''}`}>
           <p className="team-title" id="red">Red Team </p>
           <div className="team-score">Total: {redPoints}</div>
         {redTeam.map((player, index) => (
@@ -89,7 +103,8 @@ const End = () => {
           </div>
         ))}
         </div>
-        <div className="teamBlue">
+
+        <div className={`teamBlue ${winningTeam === 'blue' ? 'winner' : ''}`}>
           <p className="team-title" id="blue">Blue Team</p>
           <div className="team-score">Total: {bluePoints}</div>
         {blueTeam.map((player, index) => (

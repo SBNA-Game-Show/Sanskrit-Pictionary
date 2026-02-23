@@ -271,6 +271,7 @@ const Play = () => {
 
     socket.on("drawing-data", (data) => {
       if (canvasRef.current) {
+        canvasRef.current.clearCanvas();
         canvasRef.current.loadPaths(data);
       }
     });

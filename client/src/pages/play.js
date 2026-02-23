@@ -10,6 +10,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
+import { toastWarning, toastInfo } from "../utils/toast";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -138,11 +139,11 @@ const Play = () => {
     socket.on("connect", handleReconnect);
 
     socket.on("playerDisconnected", ({ userId, displayName }) => {
-      console.warn(`⚠️ Player ${displayName} disconnected`);
+      toastWarning(`${displayName} disconnected`, { autoClose: 2000 });
     });
 
     socket.on("playerReconnected", ({ userId, displayName }) => {
-      console.log(`✅ Player ${displayName} reconnected`);
+      toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
     const onLobbyUsers = (users) => {

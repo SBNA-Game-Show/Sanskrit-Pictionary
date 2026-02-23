@@ -39,6 +39,73 @@
 
 ---
 
+## **2\.1 Gameplay Mechanics Implemented (Current Behavior)**
+
+### **A) Guesses: 4 per player (server-enforced)**
+
+* Each eligible **guesser** starts every round with **4 guesses**.
+
+  * Eligible guesser = on the **drawer’s team**, and **not** the drawer.
+
+* A wrong guess reduces only that player’s guesses: `4 → 3 → 2 → 1 → 0`.
+
+* Guesses reset back to **4** at the start of each new round.
+
+* The round ends immediately (even if time remains) when the guessing side is “done”:
+
+  * every eligible guesser has either **guessed correctly** OR has **0 guesses left**.
+
+Where this lives:
+
+* Backend (source of truth): `server/game/gameSessionManager.js`
+
+  * `startRound(...)` resets `player.remainingGuesses = 4` and `player.hasAnswered = false`
+
+  * `handleAnswer(...)` decrements `player.remainingGuesses` on wrong answers
+
+  * `getPlayersWithScores(...)` includes `remainingGuesses` in the players payload
+
+* Backend (round end trigger): `server/game/gameSocket.js`
+
+  * Ends the round early when `handleAnswer(...)` returns `guessesExhausted`
+
+* Frontend (display): `client/src/pages/play.js`
+
+  * Shows each player’s guesses as `G: <num>` in the user list
+
+  * Disables answering when your guesses hit `0`
+
+### **B) Scoring: quicker correct guess = more points**
+
+Correct answers use time-based scoring on the server.
+
+* Constants:
+
+  * `MAX_SCORE = 200`
+
+  * `MIN_SCORE = 10`
+
+* Formula:
+
+```
+ratio = remainingSeconds / totalSeconds
+scoreGained = floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * ratio)
+```
+
+Where this lives:
+
+* Score calculation: `server/game/gameSessionManager.js` (`handleAnswer(...)`)
+
+* Timer source for `remainingSeconds`: `server/game/gameSocket.js` (`activeTimers[gameId].secondsLeft`)
+
+* UI feedback showing the earned points:
+
+  * `client/src/reusableComponents/RoundPopups.jsx` (overlay popup)
+
+  * `client/src/pages/play.js` (Correct modal)
+
+---
+
 ## **3\. File Responsibilities & Refactor Targets**
 
 * **Large / multi-responsibility files** (good candidates for SRP):

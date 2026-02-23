@@ -74,6 +74,7 @@ class GameSessionManager {
       scores: {},
       currentFlashcard: null,
       canvasData: null,
+      // guesses are tracked per-player (p.remainingGuesses)
     });
 
     // init scores
@@ -144,6 +145,11 @@ class GameSessionManager {
     if (!session || !session.players.length) return;
 
     session.roundInProgress = true;
+    // Reset per-player guesses + answered state for new round
+    session.players.forEach((p) => {
+      p.hasAnswered = false;
+      p.remainingGuesses = 4;
+    });
 
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
@@ -183,6 +189,7 @@ class GameSessionManager {
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
       timer: session.timer,
+      // per-player guesses are sent via updatePlayers/gameState
     });
 
     io.to(gameId).emit("gameState", {
@@ -200,10 +207,6 @@ class GameSessionManager {
       timer: session.timer,
       currentFlashcard: null, // drawer-only
       scores: session.scores,
-    });
-
-    session.players.forEach((p) => {
-      p.hasAnswered = false;
     });
   }
 
@@ -234,6 +237,25 @@ class GameSessionManager {
 
     const player = session.players.find((p) => p.userId === userId);
     if (!player) return { allSubmitted: false };
+
+    // Ensure remainingGuesses is always a finite number in the 0..4 range.
+    // This prevents accidental extra chances due to falsy/undefined values.
+    const rgRaw = player.remainingGuesses;
+    const rgNum = Number(rgRaw);
+    if (!Number.isFinite(rgNum)) {
+      player.remainingGuesses = 4;
+    } else {
+      player.remainingGuesses = Math.max(0, Math.min(4, Math.floor(rgNum)));
+    }
+
+    if (player.remainingGuesses <= 0) {
+      if (player.socketId) {
+        io.to(player.socketId).emit("answerRejected", {
+          message: "No guesses left this round.",
+        });
+      }
+      return { allSubmitted: false };
+    }
 
     if (player.hasAnswered) {
       io.to(gameId).emit("answerResult", {
@@ -285,7 +307,12 @@ class GameSessionManager {
       const ratio = total > 0 ? remain / total : 0;
       const gained = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * ratio);
 
+      player.hasAnswered = true;
       session.scores[userId] = (session.scores[userId] || 0) + gained;
+
+      const fc = session.currentFlashcard || {};
+      const answerText =
+        fc.transliteration || fc.translation || fc.word || "";
 
       io.to(gameId).emit("correctAnswer", {
         userId,
@@ -293,29 +320,62 @@ class GameSessionManager {
         points: session.scores[userId],
         scoreGained: gained,
         remainingSeconds: remain,
+        answerText,
+        answer: {
+          word: fc.word || "",
+          transliteration: fc.transliteration || "",
+          translation: fc.translation || "",
+        },
       });
-    } else {
-      io.to(gameId).emit("wrongAnswer", {
-        userId,
-        displayName: player.displayName,
-      });
+
+      io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
+
+      // check if all teammates (excluding drawer) already answered
+      const drawer = session.players[session.currentPlayerIndex];
+      const teammates = session.players.filter(
+        (p) => p.team === drawer.team && p.userId !== drawer.userId,
+      );
+      const everyoneCorrect =
+        teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
+
+      // DO NOT start next round here; let socket layer decide using this flag
+      return { allSubmitted: Boolean(everyoneCorrect) };
     }
 
-    // Mark as answered regardless of correctness
-    player.hasAnswered = true;
+    // wrong answer
+    player.remainingGuesses = Math.max(0, (player.remainingGuesses ?? 4) - 1);
+
+    // ----- score penalty for wrong answer -----
+    const WRONG_ANSWER_PENALTY = 15;
+    const currentScore = session.scores[userId] || 0;
+    const newScore = Math.max(0, currentScore - WRONG_ANSWER_PENALTY);
+    session.scores[userId] = newScore;
+
+    io.to(gameId).emit("wrongAnswer", {
+      userId,
+      displayName: player.displayName,
+      remainingGuesses: player.remainingGuesses,
+      points: newScore,
+      scoreLost: WRONG_ANSWER_PENALTY,
+    });
 
     io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
 
-    // check if all teammates (excluding drawer) already answered
+    // End the round when ALL eligible guessers are either correct OR out of guesses
     const drawer = session.players[session.currentPlayerIndex];
-    const teammates = session.players.filter(
-      (p) => p.team === drawer.team && p.userId !== drawer.userId
+    const eligibleGuessers = session.players.filter(
+      (p) => p.team === drawer.team && p.userId !== drawer.userId,
     );
-    const everyoneSubmitted =
-      teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
 
-    // DO NOT start next round here; let socket layer decide using this flag
-    return { allSubmitted: Boolean(everyoneSubmitted) };
+    const everyoneCorrect =
+      eligibleGuessers.length > 0 && eligibleGuessers.every((p) => p.hasAnswered === true);
+    const allGuessersDone =
+      eligibleGuessers.length > 0 &&
+      eligibleGuessers.every(
+        (p) => p.hasAnswered === true || (p.remainingGuesses ?? 0) <= 0,
+      );
+
+    return { allSubmitted: Boolean(everyoneCorrect), guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect) };
   }
 
   endRound(gameId) {
@@ -346,6 +406,7 @@ class GameSessionManager {
       userId: p.userId,
       team: p.team,
       points: session.scores[p.userId] || 0,
+      remainingGuesses: p.remainingGuesses ?? 4,
       imageSrc: p.imageSrc || "",
     }));
   }

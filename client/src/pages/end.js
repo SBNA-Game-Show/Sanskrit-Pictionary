@@ -2,10 +2,12 @@
 import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './end.css';
-import { shapes } from '@dicebear/collection';
-
+import Fireworks from './firework.js';
+import {useReward} from "partycles";
 
 const End = () => {
+
+ 
   const navigate = useNavigate();
   const location = useLocation();
   // Expect players: [{userId, displayName, points, imageSrc, team}]
@@ -51,6 +53,17 @@ const winningStyle = (winningTeam) => {
   }
 };
 
+const winningFireworkColors = (winningTeam) => {
+  if(winningTeam === 'red') {
+    return ["#ff1744"];
+  }
+  else if(winningTeam === 'blue') {
+    return ["#2979ff"];
+  }else{
+    return ["#ff1744", "#2979ff", "#ffea00", "#00e676"];
+  }
+};
+
 
 
   const handleNewGame = () => navigate('/lobby');
@@ -70,9 +83,11 @@ const winningStyle = (winningTeam) => {
     );
   }
 
+
   return (
     <div className="gameend-container">
       <h2 className="gameend-title">Leaderboard</h2>
+      <Fireworks colors={winningFireworkColors(winningTeam)} />
       <p className="winning-team" style={winningStyle(winningTeam)}>{winningTeam  === 'tie'
     ? 'It’s a Tie!'
     : `${winningTeam === 'red' ? 'Red' : 'Blue'} Team Wins!`}  </p>

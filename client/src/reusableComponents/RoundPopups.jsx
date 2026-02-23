@@ -97,10 +97,19 @@ export default function RoundPopups() {
     };
 
     // ---- Correct answer / round end ----
-    const onCorrectAnswer = ({ displayName }) => {
+    const onCorrectAnswer = ({ displayName, scoreGained, answerText }) => {
+      const pts = Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null;
+      const ans = typeof answerText === "string" && answerText.trim() ? answerText.trim() : "";
       enqueue({
         title: `Round ${roundRef.current} ended`,
-        subtitle: displayName ? `Guesser: ${displayName}` : undefined,
+        subtitle:
+          displayName && pts !== null
+            ? `Guesser: ${displayName} (+${pts} pts)${ans ? ` — Answer: ${ans}` : ""}`
+            : displayName
+              ? `Guesser: ${displayName}`
+              : pts !== null
+                ? `+${pts} pts`
+                : undefined,
         kind: "end",
         team: drawerTeamRef.current, // keep outline with the drawer team for that round
         duration: 1600,
@@ -118,16 +127,29 @@ export default function RoundPopups() {
       });
     };
 
+    // ---- Guesses exhausted ----
+    const onGuessesExhausted = () => {
+      enqueue({
+        title: `Round ${roundRef.current} ended`,
+        subtitle: "Out of guesses!",
+        kind: "exhausted",
+        team: drawerTeamRef.current,
+        duration: 1600,
+      });
+    };
+
     socket.on("roundStarted", onRoundStarted);
     socket.on("drawerChanged", onDrawerChanged);
     socket.on("correctAnswer", onCorrectAnswer);
     socket.on("gameEnded", onGameEnded);
+    socket.on("guessesExhausted", onGuessesExhausted);
 
     return () => {
       socket.off("roundStarted", onRoundStarted);
       socket.off("drawerChanged", onDrawerChanged);
       socket.off("correctAnswer", onCorrectAnswer);
       socket.off("gameEnded", onGameEnded);
+      socket.off("guessesExhausted", onGuessesExhausted);
     };
   }, []);
 

@@ -6,6 +6,7 @@ import * as Dice from "@dicebear/collection";
 import Chat from "../reusableComponents/chat";
 import "./lobby.css";
 import { getUserId, getDisplayName } from "../utils/authStorage";
+import { toastSuccess, toastInfo, toastError } from "../utils/toast";
 
 /** Inline interactive DiceBear avatar (no extra files) */
 function InteractiveAvatar({
@@ -125,7 +126,8 @@ const Lobby = () => {
   const redTeamHasPlayers = teams.Red.length > 1;
   const blueTeamHasPlayers = teams.Blue.length > 1;
   const evenTeams = Math.abs(teams.Red.length - teams.Blue.length) <= 1;
-  const canStartGame = isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
+  const canStartGame =
+    isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
   useEffect(() => {
     if (!myUserId || !roomId) return;
@@ -190,12 +192,12 @@ const Lobby = () => {
 
     socket.on("userKicked", ({ userId }) => {
       if (userId === myUserId) {
-        alert("You were kicked from the lobby.");
+        toastInfo("You were kicked from the lobby.");
         navigate("/lobby");
       }
     });
     socket.on("kicked", () => {
-      alert("You were kicked from the lobby.");
+      toastInfo("You were kicked from the lobby.");
       navigate("/lobby");
     });
 
@@ -220,7 +222,7 @@ const Lobby = () => {
     });
 
     socket.on("gameEnded", () => {
-      alert("Game Over!");
+      toastSuccess("Game Over!");
       setCurrentRound(null);
       setTimeLeft(null);
     });
@@ -230,7 +232,15 @@ const Lobby = () => {
     });
 
     socket.on("startGameError", ({ message }) => {
-      alert(message || "Unable to start the game.");
+      toastError(message || "Unable to start the game.");
+    });
+
+    socket.on("hostLeft", ({ message }) => {
+      alert(message || "The host has left the lobby. All players are being kicked.");
+      if (socket && socket.connected) {
+        socket.emit("leaveLobby", { roomId, userId: myUserId });
+      }
+      navigate('/lobby');
     });
 
     // 2) After listeners are ready, emit registration & state requests
@@ -259,9 +269,18 @@ const Lobby = () => {
       socket.off("gameEnded");
       socket.off("leftTeam");
       socket.off("startGameError");
+      socket.off("hostLeft");
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 
+    const handleBackButton = () => {
+    // Leave the lobby before navigating away
+    if (socket && socket.connected) {
+      socket.emit("leaveLobby", { roomId, userId: myUserId });
+    }
+    navigate('/lobby');
+  };
+  
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId),
@@ -380,7 +399,7 @@ const Lobby = () => {
           className="copy-button"
           onClick={() => {
             navigator.clipboard.writeText(roomId);
-            alert("Link copied to clipboard!");
+            toastSuccess("Room ID copied to clipboard! 📋");
           }}
         >
           Copy ID
@@ -396,6 +415,13 @@ const Lobby = () => {
           ) : (
             unassignedUsers.map((u) => renderUserRow(u.userId))
           )}
+
+          <button 
+              className="copy-button"
+              onClick={handleBackButton}
+              title="Back to main menu"
+            > Back to Main
+            </button>
         </div>
 
         {/* TEAMS */}
@@ -481,7 +507,11 @@ const Lobby = () => {
                     totalRounds: selectedRounds,
                     timer: selectedTimer,
                     difficulty: selectedDifficulty,
-                    hostData: {hostId, hostDisplayName: myDisplayName, hostSocketId: socket.id},
+                    hostData: {
+                      hostId,
+                      hostDisplayName: myDisplayName,
+                      hostSocketId: socket.id,
+                    },
                     teams: teams,
                   });
                 }

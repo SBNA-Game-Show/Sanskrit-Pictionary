@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./signup.css";
 import { useNavigate } from "react-router-dom";
 import { registerUser } from "../utils/authAPI";
+import { toastSuccess, toastError, toastInfo } from "../utils/toast";
 
 function Signup() {
   const navigate = useNavigate();
@@ -28,12 +29,12 @@ function Signup() {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match.");
+      toastInfo("Passwords do not match.");
       return;
     }
 
     if (!validateEmail(formData.email)) {
-      alert("Please enter a valid email (e.g., user@example.com).");
+      toastInfo("Please enter a valid email (e.g., user@example.com).");
       return;
     }
 
@@ -47,14 +48,14 @@ function Signup() {
       );
 
       if (result.success) {
-        alert("✅ Registration successful!");
+        toastSuccess("Registration successful! Please login.");
         navigate("/signin");
       } else {
-        alert(result.error);
+        toastError(result.error || "Registration failed");
       }
     } catch (error) {
       console.error("Registration error:", error);
-      alert("An unexpected error occurred");
+      toastError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }

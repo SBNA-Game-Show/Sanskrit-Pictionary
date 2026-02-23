@@ -35,9 +35,12 @@ function createGameSocket(io) {
           // Get canvas data BEFORE sending gameState
           const canvasData = gameSessionManager.getCanvasData(roomId);
 
+          const me = session.players.find((p) => p.userId === userId);
+          const myRemainingGuesses = me?.remainingGuesses ?? 4;
+
           // Send current game state to reconnected player
           socket.emit("gameState", {
-            players: session.players,
+            players: gameSessionManager.getPlayersWithScores(roomId),
             hostData: session.hostData,
             currentPlayerIndex: session.currentPlayerIndex,
             drawer: session.players[session.currentPlayerIndex],
@@ -47,6 +50,7 @@ function createGameSocket(io) {
             currentFlashcard: session.currentFlashcard,
             scores: session.scores,
             canvasData: canvasData,
+            remainingGuesses: myRemainingGuesses,
           });
 
           // Notify others that player reconnected
@@ -62,7 +66,6 @@ function createGameSocket(io) {
       const session = gameSessionManager.getSession(roomId);
       if (session) {
         const {
-          players,
           hostData,
           currentPlayerIndex,
           currentRound,
@@ -71,8 +74,12 @@ function createGameSocket(io) {
           currentFlashcard,
           scores,
         } = session;
+        const players = gameSessionManager.getPlayersWithScores(roomId);
         const drawer = players[currentPlayerIndex];
         const canvasData = gameSessionManager.getCanvasData(roomId);
+
+        const me = session.players.find((p) => p.userId === socket.userId);
+        const myRemainingGuesses = me?.remainingGuesses ?? 4;
         socket.emit("gameState", {
           players,
           hostData,
@@ -84,6 +91,7 @@ function createGameSocket(io) {
           currentFlashcard,
           scores,
           canvasData: canvasData,
+          remainingGuesses: myRemainingGuesses,
         });
       }
     });
@@ -168,6 +176,12 @@ function createGameSocket(io) {
 
       // All teammates answered correctly -> immediately proceed to the next round
       if (result?.allSubmitted) {
+        clearActiveTimer(gameId);
+        proceedToNextRound(io, gameId);
+      }
+      // All guesses exhausted -> end round immediately
+      else if (result?.guessesExhausted) {
+        io.to(gameId).emit("guessesExhausted");
         clearActiveTimer(gameId);
         proceedToNextRound(io, gameId);
       }

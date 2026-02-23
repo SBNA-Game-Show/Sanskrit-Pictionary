@@ -14,6 +14,7 @@ import {
   bigEars,
 } from "@dicebear/collection";
 import "./profile.css";
+import { toastSuccess, toastError } from "../utils/toast";
 
 /* Map of available DiceBear styles */
 const stylesMap = {
@@ -36,7 +37,6 @@ export default function ProfileSettings() {
   const [avatarStyle, setAvatarStyle] = useState("funEmoji");
   const [uploadDataUrl, setUploadDataUrl] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
 
   // Load stored profile on mount
   useEffect(() => {
@@ -67,7 +67,6 @@ export default function ProfileSettings() {
   };
 
   const handleSave = async () => {
-    setMsg("");
     setSaving(true);
     try {
       const userId = getUserId();
@@ -113,13 +112,12 @@ export default function ProfileSettings() {
         avatarStyle,
       });
 
-      setMsg("Saved ✓");
+      toastSuccess("Profile updated successfully! ✨");
     } catch (err) {
       console.error(err);
-      setMsg("Couldn't save profile.");
+      toastError("Couldn't save profile.");
     } finally {
       setSaving(false);
-      setTimeout(() => setMsg(""), 2000);
     }
   };
 
@@ -230,11 +228,6 @@ export default function ProfileSettings() {
           </div>
         </div>
       </div>
-      {msg && (
-        <div className="notice" style={{ marginTop: 8 }}>
-          {msg}
-        </div>
-      )}
       <div className="actions">
         <button className="btn primary" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save Changes"}

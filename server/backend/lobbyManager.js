@@ -282,39 +282,58 @@ function createLobbyManager(io, UserModel) {
     });
 
     // --- LEAVE LOBBY ---
-    socket.on("leaveLobby", async () => {
-      const { userId, roomId } = socket;
-      const room = rooms[roomId];
+    socket.on("leaveLobby", async ({ roomId, userId }) => {
+      const finalUserId = userId || socket.userId;
+      const finalRoomId = roomId || socket.roomId;
+      const room = rooms[finalRoomId];
+
       if (!roomId || !userId || !room) return;
+
+      // Check if host is leaving first
+      if (room.hostId === finalUserId) {
+        console.log(`[leaveLobby] Host ${finalUserId} is leaving - kicking everyone from ${finalRoomId}`);
+        
+        // Notify everyone that host left
+        io.to(finalRoomId).emit("hostLeft", {
+          message: "You have left the lobby. All players are being kicked."
+        });
+        
+        // Delete the room
+        delete rooms[finalRoomId];
+        
+        // Make all sockets leave the room and mark offline
+        const socketsInRoom = io.sockets.adapter.rooms.get(finalRoomId);
+        if (socketsInRoom) {
+          for (const sid of socketsInRoom) {
+            const s = io.sockets.sockets.get(sid);
+            if (s) {
+              s.leave(finalRoomId);
+              s.roomId = null;
+              
+              // Mark user offline in DB
+              if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
+                await UserModel.findByIdAndUpdate(s.userId, { isOnline: false });
+              }
+            }
+          }
+        }
+        
+        // Leave the host's socket too
+        socket.leave(finalRoomId);
+        socket.roomId = null;
+        
+        if (mongoose.Types.ObjectId.isValid(finalUserId)) {
+          await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
+        }
+        
+        return; // Exit early - no host handoff
+      }
 
       // remove from teams and broadcast
       room.teams.Red = room.teams.Red.filter((id) => id !== userId);
       room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
       io.to(roomId).emit("teamsUpdate", room.teams);
       io.to(roomId).emit("userLeftLobby", { userId });
-
-      // host handoff / cleanup
-      if (room.hostId === userId) {
-        const sockets = io.sockets.adapter.rooms.get(roomId);
-        let newHostId = null;
-        if (sockets && sockets.size > 0) {
-          for (const sid of sockets) {
-            const s = io.sockets.sockets.get(sid);
-            if (s && s.userId && s.userId !== userId) {
-              newHostId = s.userId;
-              break;
-            }
-          }
-          if (newHostId) {
-            room.hostId = newHostId;
-            io.to(roomId).emit("hostSet", newHostId);
-          } else {
-            delete rooms[roomId];
-          }
-        } else {
-          delete rooms[roomId];
-        }
-      }
 
       socket.leave(roomId);
       socket.roomId = null;
@@ -330,34 +349,47 @@ function createLobbyManager(io, UserModel) {
       const room = rooms[roomId];
       if (!roomId || !userId || !room) return;
 
+      if (room.hostId === userId) {
+        console.log(`[disconnect] Host ${userId} disconnected - kicking everyone from ${roomId}`);
+        
+        // Notify everyone that host left
+        io.to(roomId).emit("hostLeft", {
+          message: "You have disconnected. All players are being kicked :("
+        });
+
+        // Delete the room
+    delete rooms[roomId];
+    
+    // Make all sockets leave the room and mark offline
+    const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+    if (socketsInRoom) {
+      for (const sid of socketsInRoom) {
+        const s = io.sockets.sockets.get(sid);
+        if (s && s.id !== socket.id) { 
+          s.leave(roomId);
+          s.roomId = null;
+          
+          // Mark user offline in DB
+          if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
+            await UserModel.findByIdAndUpdate(s.userId, { isOnline: false });
+          }
+        }
+      }
+    }
+    
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      await UserModel.findByIdAndUpdate(userId, { isOnline: false });
+    }
+    
+    console.log("❌ Socket disconnected (HOST):", socket.id);
+    return; // Exit early
+  }
+
       io.to(roomId).emit("userLeftLobby", { userId });
 
       room.teams.Red = room.teams.Red.filter((id) => id !== userId);
       room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
       io.to(roomId).emit("teamsUpdate", room.teams);
-
-      // host handoff / cleanup
-      if (room.hostId === userId) {
-        const sockets = io.sockets.adapter.rooms.get(roomId);
-        let newHostId = null;
-        if (sockets && sockets.size > 0) {
-          for (const sid of sockets) {
-            const s = io.sockets.sockets.get(sid);
-            if (s && s.userId && s.userId !== userId) {
-              newHostId = s.userId;
-              break;
-            }
-          }
-          if (newHostId) {
-            room.hostId = newHostId;
-            io.to(roomId).emit("hostSet", newHostId);
-          } else {
-            delete rooms[roomId];
-          }
-        } else {
-          delete rooms[roomId];
-        }
-      }
 
       if (userId && mongoose.Types.ObjectId.isValid(userId)) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });

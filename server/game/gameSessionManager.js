@@ -285,6 +285,7 @@ class GameSessionManager {
       const ratio = total > 0 ? remain / total : 0;
       const gained = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * ratio);
 
+      player.hasAnswered = true;
       session.scores[userId] = (session.scores[userId] || 0) + gained;
 
       io.to(gameId).emit("correctAnswer", {
@@ -294,28 +295,27 @@ class GameSessionManager {
         scoreGained: gained,
         remainingSeconds: remain,
       });
-    } else {
-      io.to(gameId).emit("wrongAnswer", {
-        userId,
-        displayName: player.displayName,
-      });
+
+      io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
+
+      // check if all teammates (excluding drawer) already answered
+      const drawer = session.players[session.currentPlayerIndex];
+      const teammates = session.players.filter(
+        (p) => p.team === drawer.team && p.userId !== drawer.userId,
+      );
+      const everyoneCorrect =
+        teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
+
+      // DO NOT start next round here; let socket layer decide using this flag
+      return { allSubmitted: Boolean(everyoneCorrect) };
     }
 
-    // Mark as answered regardless of correctness
-    player.hasAnswered = true;
-
-    io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
-
-    // check if all teammates (excluding drawer) already answered
-    const drawer = session.players[session.currentPlayerIndex];
-    const teammates = session.players.filter(
-      (p) => p.team === drawer.team && p.userId !== drawer.userId
-    );
-    const everyoneSubmitted =
-      teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
-
-    // DO NOT start next round here; let socket layer decide using this flag
-    return { allSubmitted: Boolean(everyoneSubmitted) };
+    // wrong answer
+    io.to(gameId).emit("wrongAnswer", {
+      userId,
+      displayName: player.displayName,
+    });
+    return { allSubmitted: false };
   }
 
   endRound(gameId) {

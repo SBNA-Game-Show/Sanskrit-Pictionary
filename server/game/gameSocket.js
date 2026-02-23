@@ -285,6 +285,18 @@ function startSynchronizedTimer(io, gameId, duration) {
       io.to(gameId).emit("clear-canvas");
       delete activeTimers[gameId];
 
+      // Mark everyone not submited as answered when time's up
+      const session = gameSessionManager.getSession(gameId);
+      if (session) {
+        session.players.forEach((p) => {
+          if (!p.hasAnswered) {
+            p.hasAnswered = true; 
+          }
+        });
+
+        io.to(gameId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(gameId));
+      }
+
       // Time's up → proceed to the next round
       proceedToNextRound(io, gameId);
     }

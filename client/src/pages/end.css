@@ -44,17 +44,73 @@ body { background: var(--bg); color: var(--text); }
 }
 
 .leaderboard-list {
-  display: grid;
-  grid-template-columns: 1fr;
+   /* display: grid; 
+  grid-template-columns: 1fr;  */
+  display:flex;
+  flex-direction:row; 
  
-  gap: 14px;
+  gap: 10px;
   background: radial-gradient(65% 120% at 10% 0%, rgba(255,255,255,0.8), rgba(255,255,255,0.7)) , var(--panel);
-  
+  border-radius:20px;
+   /* border: 1px solid black; */ 
   
 }
 
-@media (min-width: 700px) {
-  .leaderboard-list { grid-template-columns: 1fr 1fr; }
+.teamRed{
+  /* background: linear-gradient(135deg, #ffd0d3, var(--red)); */
+  background: radial-gradient(65% 120% at 10% 0%, rgba(206, 64, 64, 0.5), rgba(173, 13, 13, 0.06)) , var(--panel);
+  
+  padding:10px;
+  border-radius:20px;
+  /* border:2px solid rgb(158, 13, 13); */
+
+}
+
+.teamBlue{
+  background: radial-gradient(65% 120% at 10% 0%, rgba(30, 60, 109, 0.3), rgba(13, 49, 173, 0.06)) , var(--panel);
+  padding:10px;
+   border-radius:20px;
+   /* border:2px solid rgb(7, 7, 85); */
+}
+.team-title{
+  font-size: clamp(18px, 3vw, 25px);
+color:#1b2432;
+padding:5px;
+}
+.team-score{
+  text-align: right;
+  padding:5px;
+  font-size: clamp(20px, 3vw, 25px);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+#blue{
+  color:#132c91
+}
+#red{
+  color:#77070d
+}
+
+.teamRed.winner{
+  border:2px solid rgb(158, 13, 13);
+}
+.teamBlue.winner{
+  border:2px solid rgb(7, 7, 85);
+}
+
+.winning-team{
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+
+
+@media (max-width: 700px) {
+  .leaderboard-list { 
+    display:grid;
+    grid-template-columns: 1fr; }
 }
 
 .leaderboard-card {
@@ -176,7 +232,7 @@ body { background: var(--bg); color: var(--text); }
 .teamRed{
   /* background: linear-gradient(135deg, #ffd0d3, var(--red)); */
   background: radial-gradient(65% 120% at 10% 0%, rgba(206, 64, 64, 0.5), rgba(173, 13, 13, 0.06)) , var(--panel);
-  margin-bottom: 5px;
+  
   padding:10px;
   
 

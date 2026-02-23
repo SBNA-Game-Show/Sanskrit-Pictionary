@@ -10,6 +10,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
+import { toastWarning, toastInfo } from "../utils/toast";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -46,6 +47,7 @@ const Play = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
+  const [remainingGuesses, setRemainingGuesses] = useState(4);
 
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
@@ -55,7 +57,8 @@ const Play = () => {
 
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
-  const canAnswer = myTeam === drawerTeam && !isDrawer;
+  const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
+  const canAnswer = isEligibleGuesser && remainingGuesses > 0;
 
   // ---------- UI helpers ----------
   const handlePenClick = () => {
@@ -136,11 +139,11 @@ const Play = () => {
     socket.on("connect", handleReconnect);
 
     socket.on("playerDisconnected", ({ userId, displayName }) => {
-      console.warn(`⚠️ Player ${displayName} disconnected`);
+      toastWarning(`${displayName} disconnected`, { autoClose: 2000 });
     });
 
     socket.on("playerReconnected", ({ userId, displayName }) => {
-      console.log(`✅ Player ${displayName} reconnected`);
+      toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
     const onLobbyUsers = (users) => {
@@ -178,9 +181,20 @@ const Play = () => {
       console.log("[Play] received gameState:", state);
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
-      setPlayers(state.players || []);
+      setPlayers((prev) => {
+        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
+        const merged = (state.players || []).map((p) => {
+          const prevP = prevMap.get(p.userId);
+          return {
+            ...p,
+            remainingGuesses:
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+          };
+        });
+        playersRef.current = merged;
+        return merged;
+      });
       setHostData(state.hostData || null);
-      playersRef.current = state.players || [];
       setDrawerId(state.drawer?.userId || null);
       setDrawerTeam(state.drawer?.team || "");
       setCurrentPlayerName(state.drawer?.displayName || "");
@@ -190,6 +204,7 @@ const Play = () => {
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
+      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
 
       // ✅ Handle canvas data from gameState
       if (canvasRef.current) {
@@ -207,10 +222,23 @@ const Play = () => {
     });
 
     socket.on("updatePlayers", (list) => {
-      setPlayers(list || []);
-      playersRef.current = list || [];
+      setPlayers((prev) => {
+        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
+        const merged = (list || []).map((p) => {
+          const prevP = prevMap.get(p.userId);
+          return {
+            ...p,
+            remainingGuesses:
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+          };
+        });
+        playersRef.current = merged;
+        return merged;
+      });
+
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
+      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
     });
 
     // drawerChanged clears canvas
@@ -243,6 +271,7 @@ const Play = () => {
 
     socket.on("drawing-data", (data) => {
       if (canvasRef.current) {
+        canvasRef.current.clearCanvas();
         canvasRef.current.loadPaths(data);
       }
     });
@@ -275,6 +304,7 @@ const Play = () => {
       setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
+      setRemainingGuesses(4);
 
       // Clear canvas when new round starts
       if (canvasRef.current) {
@@ -282,14 +312,56 @@ const Play = () => {
       }
     });
 
-    socket.on("correctAnswer", ({ userId: correctUserId, displayName }) => {
-      console.log("[Play] correctAnswer", { correctUserId, displayName });
+    socket.on("correctAnswer", ({ userId: correctUserId, displayName, scoreGained, answerText }) => {
+      console.log("[Play] correctAnswer", { correctUserId, displayName, scoreGained, answerText });
       setRoundResult({
         type: "correct",
         displayName: displayName || "Someone",
+        scoreGained: Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null,
+        answerText: typeof answerText === "string" ? answerText : "",
       });
       setTimeout(() => setRoundResult(null), 1500);
       socket.emit("getGameState", { roomId });
+    });
+
+    socket.on("wrongAnswer", ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
+      console.log("[Play] wrongAnswer", { wrongUserId, displayName, remainingGuesses, scoreLost });
+      if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
+        setRemainingGuesses(remainingGuesses);
+      }
+
+      // Update the user list for everyone immediately (server also emits updatePlayers,
+      // but this makes the UI responsive even if packets arrive out-of-order)
+      if (wrongUserId && remainingGuesses !== undefined) {
+        setPlayers((prev) => {
+          const next = (prev || []).map((p) =>
+            p.userId === wrongUserId
+              ? { ...p, remainingGuesses }
+              : p,
+          );
+          playersRef.current = next;
+          return next;
+        });
+      }
+      
+      // Show penalty notification if this is the current user
+      if (scoreLost && wrongUserId === getUserId()) {
+        setRoundResult({
+          type: "wrong",
+          displayName: displayName || "You",
+          scoreLost: scoreLost,
+        });
+        setTimeout(() => setRoundResult(null), 1200);
+      }
+    });
+
+    socket.on("guessesExhausted", () => {
+      console.log("[Play] guessesExhausted");
+      setRoundResult({
+        type: "guessesExhausted",
+        displayName: "Out of guesses!",
+      });
+      setTimeout(() => setRoundResult(null), 1500);
     });
 
     socket.on("clear-canvas", () => {
@@ -334,6 +406,8 @@ const Play = () => {
       socket.off("newFlashcard");
       socket.off("roundStarted");
       socket.off("correctAnswer");
+      socket.off("wrongAnswer");
+      socket.off("guessesExhausted");
       socket.off("clear-canvas");
       socket.off("gameEnded");
     };
@@ -360,6 +434,7 @@ const Play = () => {
       <div className={chipClass} key={user.userId}>
         <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
         <span className="chip-name">{displayName}</span>
+        <span className="chip-guesses">G: {user.remainingGuesses ?? 4}</span>
         {user.userId === drawerId && (
           <span className="chip-pen" title="Drawing now">
             ✏️
@@ -388,7 +463,29 @@ const Play = () => {
             {roundResult.type === "correct" && (
               <div className="modal-card">
                 <h3>Correct!</h3>
-                <p>{roundResult.displayName} guessed correctly 🎉</p>
+                <p>
+                  {roundResult.displayName} guessed correctly
+                  {typeof roundResult.scoreGained === "number"
+                    ? ` (+${roundResult.scoreGained} pts)`
+                    : ""}
+                </p>
+                {roundResult.answerText && (
+                  <p>
+                    <strong>Answer:</strong> {roundResult.answerText}
+                  </p>
+                )}
+              </div>
+            )}
+            {roundResult.type === "wrong" && (
+              <div className="modal-card wrong-answer">
+                <h3>Wrong Answer</h3>
+                <p>-{roundResult.scoreLost} points 😞</p>
+              </div>
+            )}
+            {roundResult.type === "guessesExhausted" && (
+              <div className="modal-card">
+                <h3>Round Ended</h3>
+                <p>No more guesses remaining!</p>
               </div>
             )}
             {roundResult.type === "gameEnded" && (
@@ -414,6 +511,21 @@ const Play = () => {
           <strong>Time Left: </strong>
           <a>
             <label htmlFor="timeleft">{timeLeft}</label> sec
+          </a>
+        </div>
+
+        <div className="guesses-box">
+          <strong>Guesses Left: </strong>
+          <a>
+            <label
+              htmlFor="guessesleft"
+              style={{
+                color:
+                  isEligibleGuesser && remainingGuesses <= 2 ? "red" : "inherit",
+              }}
+            >
+              {isEligibleGuesser ? remainingGuesses : "—"}
+            </label>
           </a>
         </div>
 

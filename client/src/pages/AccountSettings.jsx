@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { apiClient } from "../utils/authAPI";
 import { useNavigate } from "react-router-dom";
 import { getEmail } from "../utils/authStorage";
 import { logoutUser } from "../utils/authAPI";
+import { toastSuccess, toastError, toastWarning } from "../utils/toast";
 
 export default function AccountSettings() {
   const navigate = useNavigate();
@@ -10,7 +11,6 @@ export default function AccountSettings() {
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
   // show/hide toggles
@@ -27,31 +27,24 @@ export default function AccountSettings() {
 
   const changePassword = async (e) => {
     e.preventDefault();
-    setMsg("");
 
     if (newPw.length < 8)
-      return setMsg("New password must be at least 8 characters.");
-    if (newPw !== confirm) return setMsg("Passwords don't match.");
+      return toastWarning("New password must be at least 8 characters.");
+    if (newPw !== confirm) return toastWarning("Passwords don't match.");
 
     try {
       setLoading(true);
-      await axios.post(
-        "/api/users/change-password",
-        {
-          email,
-          oldPassword: oldPw,
-          newPassword: newPw,
-        },
-        {
-          withCredentials: true,
-        },
-      );
-      setMsg("Password changed ✓");
+      await apiClient.post("/api/users/change-password", {
+        email,
+        oldPassword: oldPw,
+        newPassword: newPw,
+      });
+      toastSuccess("Password changed successfully! 🔐");
       setOldPw("");
       setNewPw("");
       setConfirm("");
     } catch (err) {
-      setMsg(err?.response?.data?.error || "Couldn't change password.");
+      toastError(err?.response?.data?.error || "Couldn't change password.");
     } finally {
       setLoading(false);
     }
@@ -136,8 +129,6 @@ export default function AccountSettings() {
             {showConfirm ? "Hide" : "Show"}
           </button>
         </div>
-
-        {msg && <div className="notice">{msg}</div>}
 
         <button className="btn primary" type="submit" disabled={loading}>
           {loading ? "Changing…" : "Change Password"}

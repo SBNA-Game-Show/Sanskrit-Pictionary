@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { socket } from "./socket";
 import { getUserId, saveUserData, getUserData } from "../utils/authStorage";
+import { apiClient } from "../utils/authAPI";
 import { createAvatar } from "@dicebear/core";
 import {
   funEmoji,
@@ -14,6 +14,7 @@ import {
   bigEars,
 } from "@dicebear/collection";
 import "./profile.css";
+import { toastSuccess, toastError } from "../utils/toast";
 
 /* Map of available DiceBear styles */
 const stylesMap = {
@@ -36,7 +37,6 @@ export default function ProfileSettings() {
   const [avatarStyle, setAvatarStyle] = useState("funEmoji");
   const [uploadDataUrl, setUploadDataUrl] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
 
   // Load stored profile on mount
   useEffect(() => {
@@ -67,7 +67,6 @@ export default function ProfileSettings() {
   };
 
   const handleSave = async () => {
-    setMsg("");
     setSaving(true);
     try {
       const userId = getUserId();
@@ -77,7 +76,12 @@ export default function ProfileSettings() {
 
       // 1) Save display name to centralized auth storage
       const currentUserData = getUserData();
-      saveUserData(userId, displayName, currentUserData?.email);
+      saveUserData(
+        userId,
+        displayName,
+        currentUserData?.email,
+        currentUserData?.token,
+      );
 
       // 2) Save avatar preferences separately (UI-only data)
       localStorage.setItem(
@@ -93,18 +97,12 @@ export default function ProfileSettings() {
       window.dispatchEvent(new Event("displayNameChanged"));
 
       // 3) Save on backend (with credentials for cookie)
-      await axios.put(
-        "/api/users/me/profile",
-        {
-          userId,
-          displayName,
-          avatarSeed,
-          avatarStyle,
-        },
-        {
-          withCredentials: true, // Send HTTP-only cookie
-        },
-      );
+      await apiClient.put("/api/users/me/profile", {
+        userId,
+        displayName,
+        avatarSeed,
+        avatarStyle,
+      });
 
       // 4) Notify lobby via socket
       socket.emit("updateProfile", {
@@ -114,13 +112,12 @@ export default function ProfileSettings() {
         avatarStyle,
       });
 
-      setMsg("Saved ✓");
+      toastSuccess("Profile updated successfully! ✨");
     } catch (err) {
       console.error(err);
-      setMsg("Couldn't save profile.");
+      toastError("Couldn't save profile.");
     } finally {
       setSaving(false);
-      setTimeout(() => setMsg(""), 2000);
     }
   };
 
@@ -231,11 +228,6 @@ export default function ProfileSettings() {
           </div>
         </div>
       </div>
-      {msg && (
-        <div className="notice" style={{ marginTop: 8 }}>
-          {msg}
-        </div>
-      )}
       <div className="actions">
         <button className="btn primary" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save Changes"}

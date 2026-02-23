@@ -1,5 +1,13 @@
 import "./App.css";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import "./styles/toast.css";
 import Navbar from "./reusableComponents/navbar";
 import Footer from "./reusableComponents/footer";
 
@@ -58,9 +66,30 @@ function App() {
           </Routes>
         </div>
 
-        <img src="/background.png" className="background-image" alt="decorative" />
-        <img src="/background.png" className="background-image" alt="decorative" />
+        <img
+          src="/background.png"
+          className="background-image"
+          alt="decorative"
+        />
+        <img
+          src="/background.png"
+          className="background-image"
+          alt="decorative"
+        />
         <Footer />
+        {/* ToastContainer */}
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={true}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="colored"
+        />
       </div>
     </Router>
   );

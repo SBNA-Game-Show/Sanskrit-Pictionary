@@ -446,12 +446,6 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-  /* const hintDisplay = !isDrawer
-    ? maskPhraseToUnderscores(targetPhrase)
-    : flashcard?.word ||
-      flashcard?.translation ||
-      flashcard?.transliteration ||
-      ""; */
 
   return (
     <>
@@ -528,15 +522,6 @@ const Play = () => {
             </label>
           </a>
         </div>
-
-        {/* <div className="hint-box">
-          <strong>Word Hint: </strong>
-          <label htmlFor="wordhint">
-            {flashcard && !isDrawer
-              ? maskPhraseToUnderscores(flashcard.word || "")
-              : "..."}
-          </label>
-        </div> */} 
 
         {/* Drawer and host see the full flashcard */}
         {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}

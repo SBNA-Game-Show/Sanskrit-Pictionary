@@ -10,8 +10,7 @@
 
 .score-box,
 .time-box,
-.guesses-box,
-.hint-box {
+.guesses-box{
   background-color: rgba(242, 210, 182);
   border-radius: 15px;
   padding: 10px;

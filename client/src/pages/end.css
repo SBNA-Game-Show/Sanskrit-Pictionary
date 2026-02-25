@@ -38,8 +38,9 @@ body { background: var(--bg); color: var(--text); }
   margin-top:30px;
   margin: 0 0 20px;
   background: linear-gradient(90deg, #c4790a, #e9903e);
-  -webkit-background-clip: text;
+  -webkit-background-clip: text;  /* WebKit prefix for Safari */
   background-clip: text;
+  -webkit-text-fill-color: transparent;  /* Required for Safari gradient text */
   color: transparent;
 }
 
@@ -124,9 +125,11 @@ padding:5px;
   border: 1px solid var(--panel-strong);
   border-radius: 18px;
   box-shadow: 0 8px 26px rgba(0,0,0,0.35);
+  -webkit-backdrop-filter: blur(8px);  /* WebKit prefix for Safari */
   backdrop-filter: blur(8px);
   transform: translateY(0);
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  will-change: transform;  /* Hint to browser for hardware acceleration */
 }
 
 .leaderboard-card:hover {

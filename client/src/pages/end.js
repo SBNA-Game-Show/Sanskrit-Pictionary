@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './end.css';
 import Fireworks from './firework.js';
-import {useReward} from "partycles";
+
 
 const End = () => {
 

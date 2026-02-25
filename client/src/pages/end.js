@@ -44,10 +44,10 @@ const End = () => {
   
 const winningStyle = (winningTeam) => {
   if(winningTeam === 'red') {
-    return {color:'red', backgroundColor:'rgba(255, 0, 0, 0.1)'};
+    return {color:'red'};
   }
   else if(winningTeam === 'blue') {
-    return {color:'blue', backgroundColor:'rgba(9, 9, 235, 0.1)'};
+    return {color:'blue'};
   }else{
     return {}
   }

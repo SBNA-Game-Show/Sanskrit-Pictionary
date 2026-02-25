@@ -170,11 +170,11 @@ const Lobby = () => {
 
     socket.on(
       "profileUpdated",
-      ({ userId, displayName, avatarSeed, avatarStyle }) => {
+      ({ userId, displayName, avatarSeed, avatarStyle, avatarData }) => {
         setOnlineUsers((prev) =>
           prev.map((u) =>
             u.userId === userId
-              ? { ...u, displayName, avatarSeed, avatarStyle }
+              ? { ...u, displayName, avatarSeed, avatarStyle, avatarData }
               : u,
           ),
         );

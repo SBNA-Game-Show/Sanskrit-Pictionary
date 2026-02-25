@@ -86,14 +86,14 @@ padding:5px;
 }
 
 #blue{
-  color:#132c91
+  color:#0626a7;
 }
 #red{
-  color:#77070d
+  color:#da0a14;
 }
 
 .teamRed.winner{
-  border:2px solid rgb(158, 13, 13);
+  border:2px solid rgb(202, 13, 13);
 }
 .teamBlue.winner{
   border:2px solid rgb(7, 7, 85);
@@ -256,10 +256,10 @@ padding:5px;
 }
 
 #blue{
-  color:#132c91
+  color:#0626a7;
 }
 #red{
-  color:#77070d
+  color:#a80d15;
 }
 
 .winning-team{

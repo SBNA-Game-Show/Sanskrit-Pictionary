@@ -29,6 +29,7 @@ function maskPhraseToUnderscores(phrase) {
 const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // holds freshest players for end screen
+  const profilesRef = useRef({});
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
 
@@ -153,9 +154,11 @@ const Play = () => {
           displayName: u.displayName,
           avatarSeed: u.avatarSeed,
           avatarStyle: u.avatarStyle,
+          avatarData: u.avatarData,
         };
       });
       setProfiles(map);
+      profilesRef.current = map;
     };
     socket.on("lobbyUsers", onLobbyUsers);
 
@@ -164,15 +167,21 @@ const Play = () => {
       displayName,
       avatarSeed,
       avatarStyle,
+      avatarData,
     }) => {
-      setProfiles((prev) => ({
-        ...prev,
-        [userId]: {
-          displayName: displayName ?? prev[userId]?.displayName,
-          avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
-          avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
-        },
-      }));
+      setProfiles((prev) => {
+        const updated = {
+          ...prev,
+          [userId]: {
+            displayName: displayName ?? prev[userId]?.displayName,
+            avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
+            avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
+            avatarData: avatarData ?? prev[userId]?.avatarData,
+          },
+        };
+        profilesRef.current = updated;
+        return updated;
+      });
     };
     socket.on("profileUpdated", onProfileUpdated);
 
@@ -375,17 +384,24 @@ const Play = () => {
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
         : players;
+
+      const currentProfiles = profilesRef.current;
+
       const withAvatars = base.map((p) => {
-        const prof = profiles[p.userId] || {};
+        const prof = currentProfiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
         const style = prof.avatarStyle || "funEmoji";
+
+        // Use custom avatar if available
+        const avatarUrl = prof.avatarData || makeAvatarDataUrl(style, seed);
         return {
           ...p,
-          avatar: makeAvatarDataUrl(style, seed),
+          avatar: avatarUrl,
           avatarSeed: seed,
           avatarStyle: style,
         };
       });
+
       setTimeout(() => {
         setRoundResult(null);
         navigate("/end", { state: { players: withAvatars } });

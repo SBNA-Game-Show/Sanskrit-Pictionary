@@ -291,12 +291,7 @@ class GameSessionManager {
       io.to(gameId).emit("correctAnswer", {
         userId,
         displayName: player.displayName,
-        points: session.scores[userId],
         scoreGained: gained,
-        remainingSeconds: remain,
-        word: session.currentFlashcard.word,
-        transliteration: session.currentFlashcard.transliteration,
-        translation: session.currentFlashcard.translation,
       });
 
       io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));

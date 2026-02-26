@@ -65,7 +65,7 @@ class GameSessionManager {
     this.sessions.set(gameId, {
       players,
       hostData,
-      currentRound: 0,
+      currentRound: 1, // Round number should be starts from 1 
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
       timer,
@@ -185,7 +185,7 @@ class GameSessionManager {
     });
 
     io.to(gameId).emit("roundStarted", {
-      currentRound: session.currentRound + 1,
+      currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
       timer: session.timer,
@@ -202,7 +202,7 @@ class GameSessionManager {
         team: currentPlayer.team,
         socketId: currentPlayer.socketId,
       },
-      currentRound: session.currentRound + 1,
+      currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       timer: session.timer,
       currentFlashcard: null, // drawer-only
@@ -213,11 +213,20 @@ class GameSessionManager {
   nextRound(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
-    if (session.currentRound >= session.totalRounds) return null;
 
-    session.currentRound++;
-    session.currentPlayerIndex =
-      (session.currentPlayerIndex + 1) % session.players.length;
+    const lastDrawer = session.players[session.currentPlayerIndex];
+
+    // End game when if reached total rounds and last drawer was Blue team
+    if (lastDrawer.team === "Blue" 
+        && session.currentRound >= session.totalRounds) return null;
+
+    // Round number only increments after Blue team's turn, as Red always starts first
+    if (lastDrawer.team === "Blue") {
+      session.currentRound++;
+    }
+
+    // The turn should cycle through the target team members based on the round count
+    session.currentPlayerIndex = this._getNextDrawerIndex(session, lastDrawer);
     session.roundInProgress = true;
 
     return {
@@ -226,6 +235,24 @@ class GameSessionManager {
       timer: session.timer,
       difficulty: session.difficulty,
     };
+  }
+
+  // The next drawer should be the n-th member of the target team, 
+  // where n corresponds to the current round number (modulo team size).
+  _getNextDrawerIndex(session, lastDrawer) {
+    // Next drawer should be from the opposite team of last drawer
+    const targetTeam = (lastDrawer.team === "Blue") ? "Red" : "Blue";
+
+    // Find all players and their indexes in the target team
+    const targetTeamMembers = session.players
+        .map((player, index) => ({ player, index }))
+        .filter(item => item.player.team === targetTeam)
+        .map(item => item.index);
+
+    // Find the next drawer index based on current round number, ensuring it cycles through team members
+    const nextDrawerIndex = (session.currentRound - 1) % targetTeamMembers.length;
+
+    return targetTeamMembers[nextDrawerIndex];
   }
 
   // NOTE: include remainingSeconds for time-based scoring

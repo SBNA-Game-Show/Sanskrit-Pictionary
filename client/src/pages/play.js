@@ -47,6 +47,7 @@ const Play = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
+  const [remainingGuesses, setRemainingGuesses] = useState(4);
 
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
@@ -56,7 +57,8 @@ const Play = () => {
 
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
-  const canAnswer = myTeam === drawerTeam && !isDrawer;
+  const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
+  const canAnswer = isEligibleGuesser && remainingGuesses > 0;
 
   // ---------- UI helpers ----------
   const handlePenClick = () => {
@@ -179,9 +181,20 @@ const Play = () => {
       console.log("[Play] received gameState:", state);
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
-      setPlayers(state.players || []);
+      setPlayers((prev) => {
+        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
+        const merged = (state.players || []).map((p) => {
+          const prevP = prevMap.get(p.userId);
+          return {
+            ...p,
+            remainingGuesses:
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+          };
+        });
+        playersRef.current = merged;
+        return merged;
+      });
       setHostData(state.hostData || null);
-      playersRef.current = state.players || [];
       setDrawerId(state.drawer?.userId || null);
       setDrawerTeam(state.drawer?.team || "");
       setCurrentPlayerName(state.drawer?.displayName || "");
@@ -191,6 +204,7 @@ const Play = () => {
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
+      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
 
       // ✅ Handle canvas data from gameState
       if (canvasRef.current) {
@@ -208,10 +222,23 @@ const Play = () => {
     });
 
     socket.on("updatePlayers", (list) => {
-      setPlayers(list || []);
-      playersRef.current = list || [];
+      setPlayers((prev) => {
+        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
+        const merged = (list || []).map((p) => {
+          const prevP = prevMap.get(p.userId);
+          return {
+            ...p,
+            remainingGuesses:
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+          };
+        });
+        playersRef.current = merged;
+        return merged;
+      });
+
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
+      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
     });
 
     // drawerChanged clears canvas
@@ -244,6 +271,7 @@ const Play = () => {
 
     socket.on("drawing-data", (data) => {
       if (canvasRef.current) {
+        canvasRef.current.clearCanvas();
         canvasRef.current.loadPaths(data);
       }
     });
@@ -276,6 +304,7 @@ const Play = () => {
       setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
+      setRemainingGuesses(4);
 
       // Clear canvas when new round starts
       if (canvasRef.current) {
@@ -283,20 +312,16 @@ const Play = () => {
       }
     });
 
-    socket.on("correctAnswer", ({
-      displayName,
-      scoreGained
-    }) => {
+   socket.on("correctAnswer", ({ displayName, scoreGained }) => {
+    toastSuccess(
+      `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
+      {
+        autoClose: 3000,
+        position: "top-left"
+      }
+    );
+  });
 
-      toastSuccess(
-        `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
-        {
-          autoClose: 4000,
-          position: "top-left"
-        }
-      );
-    });
-  
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
       canvasRef.current?.eraseMode(false);
@@ -339,6 +364,8 @@ const Play = () => {
       socket.off("newFlashcard");
       socket.off("roundStarted");
       socket.off("correctAnswer");
+      socket.off("wrongAnswer");
+      socket.off("guessesExhausted");
       socket.off("clear-canvas");
       socket.off("gameEnded");
     };
@@ -365,6 +392,7 @@ const Play = () => {
       <div className={chipClass} key={user.userId}>
         <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
         <span className="chip-name">{displayName}</span>
+        <span className="chip-guesses">G: {user.remainingGuesses ?? 4}</span>
         {user.userId === drawerId && (
           <span className="chip-pen" title="Drawing now">
             ✏️
@@ -387,6 +415,45 @@ const Play = () => {
     <>
       <RoundPopups />
       <div className="play-grid">
+        {/* Round result modal */}
+        {roundResult && (
+          <div className="round-result-modal">
+            {roundResult.type === "correct" && (
+              <div className="modal-card">
+                <h3>Correct!</h3>
+                <p>
+                  {roundResult.displayName} guessed correctly
+                  {typeof roundResult.scoreGained === "number"
+                    ? ` (+${roundResult.scoreGained} pts)`
+                    : ""}
+                </p>
+                {roundResult.answerText && (
+                  <p>
+                    <strong>Answer:</strong> {roundResult.answerText}
+                  </p>
+                )}
+              </div>
+            )}
+            {roundResult.type === "wrong" && (
+              <div className="modal-card wrong-answer">
+                <h3>Wrong Answer</h3>
+                <p>-{roundResult.scoreLost} points 😞</p>
+              </div>
+            )}
+            {roundResult.type === "guessesExhausted" && (
+              <div className="modal-card">
+                <h3>Round Ended</h3>
+                <p>No more guesses remaining!</p>
+              </div>
+            )}
+            {roundResult.type === "gameEnded" && (
+              <div className="modal-card">
+                <h3>Game Over</h3>
+                <p>Thanks for playing — check the scoreboard!</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className={`score-box ${isHost && "hidden"}`}>
           <strong>Score: </strong>
@@ -402,6 +469,21 @@ const Play = () => {
           <strong>Time Left: </strong>
           <a>
             <label htmlFor="timeleft">{timeLeft}</label> sec
+          </a>
+        </div>
+
+        <div className="guesses-box">
+          <strong>Guesses Left: </strong>
+          <a>
+            <label
+              htmlFor="guessesleft"
+              style={{
+                color:
+                  isEligibleGuesser && remainingGuesses <= 2 ? "red" : "inherit",
+              }}
+            >
+              {isEligibleGuesser ? remainingGuesses : "—"}
+            </label>
           </a>
         </div>
 

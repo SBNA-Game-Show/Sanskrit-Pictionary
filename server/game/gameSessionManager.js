@@ -65,7 +65,7 @@ class GameSessionManager {
     this.sessions.set(gameId, {
       players,
       hostData,
-      currentRound: 0,
+      currentRound: 1, // Round number should be starts from 1 
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
       timer,
@@ -74,6 +74,7 @@ class GameSessionManager {
       scores: {},
       currentFlashcard: null,
       canvasData: null,
+      // guesses are tracked per-player (p.remainingGuesses)
     });
 
     // init scores
@@ -144,6 +145,11 @@ class GameSessionManager {
     if (!session || !session.players.length) return;
 
     session.roundInProgress = true;
+    // Reset per-player guesses + answered state for new round
+    session.players.forEach((p) => {
+      p.hasAnswered = false;
+      p.remainingGuesses = 4;
+    });
 
     const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
@@ -179,10 +185,11 @@ class GameSessionManager {
     });
 
     io.to(gameId).emit("roundStarted", {
-      currentRound: session.currentRound + 1,
+      currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
       timer: session.timer,
+      // per-player guesses are sent via updatePlayers/gameState
     });
 
     io.to(gameId).emit("gameState", {
@@ -195,26 +202,31 @@ class GameSessionManager {
         team: currentPlayer.team,
         socketId: currentPlayer.socketId,
       },
-      currentRound: session.currentRound + 1,
+      currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       timer: session.timer,
       currentFlashcard: null, // drawer-only
       scores: session.scores,
-    });
-
-    session.players.forEach((p) => {
-      p.hasAnswered = false;
     });
   }
 
   nextRound(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
-    if (session.currentRound >= session.totalRounds) return null;
 
-    session.currentRound++;
-    session.currentPlayerIndex =
-      (session.currentPlayerIndex + 1) % session.players.length;
+    const lastDrawer = session.players[session.currentPlayerIndex];
+
+    // End game when if reached total rounds and last drawer was Blue team
+    if (lastDrawer.team === "Blue" 
+        && session.currentRound >= session.totalRounds) return null;
+
+    // Round number only increments after Blue team's turn, as Red always starts first
+    if (lastDrawer.team === "Blue") {
+      session.currentRound++;
+    }
+
+    // The turn should cycle through the target team members based on the round count
+    session.currentPlayerIndex = this._getNextDrawerIndex(session, lastDrawer);
     session.roundInProgress = true;
 
     return {
@@ -223,6 +235,24 @@ class GameSessionManager {
       timer: session.timer,
       difficulty: session.difficulty,
     };
+  }
+
+  // The next drawer should be the n-th member of the target team, 
+  // where n corresponds to the current round number (modulo team size).
+  _getNextDrawerIndex(session, lastDrawer) {
+    // Next drawer should be from the opposite team of last drawer
+    const targetTeam = (lastDrawer.team === "Blue") ? "Red" : "Blue";
+
+    // Find all players and their indexes in the target team
+    const targetTeamMembers = session.players
+        .map((player, index) => ({ player, index }))
+        .filter(item => item.player.team === targetTeam)
+        .map(item => item.index);
+
+    // Find the next drawer index based on current round number, ensuring it cycles through team members
+    const nextDrawerIndex = (session.currentRound - 1) % targetTeamMembers.length;
+
+    return targetTeamMembers[nextDrawerIndex];
   }
 
   // NOTE: include remainingSeconds for time-based scoring
@@ -234,6 +264,25 @@ class GameSessionManager {
 
     const player = session.players.find((p) => p.userId === userId);
     if (!player) return { allSubmitted: false };
+
+    // Ensure remainingGuesses is always a finite number in the 0..4 range.
+    // This prevents accidental extra chances due to falsy/undefined values.
+    const rgRaw = player.remainingGuesses;
+    const rgNum = Number(rgRaw);
+    if (!Number.isFinite(rgNum)) {
+      player.remainingGuesses = 4;
+    } else {
+      player.remainingGuesses = Math.max(0, Math.min(4, Math.floor(rgNum)));
+    }
+
+    if (player.remainingGuesses <= 0) {
+      if (player.socketId) {
+        io.to(player.socketId).emit("answerRejected", {
+          message: "No guesses left this round.",
+        });
+      }
+      return { allSubmitted: false };
+    }
 
     if (player.hasAnswered) {
       io.to(gameId).emit("answerResult", {
@@ -288,10 +337,20 @@ class GameSessionManager {
       player.hasAnswered = true;
       session.scores[userId] = (session.scores[userId] || 0) + gained;
 
+      const fc = session.currentFlashcard || {};
+      const answerText =
+        fc.transliteration || fc.translation || fc.word || "";
+
       io.to(gameId).emit("correctAnswer", {
         userId,
         displayName: player.displayName,
         scoreGained: gained,
+        answerText,
+        answer: {
+          word: fc.word || "",
+          transliteration: fc.transliteration || "",
+          translation: fc.translation || "",
+        },
       });
 
       io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
@@ -309,11 +368,39 @@ class GameSessionManager {
     }
 
     // wrong answer
+    player.remainingGuesses = Math.max(0, (player.remainingGuesses ?? 4) - 1);
+
+    // ----- score penalty for wrong answer -----
+    const WRONG_ANSWER_PENALTY = 15;
+    const currentScore = session.scores[userId] || 0;
+    const newScore = Math.max(0, currentScore - WRONG_ANSWER_PENALTY);
+    session.scores[userId] = newScore;
+
     io.to(gameId).emit("wrongAnswer", {
       userId,
       displayName: player.displayName,
+      remainingGuesses: player.remainingGuesses,
+      points: newScore,
+      scoreLost: WRONG_ANSWER_PENALTY,
     });
-    return { allSubmitted: false };
+
+    io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
+
+    // End the round when ALL eligible guessers are either correct OR out of guesses
+    const drawer = session.players[session.currentPlayerIndex];
+    const eligibleGuessers = session.players.filter(
+      (p) => p.team === drawer.team && p.userId !== drawer.userId,
+    );
+
+    const everyoneCorrect =
+      eligibleGuessers.length > 0 && eligibleGuessers.every((p) => p.hasAnswered === true);
+    const allGuessersDone =
+      eligibleGuessers.length > 0 &&
+      eligibleGuessers.every(
+        (p) => p.hasAnswered === true || (p.remainingGuesses ?? 0) <= 0,
+      );
+
+    return { allSubmitted: Boolean(everyoneCorrect), guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect) };
   }
 
   endRound(gameId) {
@@ -344,6 +431,7 @@ class GameSessionManager {
       userId: p.userId,
       team: p.team,
       points: session.scores[p.userId] || 0,
+      remainingGuesses: p.remainingGuesses ?? 4,
       imageSrc: p.imageSrc || "",
     }));
   }

@@ -235,6 +235,14 @@ const Lobby = () => {
       toastError(message || "Unable to start the game.");
     });
 
+    socket.on("hostLeft", ({ message }) => {
+      alert(message || "The host has left the lobby. All players are being kicked.");
+      if (socket && socket.connected) {
+        socket.emit("leaveLobby", { roomId, userId: myUserId });
+      }
+      navigate('/lobby');
+    });
+
     // 2) After listeners are ready, emit registration & state requests
     socket.emit("registerLobby", {
       userId: myUserId,
@@ -261,9 +269,18 @@ const Lobby = () => {
       socket.off("gameEnded");
       socket.off("leftTeam");
       socket.off("startGameError");
+      socket.off("hostLeft");
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 
+    const handleBackButton = () => {
+    // Leave the lobby before navigating away
+    if (socket && socket.connected) {
+      socket.emit("leaveLobby", { roomId, userId: myUserId });
+    }
+    navigate('/lobby');
+  };
+  
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId),
@@ -398,6 +415,13 @@ const Lobby = () => {
           ) : (
             unassignedUsers.map((u) => renderUserRow(u.userId))
           )}
+
+          <button 
+              className="copy-button"
+              onClick={handleBackButton}
+              title="Back to main menu"
+            > Back to Main
+            </button>
         </div>
 
         {/* TEAMS */}

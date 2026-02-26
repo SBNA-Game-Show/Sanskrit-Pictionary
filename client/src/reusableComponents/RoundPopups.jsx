@@ -64,10 +64,11 @@ export default function RoundPopups() {
         title: `Round ${currentRound}${
           totalRef.current ? ` / ${totalRef.current}` : ""
         }`,
-        subtitle: `Started — Drawer: ${drawerNameRef.current}`,
+        // Add turn details in round popup
+        subtitle: `${drawerTeamRef.current} Team Turn — Drawer: ${dname}`,
         kind: "start",
         team: drawerTeamRef.current, // use last known team to color outline
-        duration: 1800,
+        duration: 3000,
       });
     };
 
@@ -84,11 +85,11 @@ export default function RoundPopups() {
       // announce team switch (only if changed and both sides are known)
       if (prevTeam && nextTeam && prevTeam !== nextTeam) {
         enqueue({
-          title: "Team switched",
+          title: `${nextTeam} Team Turn`, // Team switched!
           subtitle: `Drawer is now ${dname} (${nextTeam} team)`,
           kind: "switch",
           team: nextTeam,
-          duration: 1600,
+          duration: 3000,
         });
       }
 
@@ -96,14 +97,23 @@ export default function RoundPopups() {
       if (dname) drawerNameRef.current = dname;
     };
 
-    // ---- Correct answer / round end ----
-    const onCorrectAnswer = ({ displayName }) => {
+    // ---- Correct answer ----
+    const onCorrectAnswer = ({ displayName, scoreGained, answerText }) => {
+      const pts = Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null;
+      const ans = typeof answerText === "string" && answerText.trim() ? answerText.trim() : "";
       enqueue({
-        title: `Round ${roundRef.current} ended`,
-        subtitle: displayName ? `Guesser: ${displayName}` : undefined,
+        title: `${displayName} Answered Correctly!`,
+        subtitle:
+          displayName && pts !== null
+            ? `Guesser: ${displayName} (+${pts} pts)${ans ? ` — Answer: ${ans}` : ""}`
+            : displayName
+              ? `Guesser: ${displayName}`
+              : pts !== null
+                ? `+${pts} pts`
+                : undefined,
         kind: "end",
         team: drawerTeamRef.current, // keep outline with the drawer team for that round
-        duration: 1600,
+        duration: 2000,
       });
     };
 
@@ -118,16 +128,29 @@ export default function RoundPopups() {
       });
     };
 
+    // ---- Guesses exhausted ----
+    const onGuessesExhausted = () => {
+      enqueue({
+        title: `Ran Out of Guesses!`,
+        subtitle: "Out of guesses!",
+        kind: "exhausted",
+        team: drawerTeamRef.current,
+        duration: 2000,
+      });
+    };
+
     socket.on("roundStarted", onRoundStarted);
     socket.on("drawerChanged", onDrawerChanged);
     socket.on("correctAnswer", onCorrectAnswer);
     socket.on("gameEnded", onGameEnded);
+    socket.on("guessesExhausted", onGuessesExhausted);
 
     return () => {
       socket.off("roundStarted", onRoundStarted);
       socket.off("drawerChanged", onDrawerChanged);
       socket.off("correctAnswer", onCorrectAnswer);
       socket.off("gameEnded", onGameEnded);
+      socket.off("guessesExhausted", onGuessesExhausted);
     };
   }, []);
 

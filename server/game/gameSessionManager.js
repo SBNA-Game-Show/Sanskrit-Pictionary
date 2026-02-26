@@ -344,9 +344,7 @@ class GameSessionManager {
       io.to(gameId).emit("correctAnswer", {
         userId,
         displayName: player.displayName,
-        points: session.scores[userId],
         scoreGained: gained,
-        remainingSeconds: remain,
         answerText,
         answer: {
           word: fc.word || "",

@@ -10,7 +10,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastInfo } from "../utils/toast";
+import { toastWarning, toastInfo, toastSuccess } from "../utils/toast";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -312,57 +312,15 @@ const Play = () => {
       }
     });
 
-    socket.on("correctAnswer", ({ userId: correctUserId, displayName, scoreGained, answerText }) => {
-      console.log("[Play] correctAnswer", { correctUserId, displayName, scoreGained, answerText });
-      setRoundResult({
-        type: "correct",
-        displayName: displayName || "Someone",
-        scoreGained: Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null,
-        answerText: typeof answerText === "string" ? answerText : "",
-      });
-      setTimeout(() => setRoundResult(null), 1500);
-      socket.emit("getGameState", { roomId });
-    });
-
-    socket.on("wrongAnswer", ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
-      console.log("[Play] wrongAnswer", { wrongUserId, displayName, remainingGuesses, scoreLost });
-      if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
-        setRemainingGuesses(remainingGuesses);
+   socket.on("correctAnswer", ({ displayName, scoreGained }) => {
+    toastSuccess(
+      `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
+      {
+        autoClose: 3000,
+        position: "top-left"
       }
-
-      // Update the user list for everyone immediately (server also emits updatePlayers,
-      // but this makes the UI responsive even if packets arrive out-of-order)
-      if (wrongUserId && remainingGuesses !== undefined) {
-        setPlayers((prev) => {
-          const next = (prev || []).map((p) =>
-            p.userId === wrongUserId
-              ? { ...p, remainingGuesses }
-              : p,
-          );
-          playersRef.current = next;
-          return next;
-        });
-      }
-      
-      // Show penalty notification if this is the current user
-      if (scoreLost && wrongUserId === getUserId()) {
-        setRoundResult({
-          type: "wrong",
-          displayName: displayName || "You",
-          scoreLost: scoreLost,
-        });
-        setTimeout(() => setRoundResult(null), 1200);
-      }
-    });
-
-    socket.on("guessesExhausted", () => {
-      console.log("[Play] guessesExhausted");
-      setRoundResult({
-        type: "guessesExhausted",
-        displayName: "Out of guesses!",
-      });
-      setTimeout(() => setRoundResult(null), 1500);
-    });
+    );
+  });
 
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();

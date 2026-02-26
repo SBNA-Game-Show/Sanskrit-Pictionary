@@ -107,6 +107,9 @@ const Lobby = () => {
   const myDisplayName = getDisplayName();
   const navigate = useNavigate();
 
+  // Track recently shown join notifications to prevent duplicates
+  const recentJoinsRef = useRef(new Set());
+
   // game settings
   const [selectedRounds, setSelectedRounds] = useState(1);
   const [selectedTimer, setSelectedTimer] = useState(30);
@@ -168,6 +171,17 @@ const Lobby = () => {
       setOnlineUsers((prev) =>
         prev.some((u) => u.userId === user.userId) ? prev : [...prev, user],
       );
+
+      if (
+        user.userId !== myUserId &&
+        !recentJoinsRef.current.has(user.userId)
+      ) {
+        toastInfo(`${user.displayName} joined the lobby`, {
+          autoClose: 2500,
+        });
+        recentJoinsRef.current.add(user.userId);
+        setTimeout(() => recentJoinsRef.current.delete(user.userId), 2000);
+      }
     });
     socket.on("userLeftLobby", ({ userId }) => {
       setOnlineUsers((prev) => prev.filter((u) => u.userId !== userId));

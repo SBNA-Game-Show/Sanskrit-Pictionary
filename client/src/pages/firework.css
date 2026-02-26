@@ -6,4 +6,7 @@
   height: 0;
   pointer-events: none;
   z-index: 9999;
+  /* add for Safari optimization */
+  will-change: transform;
+  transform: translate(0);
 }

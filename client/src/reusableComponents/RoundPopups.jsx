@@ -66,7 +66,6 @@ export default function RoundPopups() {
         }`,
         // Add turn details in round popup
         subtitle: `${drawerTeamRef.current} Team Turn — Drawer: ${dname}`,
-        // subtitle: `Started — Drawer: ${drawerNameRef.current}`,
         kind: "start",
         team: drawerTeamRef.current, // use last known team to color outline
         duration: 3000,
@@ -86,8 +85,7 @@ export default function RoundPopups() {
       // announce team switch (only if changed and both sides are known)
       if (prevTeam && nextTeam && prevTeam !== nextTeam) {
         enqueue({
-          title: `${nextTeam} Team Turn`, // 明确提示换队了
-          // title: "Team switched",
+          title: `${nextTeam} Team Turn`, // Team switched!
           subtitle: `Drawer is now ${dname} (${nextTeam} team)`,
           kind: "switch",
           team: nextTeam,

@@ -185,7 +185,6 @@ class GameSessionManager {
     });
 
     io.to(gameId).emit("roundStarted", {
-      // currentRound: session.currentRound + 1,
       currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
@@ -203,7 +202,6 @@ class GameSessionManager {
         team: currentPlayer.team,
         socketId: currentPlayer.socketId,
       },
-      // currentRound: session.currentRound + 1,
       currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       timer: session.timer,

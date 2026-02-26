@@ -129,9 +129,9 @@ export default function RoundPopups() {
     };
 
     // ---- Guesses exhausted ----
-    const onGuessesExhausted = ({ displayName }) => {
+    const onGuessesExhausted = () => {
       enqueue({
-        title: `${displayName} Ran Out of Guesses!`,
+        title: `Ran Out of Guesses!`,
         subtitle: "Out of guesses!",
         kind: "exhausted",
         team: drawerTeamRef.current,

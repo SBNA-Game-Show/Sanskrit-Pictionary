@@ -97,29 +97,51 @@ function createGameSocket(io) {
     });
 
     // ---- start game ----
-    socket.on("startGame", ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
-      console.log("[socket] startGame:", { gameId, totalRounds, timer, difficulty, by: socket.id, userId: socket.userId });
-      const players = [];
-      const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
-      if (socketsInRoom) {
-        for (const sid of socketsInRoom) {
-          const s = io.sockets.sockets.get(sid);
-          if (s?.userId && s?.displayName && s.userId !== hostData.hostId) {
-            players.push({ userId: s.userId, displayName: s.displayName, socketId: s.id });
+    socket.on(
+      "startGame",
+      ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
+        console.log("[socket] startGame:", {
+          gameId,
+          totalRounds,
+          timer,
+          difficulty,
+          by: socket.id,
+          userId: socket.userId,
+        });
+        const players = [];
+        const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
+        if (socketsInRoom) {
+          for (const sid of socketsInRoom) {
+            const s = io.sockets.sockets.get(sid);
+            if (s?.userId && s?.displayName && s.userId !== hostData.hostId) {
+              players.push({
+                userId: s.userId,
+                displayName: s.displayName,
+                socketId: s.id,
+              });
+            }
           }
         }
-      }
 
-      gameSessionManager.createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData);
-      gameSessionManager.startRound(gameId, io);
+        gameSessionManager.createSession(
+          gameId,
+          players,
+          totalRounds,
+          timer,
+          difficulty,
+          teams,
+          hostData,
+        );
+        gameSessionManager.startRound(gameId, io);
 
-      io.to(gameId).emit(
-        "updatePlayers",
-        gameSessionManager.getPlayersWithScores(gameId),
-      );
-      io.to(gameId).emit("startTimer", { duration: timer });
-      startSynchronizedTimer(io, gameId, timer);
-    });
+        io.to(gameId).emit(
+          "updatePlayers",
+          gameSessionManager.getPlayersWithScores(gameId),
+        );
+        io.to(gameId).emit("startTimer", { duration: timer });
+        startSynchronizedTimer(io, gameId, timer);
+      },
+    );
 
     // ---- drawing relay (only drawer can broadcast) ----
     socket.on("drawing-data", ({ gameId, userId, data }) => {
@@ -304,12 +326,15 @@ function startSynchronizedTimer(io, gameId, duration) {
       if (session) {
         session.players.forEach((p) => {
           if (!p.hasAnswered) {
-            p.hasAnswered = true; 
+            p.hasAnswered = true;
             p.remainingGuesses = 0;
           }
         });
 
-        io.to(gameId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(gameId));
+        io.to(gameId).emit(
+          "updatePlayers",
+          gameSessionManager.getPlayersWithScores(gameId),
+        );
       }
 
       // Time's up → proceed to the next round

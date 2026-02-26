@@ -213,7 +213,9 @@ const Play = () => {
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
-      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
+      setRemainingGuesses(
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+      );
 
       // ✅ Handle canvas data from gameState
       if (canvasRef.current) {
@@ -247,7 +249,9 @@ const Play = () => {
 
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
-      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
+      setRemainingGuesses(
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+      );
     });
 
     // drawerChanged clears canvas
@@ -321,48 +325,64 @@ const Play = () => {
       }
     });
 
-    socket.on("correctAnswer", ({ userId: correctUserId, displayName, scoreGained, answerText }) => {
-      console.log("[Play] correctAnswer", { correctUserId, displayName, scoreGained, answerText });
-      setRoundResult({
-        type: "correct",
-        displayName: displayName || "Someone",
-        scoreGained: Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null,
-        answerText: typeof answerText === "string" ? answerText : "",
-      });
-      setTimeout(() => setRoundResult(null), 1500);
-      socket.emit("getGameState", { roomId });
-    });
-
-    socket.on("wrongAnswer", ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
-      console.log("[Play] wrongAnswer", { wrongUserId, displayName, remainingGuesses, scoreLost });
-      if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
-        setRemainingGuesses(remainingGuesses);
-      }
-
-      // Update the user list for everyone immediately (server also emits updatePlayers,
-      // but this makes the UI responsive even if packets arrive out-of-order)
-      if (wrongUserId && remainingGuesses !== undefined) {
-        setPlayers((prev) => {
-          const next = (prev || []).map((p) =>
-            p.userId === wrongUserId
-              ? { ...p, remainingGuesses }
-              : p,
-          );
-          playersRef.current = next;
-          return next;
+    socket.on(
+      "correctAnswer",
+      ({ userId: correctUserId, displayName, scoreGained, answerText }) => {
+        console.log("[Play] correctAnswer", {
+          correctUserId,
+          displayName,
+          scoreGained,
+          answerText,
         });
-      }
-      
-      // Show penalty notification if this is the current user
-      if (scoreLost && wrongUserId === getUserId()) {
         setRoundResult({
-          type: "wrong",
-          displayName: displayName || "You",
-          scoreLost: scoreLost,
+          type: "correct",
+          displayName: displayName || "Someone",
+          scoreGained: Number.isFinite(Number(scoreGained))
+            ? Number(scoreGained)
+            : null,
+          answerText: typeof answerText === "string" ? answerText : "",
         });
-        setTimeout(() => setRoundResult(null), 1200);
-      }
-    });
+        setTimeout(() => setRoundResult(null), 1500);
+        socket.emit("getGameState", { roomId });
+      },
+    );
+
+    socket.on(
+      "wrongAnswer",
+      ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
+        console.log("[Play] wrongAnswer", {
+          wrongUserId,
+          displayName,
+          remainingGuesses,
+          scoreLost,
+        });
+        if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
+          setRemainingGuesses(remainingGuesses);
+        }
+
+        // Update the user list for everyone immediately (server also emits updatePlayers,
+        // but this makes the UI responsive even if packets arrive out-of-order)
+        if (wrongUserId && remainingGuesses !== undefined) {
+          setPlayers((prev) => {
+            const next = (prev || []).map((p) =>
+              p.userId === wrongUserId ? { ...p, remainingGuesses } : p,
+            );
+            playersRef.current = next;
+            return next;
+          });
+        }
+
+        // Show penalty notification if this is the current user
+        if (scoreLost && wrongUserId === getUserId()) {
+          setRoundResult({
+            type: "wrong",
+            displayName: displayName || "You",
+            scoreLost: scoreLost,
+          });
+          setTimeout(() => setRoundResult(null), 1200);
+        }
+      },
+    );
 
     socket.on("guessesExhausted", () => {
       console.log("[Play] guessesExhausted");
@@ -537,7 +557,9 @@ const Play = () => {
               htmlFor="guessesleft"
               style={{
                 color:
-                  isEligibleGuesser && remainingGuesses <= 2 ? "red" : "inherit",
+                  isEligibleGuesser && remainingGuesses <= 2
+                    ? "red"
+                    : "inherit",
               }}
             >
               {isEligibleGuesser ? remainingGuesses : "—"}

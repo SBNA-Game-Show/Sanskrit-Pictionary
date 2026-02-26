@@ -297,7 +297,6 @@ function createLobbyManager(io, UserModel) {
       socket.emit("chatHistory", rooms[roomId]?.chat || []);
     });
 
-    // --- LEAVE LOBBY ---
     socket.on("leaveLobby", async ({ roomId, userId }) => {
       const finalUserId = userId || socket.userId;
       const finalRoomId = roomId || socket.roomId;
@@ -305,18 +304,27 @@ function createLobbyManager(io, UserModel) {
 
       if (!roomId || !userId || !room) return;
 
+      // Get user display name for notifications
+      let userDisplayName = "A player";
+      if (mongoose.Types.ObjectId.isValid(finalUserId)) {
+        const user = await UserModel.findById(finalUserId);
+        if (user) userDisplayName = user.displayName;
+      }
+
       // Check if host is leaving first
       if (room.hostId === finalUserId) {
-        console.log(`[leaveLobby] Host ${finalUserId} is leaving - kicking everyone from ${finalRoomId}`);
-        
-        // Notify everyone that host left
-        io.to(finalRoomId).emit("hostLeft", {
-          message: "You have left the lobby. All players are being kicked."
+        console.log(
+          `[leaveLobby] Host ${finalUserId} is leaving - kicking everyone from ${finalRoomId}`,
+        );
+
+        // Notify other players (not the host)
+        socket.to(finalRoomId).emit("hostLeftOthers", {
+          hostName: userDisplayName,
         });
-        
+
         // Delete the room
         delete rooms[finalRoomId];
-        
+
         // Make all sockets leave the room and mark offline
         const socketsInRoom = io.sockets.adapter.rooms.get(finalRoomId);
         if (socketsInRoom) {
@@ -325,25 +333,38 @@ function createLobbyManager(io, UserModel) {
             if (s) {
               s.leave(finalRoomId);
               s.roomId = null;
-              
+
               // Mark user offline in DB
               if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
-                await UserModel.findByIdAndUpdate(s.userId, { isOnline: false });
+                await UserModel.findByIdAndUpdate(s.userId, {
+                  isOnline: false,
+                });
               }
             }
           }
         }
-        
+
         // Leave the host's socket too
         socket.leave(finalRoomId);
         socket.roomId = null;
-        
+
         if (mongoose.Types.ObjectId.isValid(finalUserId)) {
           await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
         }
-        
+
         return; // Exit early - no host handoff
       }
+
+      // Non-host player leaving - notify everyone
+      console.log(
+        `[leaveLobby] Player ${userDisplayName} is leaving ${finalRoomId}`,
+      );
+
+      // Notify everyone else that this player left
+      socket.to(finalRoomId).emit("playerLeftLobby", {
+        userId: finalUserId,
+        displayName: userDisplayName,
+      });
 
       // remove from teams and broadcast
       room.teams.Red = room.teams.Red.filter((id) => id !== userId);
@@ -365,51 +386,65 @@ function createLobbyManager(io, UserModel) {
       const room = rooms[roomId];
       if (!roomId || !userId || !room) return;
 
+      // Get user display name
+      let userDisplayName = "A player";
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        const user = await UserModel.findById(userId);
+        if (user) userDisplayName = user.displayName;
+      }
+
       if (room.hostId === userId) {
-        console.log(`[disconnect] Host ${userId} disconnected - kicking everyone from ${roomId}`);
-        
-        // Notify everyone that host left
-        io.to(roomId).emit("hostLeft", {
-          message: "You have disconnected. All players are being kicked :("
+        console.log(
+          `[disconnect] Host ${userId} disconnected - kicking everyone from ${roomId}`,
+        );
+
+        // Send different message for disconnect
+        io.to(roomId).emit("hostDisconnectedOthers", {
+          hostName: userDisplayName,
         });
 
         // Delete the room
-    delete rooms[roomId];
-    
-    // Make all sockets leave the room and mark offline
-    const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
-    if (socketsInRoom) {
-      for (const sid of socketsInRoom) {
-        const s = io.sockets.sockets.get(sid);
-        if (s && s.id !== socket.id) { 
-          s.leave(roomId);
-          s.roomId = null;
-          
-          // Mark user offline in DB
-          if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
-            await UserModel.findByIdAndUpdate(s.userId, { isOnline: false });
+        delete rooms[roomId];
+
+        // Make all sockets leave the room and mark offline
+        const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+        if (socketsInRoom) {
+          for (const sid of socketsInRoom) {
+            const s = io.sockets.sockets.get(sid);
+            if (s && s.id !== socket.id) {
+              s.leave(roomId);
+              s.roomId = null;
+
+              if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
+                await UserModel.findByIdAndUpdate(s.userId, {
+                  isOnline: false,
+                });
+              }
+            }
           }
         }
+      } else {
+        // Non-host disconnected
+        console.log(
+          `[disconnect] Player ${userDisplayName} disconnected from ${roomId}`,
+        );
+
+        io.to(roomId).emit("playerLeftLobby", {
+          userId: userId,
+          displayName: userDisplayName,
+        });
+
+        io.to(roomId).emit("userLeftLobby", { userId });
+
+        room.teams.Red = room.teams.Red.filter((id) => id !== userId);
+        room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
+        io.to(roomId).emit("teamsUpdate", room.teams);
       }
-    }
-    
-    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-      await UserModel.findByIdAndUpdate(userId, { isOnline: false });
-    }
-    
-    console.log("❌ Socket disconnected (HOST):", socket.id);
-    return; // Exit early
-  }
-
-      io.to(roomId).emit("userLeftLobby", { userId });
-
-      room.teams.Red = room.teams.Red.filter((id) => id !== userId);
-      room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
-      io.to(roomId).emit("teamsUpdate", room.teams);
 
       if (userId && mongoose.Types.ObjectId.isValid(userId)) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
       }
+
       console.log("❌ Socket disconnected:", socket.id);
     });
   });

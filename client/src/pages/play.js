@@ -47,7 +47,9 @@ const Play = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
-  const [remainingGuesses, setRemainingGuesses] = useState(4);
+  const [imageChoices, setImageChoices] = useState([]);
+  const [showChoices, setShowChoices] = useState(false);
+  const [roundKey, setRoundKey] = useState(0);
 
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
@@ -252,6 +254,10 @@ const Play = () => {
 
       setDrawerId(newDrawerId);
       setDrawerTeam(team || "");
+ // Reset answer and choices when drawer changes
+    setShowChoices(false);
+    setImageChoices([]);
+    setRoundKey((k) => k + 1);
 
       const name =
         typeof displayName === "string"
@@ -275,18 +281,55 @@ const Play = () => {
         canvasRef.current.loadPaths(data);
       }
     });
+    //updated image to audio
+  const IMAGE_TO_AUDIO = (imageSrc) => {
+  if (!imageSrc) return "";
 
-    socket.on("newFlashcard", (data) => {
-      console.log("[Play] received newFlashcard (drawer-only):", {
-        data,
-        clientUserId: getUserId(),
-        drawerId,
-        translation: data.translation ?? data.hint ?? "",
-        imageSrc: data.imageSrc ?? data.image ?? "",
-        audioSrc: data.audioSrc ?? data.audio ?? "",
-      });
-      setFlashcard(data);
-    });
+  // ensure leading slash (important if server sends "FlashCardEasy/bird.png")
+  const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
+
+  // folder + filename safely
+  const parts = src.split("/").filter(Boolean); // ["FlashCardEasy", "bird.png"]
+  const folderRaw = parts[0] || "";
+  const file = parts[parts.length - 1] || "";
+  const base = (file.split(".")[0] || "").toLowerCase(); // lowercase fixes Happiness.png case
+
+  // normalize folder casing (FlashCardEasy/Medium/Hard)
+  const canon =
+    folderRaw.toLowerCase() === "flashcardeasy"
+      ? "FlashCardEasy"
+      : folderRaw.toLowerCase() === "flashcardmedium"
+      ? "FlashCardMedium"
+      : folderRaw.toLowerCase() === "flashcardhard"
+      ? "FlashCardHard"
+      : folderRaw;
+
+  return `/${canon}/audio/${base}.mp3`;
+};
+
+
+  
+  // updated newFlashcard handler to support flexible flashcard data and auto-derive audioSrc
+   socket.on("newFlashcard", (data) => {
+    const imageSrc = data.imageSrc ?? data.image ?? "";
+  
+    const audioSrc =
+      data.audioSrc ??
+      data.audio ??
+      IMAGE_TO_AUDIO(imageSrc);
+  
+    const patched = {
+      ...data,
+      imageSrc: imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`,
+      audioSrc,
+      translation: data.translation ?? data.hint ?? "",
+    };
+  
+    console.log("[newFlashcard] patched:", patched);
+    setFlashcard(patched);
+  });
+  
+  
 
     // roundStarted clears canvas
     socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
@@ -304,7 +347,12 @@ const Play = () => {
       setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
-      setRemainingGuesses(4);
+            // Reset answer and choices when drawer changes
+      setImageChoices([]);
+      setRoundKey((k) => k + 1);
+      setFlashcard(null); //  clear old card instantly
+      socket.emit("getGameState", { roomId }); //  fetch new card
+      
 
       // Clear canvas when new round starts
       if (canvasRef.current) {
@@ -320,6 +368,12 @@ const Play = () => {
         scoreGained: Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null,
         answerText: typeof answerText === "string" ? answerText : "",
       });
+            // Reset  choices when ROUND changes
+      setImageChoices([]);
+      setRoundKey((k) => k + 1);
+      setFlashcard(null); // optional but recommended to clear old card instantly
+      socket.emit("getGameState", { roomId }); // force fetch new card
+      
       setTimeout(() => setRoundResult(null), 1500);
       socket.emit("getGameState", { roomId });
     });
@@ -452,7 +506,105 @@ const Play = () => {
       flashcard?.translation ||
       flashcard?.transliteration ||
       "";
+      const DIFFICULTY_FOLDERS = {
+  Easy: [
+    "/FlashCardEasy/bird.png",
+    "/FlashCardEasy/book.png",
+    "/FlashCardEasy/cow.png",
+    "/FlashCardEasy/elephant.png",
+    "/FlashCardEasy/father.png",
+    "/FlashCardEasy/flower.png",
+    "/FlashCardEasy/friend.png",
+    "/FlashCardEasy/fruit.png",
+    "/FlashCardEasy/house.png",
+    "/FlashCardEasy/king.png",
+    "/FlashCardEasy/moon.png",
+    "/FlashCardEasy/mother.png",
+    "/FlashCardEasy/river.png",
+    "/FlashCardEasy/sun.png",
+    "/FlashCardEasy/tree.png",
+    "/FlashCardEasy/water.png",
+  ],
 
+  Medium: [
+    "/FlashCardMedium/child.png",
+    "/FlashCardMedium/earth.png",
+    "/FlashCardMedium/fire.png",
+    "/FlashCardMedium/king.png",
+    "/FlashCardMedium/mountain.png",
+    "/FlashCardMedium/ocean.png",
+    "/FlashCardMedium/queen.png",
+    "/FlashCardMedium/sky.png",
+    "/FlashCardMedium/teacher.png",
+    "/FlashCardMedium/time.png",
+  ],
+
+  Hard: [
+    "/FlashCardHard/compassion.png",
+    "/FlashCardHard/energy.png",
+    "/FlashCardHard/freedom.png",
+    "/FlashCardHard/Happiness.png",
+    "/FlashCardHard/knowledge.png",
+    "/FlashCardHard/mind.png",
+    "/FlashCardHard/speech.png",
+    "/FlashCardHard/student.png",
+    "/FlashCardHard/truth.png",
+    "/FlashCardHard/universe.png",
+  ],
+};
+
+        //shuffle helper for randomizing choices and usEffect dependencies
+        function shuffle(arr) {
+          const a = [...arr];
+          for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+          }
+          return a;
+        }
+        //updated useEffect to generate image choices based on flashcard difficulty and current round
+        useEffect(() => {
+          if (!canAnswer || !flashcard?.imageSrc) {
+            setShowChoices(false);
+            setImageChoices([]);
+            return;
+          }
+        
+          // detect difficulty from imageSrc path
+          let difficulty = "Easy";
+          const src = flashcard.imageSrc;
+          if (src.includes("FlashCardMedium")) difficulty = "Medium";
+          if (src.includes("FlashCardHard")) difficulty = "Hard";
+        
+          const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
+          const distractorPool = folderImages.filter((img) => img !== src);
+          const randomFour = shuffle(distractorPool).slice(0, 4);
+        
+          const mixed = shuffle([
+            { src, isCorrect: true },
+            ...randomFour.map((s) => ({ src: s, isCorrect: false })),
+          ]);
+        
+          setImageChoices(mixed);
+          setShowChoices(mixed.length === 5);
+        }, [canAnswer, flashcard?.imageSrc, roundKey]);
+        
+        // Handler for when user picks an image choice instead of typing answer
+        const handlePickChoice = (choice) => {
+          if (!canAnswer) return;
+        
+          if (choice.isCorrect) {
+            socket.emit("submitAnswer", {
+              gameId: roomId,
+              userId: getUserId(),
+              answer: flashcard.word,
+            });
+        
+            setShowChoices(false);
+            setImageChoices([]);
+          }
+        };
+        
   return (
     <>
       <RoundPopups />
@@ -656,6 +808,29 @@ const Play = () => {
               Send
             </button>
           </div>
+          
+           {/* Show image choices if applicable */}
+            {showChoices && canAnswer && imageChoices.length === 5 && (
+  <div className="choice-modal">
+    <div className="choice-card">
+      <h3>Pick the correct image</h3>
+
+      <div className="choice-grid">
+        {imageChoices.map((c, index) => (
+          <button
+            key={index}
+            className="choice-tile"
+            onClick={() => handlePickChoice(c)}
+          >
+            <img src={c.src} alt="choice" />
+          </button>
+        ))}
+
+      </div>
+    </div>
+  </div>
+)}
+
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
               Only the {drawerTeam} team can answer, and not the drawer.

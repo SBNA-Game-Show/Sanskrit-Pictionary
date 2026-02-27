@@ -1,21 +1,71 @@
-import React from 'react';
+import React, { useRef } from "react";
 
-function Flashcard({ items }) {
+function Flashcard({ items = [] }) {
+  const audioRef = useRef(null);
+
+  const imageToAudio = (imageSrc) => {
+    if (!imageSrc) return "";
+
+    const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
+
+    const parts = src.split("/").filter(Boolean); 
+    // ["FlashCardEasy", "bird.png"]
+
+    const folder = parts[0]; 
+    const file = parts[parts.length - 1]; 
+    const base = file.split(".")[0].toLowerCase();
+
+    return `/${folder}/audio/${base}.mp3`;
+  };
+
+  const playAudio = async (imageSrc) => {
+    const audioPath = imageToAudio(imageSrc);
+    if (!audioPath) return;
+
+    const el = audioRef.current;
+    if (!el) return;
+
+    try {
+      el.src = audioPath;
+      el.currentTime = 0;
+      el.volume = 1;
+      await el.play();
+      console.log("Playing:", audioPath);
+    } catch (e) {
+      console.error("Audio failed:", e, "SRC:", audioPath);
+    }
+  };
+
   return (
     <div className="flashcard-container">
-      {items.map(({ word, transliteration, translation, audioSrc, imageSrc }, index) => (
-        <div key={index} className="vocab-row">
-          
-          <span className="sanskrit-word">{word}</span>
+      <audio ref={audioRef} preload="auto" />
 
-          <button onClick={() => new Audio(audioSrc).play()} className="sound-button" >🔊</button>
+      {items.map((item, index) => (
+        <div
+          key={item?.id ?? `${item?.word}-${index}`}
+          className="vocab-row"
+          onClick={() => playAudio(item?.imageSrc)}
+          style={{ cursor: "pointer" }}
+        >
+          <span className="sanskrit-word">{item?.word}</span>
 
-          <img className="numimage" src={imageSrc} alt="Vocab" />
+          <button
+            className="sound-button"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              playAudio(item?.imageSrc);
+            }}
+          >
+            🔊
+          </button>
 
-          <div className="translation-row">{translation}</div>
+          {item?.imageSrc && (
+            <img className="numimage" src={item.imageSrc} alt="Vocab" />
+          )}
 
-          <div className="transliteration-row">{transliteration}</div>
-          
+          <div className="translation-row">{item?.translation}</div>
+          <div className="transliteration-row">{item?.transliteration}</div>
         </div>
       ))}
     </div>

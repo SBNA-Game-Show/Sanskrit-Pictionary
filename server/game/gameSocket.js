@@ -149,12 +149,17 @@ function createGameSocket(io) {
     // ---- warn drawer ----
     socket.on("warnDrawer", ({ gameId, userId }) => {
       const session = gameSessionManager.getSession(gameId);
+      const drawerId = session.players[session.currentPlayerIndex]?.userId;
       if (!session) return;
       if (userId !== session.hostData.hostId) return;
 
       // Clear stored canvas data
       gameSessionManager.clearCanvasData(gameId);
-      io.to(gameId).emit("warnDrawer");
+
+      // Deduct 50 points
+      const newScore = gameSessionManager.updatePlayerPoints(gameId, drawerId, -50);
+
+      io.to(gameId).emit("warnDrawer", drawerId, newScore);
     });
 
     // ---- submit answer ----

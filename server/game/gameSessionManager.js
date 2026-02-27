@@ -405,6 +405,15 @@ class GameSessionManager {
     return { allSubmitted: Boolean(everyoneCorrect), guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect) };
   }
 
+  updatePlayerPoints(gameId, userId, scoreChange) {
+    const session = this.sessions.get(gameId);
+    const currentScore = session.scores[userId] || 0;
+    const newScore = Math.max(0, currentScore + scoreChange);
+    session.scores[userId] = newScore;
+
+    return session.scores[userId];
+  }
+
   endRound(gameId) {
     const session = this.sessions.get(gameId);
     if (session) session.roundInProgress = false;

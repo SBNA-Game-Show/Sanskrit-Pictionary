@@ -381,8 +381,19 @@ const Play = () => {
       setEraseMode(false);
     });
 
-    socket.on("warnDrawer", () => {
+    socket.on("warnDrawer", (drawerId, newScore) => {
       canvasRef.current?.clearCanvas();
+
+      setPlayers((prev) => {
+        const next = (prev || []).map((p) =>
+          p.userId === drawerId
+            ? { ...p, points: newScore } 
+            : p
+        );
+
+        playersRef.current = next;
+        return next;
+      });
     });
 
     socket.on("gameEnded", () => {

@@ -162,6 +162,14 @@ function createGameSocket(io) {
       io.to(gameId).emit("warnDrawer", drawerId, newScore);
     });
 
+    socket.on("forceSkipRound", ({ gameId, userId }) => {
+      const session = gameSessionManager.getSession(gameId);
+      if (userId !== session.hostData.hostId) return;
+
+      clearActiveTimer(gameId);
+      proceedToNextRound(io, gameId);
+    });
+
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
       const session = gameSessionManager.getSession(gameId);

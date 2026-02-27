@@ -121,6 +121,16 @@ const Play = () => {
     }
   };
 
+  const handleForceSkip = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("forceSkipRound", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
+
   // ---------- Socket setup ----------
   useEffect(() => {
     const userId = getUserId();
@@ -660,6 +670,7 @@ const Play = () => {
           ): (
             <>
             <button onClick={handleWarnDrawer}>Warn Drawer</button>
+            <button onClick={handleForceSkip}>Force Skip Round</button>
             </>
           )}
           

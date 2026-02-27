@@ -1,0 +1,12 @@
+.fireworks-trigger {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 9999;
+  /* add for Safari optimization */
+  will-change: transform;
+  transform: translate(0);
+}

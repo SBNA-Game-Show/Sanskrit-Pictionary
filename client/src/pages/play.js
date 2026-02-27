@@ -50,7 +50,9 @@ const Play = () => {
   const [imageChoices, setImageChoices] = useState([]);
   const [showChoices, setShowChoices] = useState(false);
   const [roundKey, setRoundKey] = useState(0);
-
+  // this was missing from the branch I merged in, so adding now to fix the "remainingGuesses is not defined" error after wrong answers
+  const [remainingGuesses, setRemainingGuesses] = useState(4);
+  
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
 
@@ -506,6 +508,7 @@ const Play = () => {
       flashcard?.translation ||
       flashcard?.transliteration ||
       "";
+
       const DIFFICULTY_FOLDERS = {
   Easy: [
     "/FlashCardEasy/bird.png",

@@ -38,30 +38,13 @@ export default function Fireworks({colors}) {
   // Detect Safari browser for optimizations
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-  const { reward } = useReward(ref, "mortar", {
-
-    particleCount: 4,
-  spread: 40,
-  startVelocity: 20,
-  elementSize: 10,
-  lifetime: 100,
-  physics: {
-    gravity: 0.35,
-    friction: 0.99
-  },
-  colors: [
-    "#bf2222",
-    "#df0c21",
-    "#df162a",
-    "#ff1744",
-    "#d500f9",
-  ]
-   /*  particleCount: isSafari ? 60 : 80,  // Reduce for Safari performance
+  const { reward } = useReward(ref, "fireworks", {
+    particleCount: isSafari ? 40 : 80,  // Reduce for Safari performance
     spread: 140,
     colors: colors, 
-    startVelocity: isSafari ? 35 : 40,  // Lower for Safari smoothness
+    startVelocity: isSafari ? 30 : 40,  // Lower for Safari smoothness
     decay: 0.9,
-    scalar: 1, */
+    scalar: 1,
   });
 
   useEffect(() => {

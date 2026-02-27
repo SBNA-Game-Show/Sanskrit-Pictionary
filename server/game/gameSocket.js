@@ -337,7 +337,7 @@ function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
 
     if (nextRoundInfo) {
       // startRound is responsible for: sending a new Flashcard to the questioner, broadcasting drawerChanged/roundStarted, and updating gameState

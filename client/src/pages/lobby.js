@@ -6,7 +6,12 @@ import * as Dice from "@dicebear/collection";
 import Chat from "../reusableComponents/chat";
 import "./lobby.css";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastSuccess, toastInfo, toastError } from "../utils/toast";
+import {
+  toastSuccess,
+  toastInfo,
+  toastError,
+  toastWarning,
+} from "../utils/toast";
 
 /** Inline interactive DiceBear avatar (no extra files) */
 function InteractiveAvatar({
@@ -235,12 +240,29 @@ const Lobby = () => {
       toastError(message || "Unable to start the game.");
     });
 
-    socket.on("hostLeft", ({ message }) => {
-      alert(message || "The host has left the lobby. All players are being kicked.");
+    socket.on("hostLeftOthers", ({ hostName }) => {
+      toastError(`Host ${hostName} ended the game. You have been kicked out.`, {
+        autoClose: 4000,
+      });
       if (socket && socket.connected) {
         socket.emit("leaveLobby", { roomId, userId: myUserId });
       }
-      navigate('/lobby');
+      navigate("/lobby");
+    });
+
+    socket.on("hostDisconnectedOthers", ({ hostName }) => {
+      toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
+        autoClose: 4000,
+      });
+      if (socket && socket.connected) {
+        socket.emit("leaveLobby", { roomId, userId: myUserId });
+      }
+      navigate("/lobby");
+    });
+
+    // Non-host player left
+    socket.on("playerLeftLobby", ({ userId, displayName }) => {
+      toastWarning(`${displayName} left the lobby`, { autoClose: 2500 });
     });
 
     // 2) After listeners are ready, emit registration & state requests
@@ -269,18 +291,46 @@ const Lobby = () => {
       socket.off("gameEnded");
       socket.off("leftTeam");
       socket.off("startGameError");
-      socket.off("hostLeft");
+      socket.off("hostLeftOthers");
+      socket.off("hostDisconnectedOthers");
+      socket.off("playerLeftLobby");
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 
-    const handleBackButton = () => {
+  const handleBackButton = () => {
+    // Show confirmation for host
+    if (isHost) {
+      // If host is alone in the room
+      const isAlone = onlineUsers.length === 1;
+
+      const confirmed = window.confirm(
+        isAlone
+          ? "Are you sure you want to leave the lobby?"
+          : "Are you sure you want to leave? This will end the game and kick all players.",
+      );
+
+      if (!confirmed) {
+        return; // User cancelled, don't leave
+      }
+
+      // Based on whether host is alone
+      if (isAlone) {
+        toastInfo("You have left the lobby.", { autoClose: 2000 });
+      } else {
+        toastInfo("You have left the lobby. All players are being kicked.", {
+          autoClose: 2500,
+        });
+      }
+    }
+
     // Leave the lobby before navigating away
     if (socket && socket.connected) {
       socket.emit("leaveLobby", { roomId, userId: myUserId });
     }
-    navigate('/lobby');
+
+    navigate("/lobby");
   };
-  
+
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId),
@@ -399,7 +449,9 @@ const Lobby = () => {
           className="copy-button"
           onClick={() => {
             navigator.clipboard.writeText(roomId);
-            toastSuccess("Room ID copied to clipboard! 📋");
+            toastSuccess("Room ID copied to clipboard! 📋", {
+              autoClose: 2000,
+            });
           }}
         >
           Copy ID
@@ -416,12 +468,14 @@ const Lobby = () => {
             unassignedUsers.map((u) => renderUserRow(u.userId))
           )}
 
-          <button 
-              className="copy-button"
-              onClick={handleBackButton}
-              title="Back to main menu"
-            > Back to Main
-            </button>
+          <button
+            className="copy-button"
+            onClick={handleBackButton}
+            title="Back to main menu"
+          >
+            {" "}
+            Back to Main
+          </button>
         </div>
 
         {/* TEAMS */}

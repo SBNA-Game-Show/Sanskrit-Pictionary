@@ -321,6 +321,52 @@ const Play = () => {
       }
     );
   });
+    
+  socket.on(
+      "wrongAnswer",
+      ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
+        console.log("[Play] wrongAnswer", {
+          wrongUserId,
+          displayName,
+          remainingGuesses,
+          scoreLost,
+        });
+        if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
+          setRemainingGuesses(remainingGuesses);
+        }
+
+        // Update the user list for everyone immediately (server also emits updatePlayers,
+        // but this makes the UI responsive even if packets arrive out-of-order)
+        if (wrongUserId && remainingGuesses !== undefined) {
+          setPlayers((prev) => {
+            const next = (prev || []).map((p) =>
+              p.userId === wrongUserId ? { ...p, remainingGuesses } : p,
+            );
+            playersRef.current = next;
+            return next;
+          });
+        }
+
+        // Show penalty notification if this is the current user
+        if (scoreLost && wrongUserId === getUserId()) {
+          setRoundResult({
+            type: "wrong",
+            displayName: displayName || "You",
+            scoreLost: scoreLost,
+          });
+          setTimeout(() => setRoundResult(null), 1200);
+        }
+      },
+    );
+
+    socket.on("guessesExhausted", () => {
+      console.log("[Play] guessesExhausted");
+      setRoundResult({
+        type: "guessesExhausted",
+        displayName: "Out of guesses!",
+      });
+      setTimeout(() => setRoundResult(null), 1500);
+    });
 
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();

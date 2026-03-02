@@ -180,6 +180,20 @@
   box-shadow: 0 12px 24px rgba(0,0,0,0.15);
 }
 
+.round-result-modal .modal-card.wrong-answer {
+  background: #ffebee;
+  border: 2px solid #c62828;
+}
+ 
+.round-result-modal .modal-card.wrong-answer h3 {
+  color: #c62828;
+}
+ 
+.round-result-modal .modal-card.wrong-answer p {
+  color: #b71c1c;
+  font-weight: bold;
+}
+
 .drawer-name{
   font-size: 2.0em;
   font-weight: 700;

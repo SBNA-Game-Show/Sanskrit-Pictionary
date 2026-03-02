@@ -146,6 +146,30 @@ function createGameSocket(io) {
       socket.to(gameId).emit("clear-canvas");
     });
 
+    // ---- warn drawer ----
+    socket.on("warnDrawer", ({ gameId, userId }) => {
+      const session = gameSessionManager.getSession(gameId);
+      const drawerId = session.players[session.currentPlayerIndex]?.userId;
+      if (!session) return;
+      if (userId !== session.hostData.hostId) return;
+
+      // Clear stored canvas data
+      gameSessionManager.clearCanvasData(gameId);
+
+      // Deduct 50 points
+      const newScore = gameSessionManager.updatePlayerPoints(gameId, drawerId, -50);
+
+      io.to(gameId).emit("warnDrawer", drawerId, newScore);
+    });
+
+    socket.on("forceSkipRound", ({ gameId, userId }) => {
+      const session = gameSessionManager.getSession(gameId);
+      if (userId !== session.hostData.hostId) return;
+
+      clearActiveTimer(gameId);
+      proceedToNextRound(io, gameId);
+    });
+
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
       const session = gameSessionManager.getSession(gameId);

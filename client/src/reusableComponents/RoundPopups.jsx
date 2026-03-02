@@ -139,9 +139,21 @@ export default function RoundPopups() {
       });
     };
 
+    // ---- Warn player ----
+    const onWarnPlayer = () => {
+      enqueue({
+        title: "Warning Drawer",
+        subtitle: "Reminder: All drawings must be appropriate and respectful for all players.",
+        kind: "warning",
+        team: drawerTeamRef.current,
+        duration: 5000,
+      });
+    };
+
     socket.on("roundStarted", onRoundStarted);
     socket.on("drawerChanged", onDrawerChanged);
     socket.on("correctAnswer", onCorrectAnswer);
+    socket.on("warnDrawer", onWarnPlayer);
     socket.on("gameEnded", onGameEnded);
     socket.on("guessesExhausted", onGuessesExhausted);
 
@@ -149,6 +161,7 @@ export default function RoundPopups() {
       socket.off("roundStarted", onRoundStarted);
       socket.off("drawerChanged", onDrawerChanged);
       socket.off("correctAnswer", onCorrectAnswer);
+      socket.off("warnDrawer", onWarnPlayer);
       socket.off("gameEnded", onGameEnded);
       socket.off("guessesExhausted", onGuessesExhausted);
     };

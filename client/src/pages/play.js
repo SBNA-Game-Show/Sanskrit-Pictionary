@@ -116,6 +116,27 @@ const Play = () => {
     }
   };
 
+  // Warn current drawer
+  const handleWarnDrawer = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("warnDrawer", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
+
+  const handleForceSkip = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("forceSkipRound", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
+
   // ---------- Socket setup ----------
   useEffect(() => {
     const userId = getUserId();
@@ -382,6 +403,21 @@ const Play = () => {
       setEraseMode(false);
     });
 
+    socket.on("warnDrawer", (drawerId, newScore) => {
+      canvasRef.current?.clearCanvas();
+
+      setPlayers((prev) => {
+        const next = (prev || []).map((p) =>
+          p.userId === drawerId
+            ? { ...p, points: newScore } 
+            : p
+        );
+
+        playersRef.current = next;
+        return next;
+      });
+    });
+
     socket.on("gameEnded", () => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
@@ -421,6 +457,7 @@ const Play = () => {
       socket.off("wrongAnswer");
       socket.off("guessesExhausted");
       socket.off("clear-canvas");
+      socket.off("warnDrawer")
       socket.off("gameEnded");
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -728,39 +765,49 @@ const Play = () => {
         />
 
         <div className="canvascontrols">
-          <button onClick={handlePenClick} disabled={!isDrawer || !eraseMode}>
-            Pen
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="30"
-            step="1"
-            value={strokeWidth}
-            onChange={handleStrokeWidthChange}
-            disabled={!isDrawer || eraseMode}
-          />
-          <input
-            type="color"
-            value={strokeColor}
-            onChange={handleStrokeColorChange}
-            disabled={!isDrawer}
-          />
-          <button onClick={handleEraserClick} disabled={!isDrawer || eraseMode}>
-            Eraser
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="100"
-            step="1"
-            value={eraserWidth}
-            onChange={handleEraserWidthChange}
-            disabled={!isDrawer || !eraseMode}
-          />
-          <button onClick={handleClear} disabled={!isDrawer}>
-            Clear
-          </button>
+          {!isHost ? (
+            <>
+              <button onClick={handlePenClick} disabled={!isDrawer || !eraseMode}>
+                Pen
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="30"
+                step="1"
+                value={strokeWidth}
+                onChange={handleStrokeWidthChange}
+                disabled={!isDrawer || eraseMode}
+              />
+              <input
+                type="color"
+                value={strokeColor}
+                onChange={handleStrokeColorChange}
+                disabled={!isDrawer}
+              />
+              <button onClick={handleEraserClick} disabled={!isDrawer || eraseMode}>
+                Eraser
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={eraserWidth}
+                onChange={handleEraserWidthChange}
+                disabled={!isDrawer || !eraseMode}
+              />
+              <button onClick={handleClear} disabled={!isDrawer}>
+                Clear
+              </button>
+            </>
+          ): (
+            <>
+            <button onClick={handleWarnDrawer}>Warn Drawer</button>
+            <button onClick={handleForceSkip}>Force Skip Round</button>
+            </>
+          )}
+          
         </div>
 
         <div className="chat-box">

@@ -102,6 +102,7 @@ export default function ProfileSettings() {
         displayName,
         avatarSeed,
         avatarStyle,
+        avatarData,
       });
 
       // 4) Notify lobby via socket
@@ -110,6 +111,7 @@ export default function ProfileSettings() {
         displayName,
         avatarSeed,
         avatarStyle,
+        avatarData,
       });
 
       toastSuccess("Profile updated successfully! ✨");

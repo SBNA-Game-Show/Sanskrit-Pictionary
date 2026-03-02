@@ -29,6 +29,7 @@ function maskPhraseToUnderscores(phrase) {
 const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // holds freshest players for end screen
+  const profilesRef = useRef({});
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
 
@@ -48,6 +49,12 @@ const Play = () => {
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
   const [remainingGuesses, setRemainingGuesses] = useState(4);
+
+
+  // For multiple-choice image selection (guessers only)
+  const [imageChoices, setImageChoices] = useState([]);
+  const [showChoices, setShowChoices] = useState(false);
+  const [roundKey, setRoundKey] = useState(0);
 
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
@@ -110,6 +117,27 @@ const Play = () => {
     }
   };
 
+  // Warn current drawer
+  const handleWarnDrawer = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("warnDrawer", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
+
+  const handleForceSkip = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("forceSkipRound", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
+
   // ---------- Socket setup ----------
   useEffect(() => {
     const userId = getUserId();
@@ -153,9 +181,11 @@ const Play = () => {
           displayName: u.displayName,
           avatarSeed: u.avatarSeed,
           avatarStyle: u.avatarStyle,
+          avatarData: u.avatarData,
         };
       });
       setProfiles(map);
+      profilesRef.current = map;
     };
     socket.on("lobbyUsers", onLobbyUsers);
 
@@ -164,15 +194,21 @@ const Play = () => {
       displayName,
       avatarSeed,
       avatarStyle,
+      avatarData,
     }) => {
-      setProfiles((prev) => ({
-        ...prev,
-        [userId]: {
-          displayName: displayName ?? prev[userId]?.displayName,
-          avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
-          avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
-        },
-      }));
+      setProfiles((prev) => {
+        const updated = {
+          ...prev,
+          [userId]: {
+            displayName: displayName ?? prev[userId]?.displayName,
+            avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
+            avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
+            avatarData: avatarData ?? prev[userId]?.avatarData,
+          },
+        };
+        profilesRef.current = updated;
+        return updated;
+      });
     };
     socket.on("profileUpdated", onProfileUpdated);
 
@@ -204,7 +240,9 @@ const Play = () => {
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
-      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
+      setRemainingGuesses(
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+      );
 
       // ✅ Handle canvas data from gameState
       if (canvasRef.current) {
@@ -238,7 +276,9 @@ const Play = () => {
 
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
-      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
+      setRemainingGuesses(
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+      );
     });
 
     // drawerChanged clears canvas
@@ -306,6 +346,12 @@ const Play = () => {
       setTimeLeft(timer || 0);
       setRemainingGuesses(4);
 
+      // Reset answer and choices when drawer changes
+      setImageChoices([]);
+      setRoundKey((k) => k + 1);
+      setFlashcard(null); //  clear old card instantly
+      socket.emit("getGameState", { roomId }); //  fetch new card
+
       // Clear canvas when new round starts
       if (canvasRef.current) {
         canvasRef.current.clearCanvas();
@@ -360,6 +406,7 @@ const Play = () => {
     );
 
     socket.on("guessesExhausted", () => {
+
       console.log("[Play] guessesExhausted");
       setRoundResult({
         type: "guessesExhausted",
@@ -374,22 +421,44 @@ const Play = () => {
       setEraseMode(false);
     });
 
+    socket.on("warnDrawer", (drawerId, newScore) => {
+      canvasRef.current?.clearCanvas();
+
+      setPlayers((prev) => {
+        const next = (prev || []).map((p) =>
+          p.userId === drawerId
+            ? { ...p, points: newScore } 
+            : p
+        );
+
+        playersRef.current = next;
+        return next;
+      });
+    });
+
     socket.on("gameEnded", () => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
         : players;
+
+      const currentProfiles = profilesRef.current;
+
       const withAvatars = base.map((p) => {
-        const prof = profiles[p.userId] || {};
+        const prof = currentProfiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
         const style = prof.avatarStyle || "funEmoji";
+
+        // Use custom avatar if available
+        const avatarUrl = prof.avatarData || makeAvatarDataUrl(style, seed);
         return {
           ...p,
-          avatar: makeAvatarDataUrl(style, seed),
+          avatar: avatarUrl,
           avatarSeed: seed,
           avatarStyle: style,
         };
       });
+
       setTimeout(() => {
         setRoundResult(null);
         navigate("/end", { state: { players: withAvatars } });
@@ -413,6 +482,7 @@ const Play = () => {
       socket.off("wrongAnswer");
       socket.off("guessesExhausted");
       socket.off("clear-canvas");
+      socket.off("warnDrawer");
       socket.off("gameEnded");
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -450,12 +520,128 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-  const hintDisplay = !isDrawer
-    ? maskPhraseToUnderscores(targetPhrase)
-    : flashcard?.word ||
-      flashcard?.translation ||
-      flashcard?.transliteration ||
-      "";
+
+  //-------------------------------------------------------
+  //------------ cards and audio PLAYBACK LOGIC -----------
+  //-------------------------------------------------------
+  
+     const DIFFICULTY_FOLDERS = {
+      Easy: [
+        "/FlashCardEasy/bird.png",
+        "/FlashCardEasy/book.png",
+        "/FlashCardEasy/cow.png",
+        "/FlashCardEasy/elephant.png",
+        "/FlashCardEasy/father.png",
+        "/FlashCardEasy/flower.png",
+        "/FlashCardEasy/friend.png",
+        "/FlashCardEasy/fruit.png",
+        "/FlashCardEasy/house.png",
+        "/FlashCardEasy/king.png",
+        "/FlashCardEasy/moon.png",
+        "/FlashCardEasy/mother.png",
+        "/FlashCardEasy/river.png",
+        "/FlashCardEasy/sun.png",
+        "/FlashCardEasy/tree.png",
+        "/FlashCardEasy/water.png",
+      ],
+  
+      Medium: [
+        "/FlashCardMedium/child.png",
+        "/FlashCardMedium/earth.png",
+        "/FlashCardMedium/fire.png",
+        "/FlashCardMedium/king.png",
+        "/FlashCardMedium/mountain.png",
+        "/FlashCardMedium/ocean.png",
+        "/FlashCardMedium/queen.png",
+        "/FlashCardMedium/sky.png",
+        "/FlashCardMedium/teacher.png",
+        "/FlashCardMedium/time.png",
+      ],
+  
+      Hard: [
+        "/FlashCardHard/compassion.png",
+        "/FlashCardHard/energy.png",
+        "/FlashCardHard/freedom.png",
+        "/FlashCardHard/Happiness.png",
+        "/FlashCardHard/knowledge.png",
+        "/FlashCardHard/mind.png",
+        "/FlashCardHard/speech.png",
+        "/FlashCardHard/student.png",
+        "/FlashCardHard/truth.png",
+        "/FlashCardHard/universe.png",
+      ],
+    };
+  
+    function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  
+  useEffect(() => {
+    if (!canAnswer || !flashcard?.imageSrc) {
+      setShowChoices(false);
+      setImageChoices([]);
+      return;
+    }
+  
+    // Detect difficulty from the imageSrc path
+    let difficulty = "Easy";
+    const src = flashcard.imageSrc;
+    if (src.includes("FlashCardMedium")) difficulty = "Medium";
+    if (src.includes("FlashCardHard")) difficulty = "Hard";
+  
+    const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
+  
+    // Filter out correct image from distractors
+    const distractorPool = folderImages.filter((img) => img !== src);
+  
+    // Pick 4 random distractors
+    const validDistractors = shuffle(distractorPool).slice(0, 4);
+  
+    // Mix correct + distractors and shuffle
+    const mixed = shuffle([
+      { src, isCorrect: true },
+      ...validDistractors.map((s) => ({ src: s, isCorrect: false })),
+    ]);
+  
+    setImageChoices(mixed);
+    setShowChoices(mixed.length === 5);
+  }, [canAnswer, flashcard?.imageSrc, roundKey]);
+  
+  const handlePickChoice = (choice) => {
+    if (!canAnswer) return;
+  
+    if (choice.isCorrect) {
+      // Correct click → send real answer
+      socket.emit("submitAnswer", {
+        gameId: roomId,
+        userId: getUserId(),
+        answer: flashcard?.word || "",
+      });
+  
+      setShowChoices(false);
+      setImageChoices([]);
+    } else {
+      // ❌ Wrong click → send intentionally wrong answer
+      socket.emit("submitAnswer", {
+        gameId: roomId,
+        userId: getUserId(),
+        answer: "__wrong_choice__", // something that will never match
+      });
+  
+      
+      setShowChoices(false);
+      setTimeout(() => {
+        setShowChoices(true);
+      }, 400);
+    }
+  };
+
+
 
   return (
     <>
@@ -525,21 +711,14 @@ const Play = () => {
               htmlFor="guessesleft"
               style={{
                 color:
-                  isEligibleGuesser && remainingGuesses <= 2 ? "red" : "inherit",
+                  isEligibleGuesser && remainingGuesses <= 2
+                    ? "red"
+                    : "inherit",
               }}
             >
               {isEligibleGuesser ? remainingGuesses : "—"}
             </label>
           </a>
-        </div>
-
-        <div className="hint-box">
-          <strong>Word Hint: </strong>
-          <label htmlFor="wordhint">
-            {flashcard && !isDrawer
-              ? maskPhraseToUnderscores(flashcard.word || "")
-              : "..."}
-          </label>
         </div>
 
         {/* Drawer and host see the full flashcard */}
@@ -568,7 +747,7 @@ const Play = () => {
           </div>
         </div>
 
-        <div style={{ textAlign: "center", marginBottom: "5px" }}>
+        <div className="drawer-name" style={{ textAlign: "center", marginBottom: "5px" }}>
           <strong>Drawing by:</strong>{" "}
           <span
             style={{
@@ -598,39 +777,49 @@ const Play = () => {
         />
 
         <div className="canvascontrols">
-          <button onClick={handlePenClick} disabled={!isDrawer || !eraseMode}>
-            Pen
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="30"
-            step="1"
-            value={strokeWidth}
-            onChange={handleStrokeWidthChange}
-            disabled={!isDrawer || eraseMode}
-          />
-          <input
-            type="color"
-            value={strokeColor}
-            onChange={handleStrokeColorChange}
-            disabled={!isDrawer}
-          />
-          <button onClick={handleEraserClick} disabled={!isDrawer || eraseMode}>
-            Eraser
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="100"
-            step="1"
-            value={eraserWidth}
-            onChange={handleEraserWidthChange}
-            disabled={!isDrawer || !eraseMode}
-          />
-          <button onClick={handleClear} disabled={!isDrawer}>
-            Clear
-          </button>
+          {!isHost ? (
+            <>
+              <button onClick={handlePenClick} disabled={!isDrawer || !eraseMode}>
+                Pen
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="30"
+                step="1"
+                value={strokeWidth}
+                onChange={handleStrokeWidthChange}
+                disabled={!isDrawer || eraseMode}
+              />
+              <input
+                type="color"
+                value={strokeColor}
+                onChange={handleStrokeColorChange}
+                disabled={!isDrawer}
+              />
+              <button onClick={handleEraserClick} disabled={!isDrawer || eraseMode}>
+                Eraser
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={eraserWidth}
+                onChange={handleEraserWidthChange}
+                disabled={!isDrawer || !eraseMode}
+              />
+              <button onClick={handleClear} disabled={!isDrawer}>
+                Clear
+              </button>
+            </>
+          ): (
+            <>
+            <button onClick={handleWarnDrawer}>Warn Drawer</button>
+            <button onClick={handleForceSkip}>Force Skip Round</button>
+            </>
+          )}
+          
         </div>
 
         <div className="chat-box">
@@ -660,6 +849,27 @@ const Play = () => {
               Send
             </button>
           </div>
+
+              {showChoices && canAnswer && imageChoices.length === 5 && (
+            <div className="choice-modal">
+              <div className="choice-card">
+                <h3>Pick the correct image</h3>
+
+                <div className="choice-grid">
+                  {imageChoices.map((c, index) => (
+                    <button
+                      key={index}
+                      className="choice-tile"
+                      onClick={() => handlePickChoice(c)}
+                    >
+                      <img src={c.src} alt="choice" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
               Only the {drawerTeam} team can answer, and not the drawer.

@@ -163,6 +163,23 @@
   background: #fff6e3; /* subtle highlight for the active drawer */
 }
 
+.user-chip.correct-answer {
+  background: #c8e6c9; /* light green background */
+  border-color: #4caf50;
+  animation: correctAnswerPulse 0.6s ease-out;
+}
+
+@keyframes correctAnswerPulse {
+  0% {
+    background: #a5d6a7;
+    transform: scale(1.02);
+  }
+  100% {
+    background: #c8e6c9;
+    transform: scale(1);
+  }
+}
+
 /* round result mini modal (top-left) – already in your file; keep if present */
 .round-result-modal {
   position: fixed;

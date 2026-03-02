@@ -96,21 +96,21 @@ export default function RoundPopups() {
       if (dname) drawerNameRef.current = dname;
     };
 
-    // ---- Correct answer / round end ----
+    // ---- Correct answer ----
     const onCorrectAnswer = ({ displayName, scoreGained, answerText }) => {
       const pts = Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null;
       const ans = typeof answerText === "string" && answerText.trim() ? answerText.trim() : "";
       enqueue({
-        title: `Round ${roundRef.current} ended`,
+        title: `Correct Answer! 🎉`,
         subtitle:
           displayName && pts !== null
-            ? `Guesser: ${displayName} (+${pts} pts)${ans ? ` — Answer: ${ans}` : ""}`
+            ? `${displayName} (+${pts} pts)${ans ? ` — ${ans}` : ""}`
             : displayName
-              ? `Guesser: ${displayName}`
+              ? `${displayName} guessed correctly!`
               : pts !== null
                 ? `+${pts} pts`
                 : undefined,
-        kind: "end",
+        kind: "correct",
         team: drawerTeamRef.current, // keep outline with the drawer team for that round
         duration: 1600,
       });

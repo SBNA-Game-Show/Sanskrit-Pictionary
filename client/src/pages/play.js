@@ -54,6 +54,9 @@ const Play = () => {
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
 
+  // Track which user just answered correctly to highlight their card
+  const [lastCorrectUserId, setLastCorrectUserId] = useState(null);
+
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
   const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
@@ -303,6 +306,7 @@ const Play = () => {
       setAnswer("");
       setTimeLeft(timer || 0);
       setRemainingGuesses(4);
+      setLastCorrectUserId(null); // Reset the correct answer highlight
 
       // Clear canvas when new round starts
       if (canvasRef.current) {
@@ -312,6 +316,7 @@ const Play = () => {
 
     socket.on("correctAnswer", ({ userId: correctUserId, displayName, scoreGained, answerText }) => {
       console.log("[Play] correctAnswer", { correctUserId, displayName, scoreGained, answerText });
+      setLastCorrectUserId(correctUserId);
       setRoundResult({
         type: "correct",
         displayName: displayName || "Someone",
@@ -426,7 +431,8 @@ const Play = () => {
     const chipClass =
       "user-chip " +
       (user.team === "Red" ? "chip-red" : "chip-blue") +
-      (user.userId === drawerId ? " is-drawer" : "");
+      (user.userId === drawerId ? " is-drawer" : "") +
+      (user.userId === lastCorrectUserId ? " correct-answer" : "");
 
     return (
       <div className={chipClass} key={user.userId}>

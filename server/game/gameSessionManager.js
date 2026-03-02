@@ -265,6 +265,24 @@ class GameSessionManager {
     const player = session.players.find((p) => p.userId === userId);
     if (!player) return { allSubmitted: false };
 
+    const getGuessersRoundStatus = () => {
+      const drawer = session.players[session.currentPlayerIndex];
+      const eligibleGuessers = session.players.filter(
+        (p) => p.team === drawer.team && p.userId !== drawer.userId,
+      );
+
+      const everyoneCorrect =
+        eligibleGuessers.length > 0 &&
+        eligibleGuessers.every((p) => p.hasAnswered === true);
+      const allGuessersDone =
+        eligibleGuessers.length > 0 &&
+        eligibleGuessers.every(
+          (p) => p.hasAnswered === true || (p.remainingGuesses ?? 0) <= 0,
+        );
+
+      return { everyoneCorrect, allGuessersDone };
+    };
+
     // Ensure remainingGuesses is always a finite number in the 0..4 range.
     // This prevents accidental extra chances due to falsy/undefined values.
     const rgRaw = player.remainingGuesses;
@@ -355,16 +373,13 @@ class GameSessionManager {
 
       io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
 
-      // check if all teammates (excluding drawer) already answered
-      const drawer = session.players[session.currentPlayerIndex];
-      const teammates = session.players.filter(
-        (p) => p.team === drawer.team && p.userId !== drawer.userId,
-      );
-      const everyoneCorrect =
-        teammates.length > 0 && teammates.every((p) => p.hasAnswered === true);
+      const { everyoneCorrect, allGuessersDone } = getGuessersRoundStatus();
 
-      // DO NOT start next round here; let socket layer decide using this flag
-      return { allSubmitted: Boolean(everyoneCorrect) };
+      // DO NOT start next round here; let socket layer decide using these flags
+      return {
+        allSubmitted: Boolean(everyoneCorrect),
+        guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect),
+      };
     }
 
     // wrong answer
@@ -386,21 +401,12 @@ class GameSessionManager {
 
     io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
 
-    // End the round when ALL eligible guessers are either correct OR out of guesses
-    const drawer = session.players[session.currentPlayerIndex];
-    const eligibleGuessers = session.players.filter(
-      (p) => p.team === drawer.team && p.userId !== drawer.userId,
-    );
+    const { everyoneCorrect, allGuessersDone } = getGuessersRoundStatus();
 
-    const everyoneCorrect =
-      eligibleGuessers.length > 0 && eligibleGuessers.every((p) => p.hasAnswered === true);
-    const allGuessersDone =
-      eligibleGuessers.length > 0 &&
-      eligibleGuessers.every(
-        (p) => p.hasAnswered === true || (p.remainingGuesses ?? 0) <= 0,
-      );
-
-    return { allSubmitted: Boolean(everyoneCorrect), guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect) };
+    return {
+      allSubmitted: Boolean(everyoneCorrect),
+      guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect),
+    };
   }
 
   updatePlayerPoints(gameId, userId, scoreChange) {

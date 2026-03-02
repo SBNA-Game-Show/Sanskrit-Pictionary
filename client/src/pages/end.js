@@ -209,12 +209,6 @@ const End = () => {
       </div>
 
       <div className="gameend-actions">
-        <button
-          className="action-button new-game-button"
-          onClick={handleNewGame}
-        >
-          New Game
-        </button>
         <button className="action-button home-button" onClick={handleGoHome}>
           Exit to Home
         </button>

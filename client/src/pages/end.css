@@ -216,6 +216,7 @@ padding:5px;
 
 .action-button {
   background: linear-gradient(135deg, #1b2a4a, #0f1730);
+  font-size: 1.4em;
   border: 1px solid rgba(255,255,255,0.18);
   color: #ffffff;
   padding: 10px 16px;

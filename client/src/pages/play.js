@@ -49,6 +49,12 @@ const Play = () => {
   const [answer, setAnswer] = useState("");
   const [remainingGuesses, setRemainingGuesses] = useState(4);
 
+
+  // For multiple-choice image selection (guessers only)
+  const [imageChoices, setImageChoices] = useState([]);
+  const [showChoices, setShowChoices] = useState(false);
+  const [roundKey, setRoundKey] = useState(0);
+
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
 
@@ -306,6 +312,12 @@ const Play = () => {
       setTimeLeft(timer || 0);
       setRemainingGuesses(4);
 
+      // Reset answer and choices when drawer changes
+      setImageChoices([]);
+      setRoundKey((k) => k + 1);
+      setFlashcard(null); //  clear old card instantly
+      socket.emit("getGameState", { roomId }); //  fetch new card
+
       // Clear canvas when new round starts
       if (canvasRef.current) {
         canvasRef.current.clearCanvas();
@@ -452,6 +464,128 @@ const Play = () => {
       flashcard?.translation ||
       flashcard?.transliteration ||
       "";
+
+  //-------------------------------------------------------
+  //------------ cards and audio PLAYBACK LOGIC -----------
+  //-------------------------------------------------------
+  
+     const DIFFICULTY_FOLDERS = {
+      Easy: [
+        "/FlashCardEasy/bird.png",
+        "/FlashCardEasy/book.png",
+        "/FlashCardEasy/cow.png",
+        "/FlashCardEasy/elephant.png",
+        "/FlashCardEasy/father.png",
+        "/FlashCardEasy/flower.png",
+        "/FlashCardEasy/friend.png",
+        "/FlashCardEasy/fruit.png",
+        "/FlashCardEasy/house.png",
+        "/FlashCardEasy/king.png",
+        "/FlashCardEasy/moon.png",
+        "/FlashCardEasy/mother.png",
+        "/FlashCardEasy/river.png",
+        "/FlashCardEasy/sun.png",
+        "/FlashCardEasy/tree.png",
+        "/FlashCardEasy/water.png",
+      ],
+  
+      Medium: [
+        "/FlashCardMedium/child.png",
+        "/FlashCardMedium/earth.png",
+        "/FlashCardMedium/fire.png",
+        "/FlashCardMedium/king.png",
+        "/FlashCardMedium/mountain.png",
+        "/FlashCardMedium/ocean.png",
+        "/FlashCardMedium/queen.png",
+        "/FlashCardMedium/sky.png",
+        "/FlashCardMedium/teacher.png",
+        "/FlashCardMedium/time.png",
+      ],
+  
+      Hard: [
+        "/FlashCardHard/compassion.png",
+        "/FlashCardHard/energy.png",
+        "/FlashCardHard/freedom.png",
+        "/FlashCardHard/Happiness.png",
+        "/FlashCardHard/knowledge.png",
+        "/FlashCardHard/mind.png",
+        "/FlashCardHard/speech.png",
+        "/FlashCardHard/student.png",
+        "/FlashCardHard/truth.png",
+        "/FlashCardHard/universe.png",
+      ],
+    };
+  
+    function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  
+  useEffect(() => {
+    if (!canAnswer || !flashcard?.imageSrc) {
+      setShowChoices(false);
+      setImageChoices([]);
+      return;
+    }
+  
+    // Detect difficulty from the imageSrc path
+    let difficulty = "Easy";
+    const src = flashcard.imageSrc;
+    if (src.includes("FlashCardMedium")) difficulty = "Medium";
+    if (src.includes("FlashCardHard")) difficulty = "Hard";
+  
+    const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
+  
+    // Filter out correct image from distractors
+    const distractorPool = folderImages.filter((img) => img !== src);
+  
+    // Pick 4 random distractors
+    const validDistractors = shuffle(distractorPool).slice(0, 4);
+  
+    // Mix correct + distractors and shuffle
+    const mixed = shuffle([
+      { src, isCorrect: true },
+      ...validDistractors.map((s) => ({ src: s, isCorrect: false })),
+    ]);
+  
+    setImageChoices(mixed);
+    setShowChoices(mixed.length === 5);
+  }, [canAnswer, flashcard?.imageSrc, roundKey]);
+  
+  const handlePickChoice = (choice) => {
+    if (!canAnswer) return;
+  
+    if (choice.isCorrect) {
+      // Correct click → send real answer
+      socket.emit("submitAnswer", {
+        gameId: roomId,
+        userId: getUserId(),
+        answer: flashcard?.word || "",
+      });
+  
+      setShowChoices(false);
+      setImageChoices([]);
+    } else {
+      // ❌ Wrong click → send intentionally wrong answer
+      socket.emit("submitAnswer", {
+        gameId: roomId,
+        userId: getUserId(),
+        answer: "__wrong_choice__", // something that will never match
+      });
+  
+      
+      setShowChoices(false);
+      setTimeout(() => {
+        setShowChoices(true);
+      }, 400);
+    }
+  };
+
+
 
   return (
     <>
@@ -656,6 +790,27 @@ const Play = () => {
               Send
             </button>
           </div>
+
+              {showChoices && canAnswer && imageChoices.length === 5 && (
+            <div className="choice-modal">
+              <div className="choice-card">
+                <h3>Pick the correct image</h3>
+
+                <div className="choice-grid">
+                  {imageChoices.map((c, index) => (
+                    <button
+                      key={index}
+                      className="choice-tile"
+                      onClick={() => handlePickChoice(c)}
+                    >
+                      <img src={c.src} alt="choice" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
               Only the {drawerTeam} team can answer, and not the drawer.

@@ -535,6 +535,7 @@ const Lobby = () => {
           <div className="setting-section">
             <h3>Select Timer</h3>
             <div className="option-buttons">
+              {/* Added time to adjust styling. To be removed when completed*/}
               {[30, 45, 60, 75, 90].map((sec) => (
                 <button
                   key={sec}

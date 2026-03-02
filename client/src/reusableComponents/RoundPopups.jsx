@@ -97,7 +97,7 @@ export default function RoundPopups() {
       if (dname) drawerNameRef.current = dname;
     };
 
-    // ---- Correct answer ----
+    // ---- Round Ended ----
     const onCorrectAnswer = ({ displayName, scoreGained, answerText }) => {
       const pts = Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null;
       const ans = typeof answerText === "string" && answerText.trim() ? answerText.trim() : "";
@@ -152,7 +152,7 @@ export default function RoundPopups() {
 
     socket.on("roundStarted", onRoundStarted);
     socket.on("drawerChanged", onDrawerChanged);
-    socket.on("correctAnswer", onCorrectAnswer);
+    // socket.on("correctAnswer", onCorrectAnswer);
     socket.on("warnDrawer", onWarnPlayer);
     socket.on("gameEnded", onGameEnded);
     socket.on("guessesExhausted", onGuessesExhausted);
@@ -160,7 +160,7 @@ export default function RoundPopups() {
     return () => {
       socket.off("roundStarted", onRoundStarted);
       socket.off("drawerChanged", onDrawerChanged);
-      socket.off("correctAnswer", onCorrectAnswer);
+      // socket.off("correctAnswer", onCorrectAnswer);
       socket.off("warnDrawer", onWarnPlayer);
       socket.off("gameEnded", onGameEnded);
       socket.off("guessesExhausted", onGuessesExhausted);

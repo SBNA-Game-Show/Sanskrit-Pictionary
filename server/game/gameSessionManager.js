@@ -169,7 +169,7 @@ class GameSessionManager {
     );
 
     // Send flashcard privately to drawer and host
-    io.to([currentPlayer.socketId, session.hostData.hostSocketId]).emit("newFlashcard", {
+    io.to(gameId).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
       translation: flashcard.translation,

@@ -349,42 +349,6 @@ function createLobbyManager(io, UserModel) {
       const room = rooms[roomId];
       if (!roomId || !userId || !room) return;
 
-      if (room.hostId === userId) {
-        console.log(`[disconnect] Host ${userId} disconnected - kicking everyone from ${roomId}`);
-        
-        // Notify everyone that host left
-        io.to(roomId).emit("hostLeft", {
-          message: "You have disconnected. All players are being kicked :("
-        });
-
-        // Delete the room
-    delete rooms[roomId];
-    
-    // Make all sockets leave the room and mark offline
-    const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
-    if (socketsInRoom) {
-      for (const sid of socketsInRoom) {
-        const s = io.sockets.sockets.get(sid);
-        if (s && s.id !== socket.id) { 
-          s.leave(roomId);
-          s.roomId = null;
-          
-          // Mark user offline in DB
-          if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
-            await UserModel.findByIdAndUpdate(s.userId, { isOnline: false });
-          }
-        }
-      }
-    }
-    
-    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-      await UserModel.findByIdAndUpdate(userId, { isOnline: false });
-    }
-    
-    console.log("❌ Socket disconnected (HOST):", socket.id);
-    return; // Exit early
-  }
-
       io.to(roomId).emit("userLeftLobby", { userId });
 
       room.teams.Red = room.teams.Red.filter((id) => id !== userId);

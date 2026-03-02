@@ -10,7 +10,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastInfo } from "../utils/toast";
+import { toastWarning, toastInfo, toastSuccess } from "../utils/toast";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -358,29 +358,17 @@ const Play = () => {
       }
     });
 
-    socket.on(
-      "correctAnswer",
-      ({ userId: correctUserId, displayName, scoreGained, answerText }) => {
-        console.log("[Play] correctAnswer", {
-          correctUserId,
-          displayName,
-          scoreGained,
-          answerText,
-        });
-        setRoundResult({
-          type: "correct",
-          displayName: displayName || "Someone",
-          scoreGained: Number.isFinite(Number(scoreGained))
-            ? Number(scoreGained)
-            : null,
-          answerText: typeof answerText === "string" ? answerText : "",
-        });
-        setTimeout(() => setRoundResult(null), 1500);
-        socket.emit("getGameState", { roomId });
-      },
+   socket.on("correctAnswer", ({ displayName, scoreGained }) => {
+    toastSuccess(
+      `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
+      {
+        autoClose: 3000,
+        position: "top-left"
+      }
     );
-
-    socket.on(
+  });
+    
+  socket.on(
       "wrongAnswer",
       ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
         console.log("[Play] wrongAnswer", {
@@ -418,6 +406,7 @@ const Play = () => {
     );
 
     socket.on("guessesExhausted", () => {
+
       console.log("[Play] guessesExhausted");
       setRoundResult({
         type: "guessesExhausted",
@@ -493,7 +482,7 @@ const Play = () => {
       socket.off("wrongAnswer");
       socket.off("guessesExhausted");
       socket.off("clear-canvas");
-      socket.off("warnDrawer")
+      socket.off("warnDrawer");
       socket.off("gameEnded");
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps

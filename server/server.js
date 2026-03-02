@@ -7,8 +7,8 @@ const { Server } = require("socket.io");
 const cookieParser = require("cookie-parser");
 
 // DNS override (uncomment if running into querySrv ECONNREFUSED errors)
-// const { setServers } = require("node:dns/promises");
-// setServers(["1.1.1.1", "8.8.8.8"]);
+const { setServers } = require("node:dns/promises");
+setServers(["1.1.1.1", "8.8.8.8"]);
 
 dotenv.config();
 

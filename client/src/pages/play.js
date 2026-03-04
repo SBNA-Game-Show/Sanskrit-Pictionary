@@ -505,15 +505,35 @@ const Play = () => {
       (user.userId === drawerId ? " is-drawer" : "");
 
     return (
-      <div className={chipClass} key={user.userId}>
-        <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
-        <span className="chip-name">{displayName}</span>
-        <span className="chip-guesses">G: {user.remainingGuesses ?? 4}</span>
-        {user.userId === drawerId && (
-          <span className="chip-pen" title="Drawing now">
-            ✏️
+      <div className={chipClass} key={user.userId} style={{ display: 'flex', 
+        alignItems: 'center', justifyContent: 'space-between', 
+        padding: '12px 2px', minWidth: '200px'}}>
+        
+        {/* Avatar + DisplayName */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
+          <span className="chip-name" style={{ fontWeight: 'bold', fontSize: '18px', 
+              wordBreak: 'break-word' , minWidth: '95px'}}>
+            {displayName}{user.userId === drawerId && " ✏️"}
           </span>
-        )}
+        </div>
+
+        {/* Points + Atmps*/}
+        <div style={{ display: 'flex', flexDirection: 'column', 
+          alignItems: 'flex-end', fontSize: '13px', minWidth: '55px'}}>
+          {/* Points */}
+          <span style={{ color: '#e1bf00', fontWeight: 'bold' }}>
+            Pts: {user.points ?? 0}
+          </span>
+          {/* Atmps */}
+          <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
+            {[...Array(4)].map((_, i) => (
+              <span key={i} style={{ fontSize: '7px' }}>
+                {i < (user.remainingGuesses ?? 4) ? '❤️' : '🤍'}
+              </span>
+            )).reverse()}
+          </div>
+        </div>
       </div>
     );
   };
@@ -726,7 +746,7 @@ const Play = () => {
 
         {/* User List */}
         <div className="user-list">
-          <div className="user-panel-title">User List</div>
+          <div className="user-panel-title">Players List</div>
 
           <div className="team-block">
             <h3 className="team-title red">Red Team</h3>

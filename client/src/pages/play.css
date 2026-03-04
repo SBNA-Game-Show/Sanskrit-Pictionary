@@ -63,19 +63,14 @@
 }
 
 .chat-box {
- /*  grid-column: 4 / 5;
-  grid-row: 3 / 5; */
   grid-column: 4 / 5;
   grid-row: 5 / 6;
-  /* max-width: 270px; */
   width:320px;
   margin: auto;
   
 }
 
 .input-area-wrapper {
- /*  grid-column: 4 / 5;
-  grid-row: 5 / 6; */
   grid-column: 4 / 5;
   grid-row: 3 / 5;
   margin: 0 auto;

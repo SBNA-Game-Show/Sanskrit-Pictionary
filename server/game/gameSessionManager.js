@@ -169,7 +169,7 @@ class GameSessionManager {
     );
 
     // Send flashcard privately to drawer and host
-    io.to([currentPlayer.socketId, session.hostData.hostSocketId]).emit("newFlashcard", {
+    io.to(gameId).emit("newFlashcard", {
       word: flashcard.word,
       transliteration: flashcard.transliteration,
       translation: flashcard.translation,
@@ -349,9 +349,7 @@ class GameSessionManager {
       io.to(gameId).emit("correctAnswer", {
         userId,
         displayName: player.displayName,
-        points: session.scores[userId],
         scoreGained: gained,
-        remainingSeconds: remain,
         answerText,
         answer: {
           word: fc.word || "",
@@ -408,6 +406,15 @@ class GameSessionManager {
       );
 
     return { allSubmitted: Boolean(everyoneCorrect), guessesExhausted: Boolean(allGuessersDone && !everyoneCorrect) };
+  }
+
+  updatePlayerPoints(gameId, userId, scoreChange) {
+    const session = this.sessions.get(gameId);
+    const currentScore = session.scores[userId] || 0;
+    const newScore = Math.max(0, currentScore + scoreChange);
+    session.scores[userId] = newScore;
+
+    return session.scores[userId];
   }
 
   endRound(gameId) {

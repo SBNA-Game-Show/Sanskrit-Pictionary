@@ -217,13 +217,11 @@ class GameSessionManager {
     const lastDrawer = session.players[session.currentPlayerIndex];
 
     // No next round if reached total rounds and last drawer was Blue team
-    if (lastDrawer.team === "Blue" && session.currentRound >= session.totalRounds) {
-      return null;
-    }
+    if (lastDrawer.team === "Blue" 
+        && session.currentRound >= session.totalRounds) return null;
 
     // Round number only increments after Blue team's turn, as Red always starts first
     if (lastDrawer.team === "Blue") {
-      console.log(`RoundEnd score synced`);
       session.currentRound++;
     }
 

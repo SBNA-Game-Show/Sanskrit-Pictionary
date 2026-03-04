@@ -670,40 +670,12 @@ const Play = () => {
         {/* Round result modal */}
         {roundResult && (
           <div className="round-result-modal">
-            {roundResult.type === "correct" && (
-              <div className="modal-card">
-                <h3>Correct!</h3>
-                <p>
-                  {roundResult.displayName} guessed correctly
-                  {typeof roundResult.scoreGained === "number"
-                    ? ` (+${roundResult.scoreGained} pts)`
-                    : ""}
-                </p>
-                {roundResult.answerText && (
-                  <p>
-                    <strong>Answer:</strong> {roundResult.answerText}
-                  </p>
-                )}
-              </div>
-            )}
-            {roundResult.type === "wrong" && (
-              <div className="modal-card wrong-answer">
-                <h3>Wrong Answer</h3>
-                <p>-{roundResult.scoreLost} points 😞</p>
-              </div>
-            )}
-            {roundResult.type === "guessesExhausted" && (
-              <div className="modal-card">
-                <h3>Round Ended</h3>
-                <p>No more guesses remaining!</p>
-              </div>
-            )}
-            {roundResult.type === "gameEnded" && (
-              <div className="modal-card">
-                <h3>Game Over</h3>
-                <p>Thanks for playing — check the scoreboard!</p>
-              </div>
-            )}
+            {/* Removed the JSX popups here as we are using toast 
+                  and roundpopups for all the notifications */}
+            {roundResult.type === "correct" }
+            {roundResult.type === "wrong" }
+            {roundResult.type === "guessesExhausted" }
+            {roundResult.type === "gameEnded" }
           </div>
         )}
 

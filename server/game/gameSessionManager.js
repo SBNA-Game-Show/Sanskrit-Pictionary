@@ -210,7 +210,7 @@ class GameSessionManager {
     });
   }
 
-  nextRound(gameId) {
+  nextRound(gameId, io) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
 
@@ -222,6 +222,11 @@ class GameSessionManager {
 
     // Round number only increments after Blue team's turn, as Red always starts first
     if (lastDrawer.team === "Blue") {
+      // Trigger roundEnded popup message
+      io.to(gameId).emit("roundEnded", {
+        roundNumber: session.currentRound
+      });
+
       session.currentRound++;
     }
 

@@ -386,7 +386,7 @@ function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
 
     // Get latest scores before starting the next round
     const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);

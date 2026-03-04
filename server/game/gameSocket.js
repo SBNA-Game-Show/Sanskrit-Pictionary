@@ -387,16 +387,26 @@ function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
+
+    // Get latest scores before starting the next round
+    const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);
 
     if (nextRoundInfo) {
-      // startRound is responsible for: sending a new Flashcard to the questioner, broadcasting drawerChanged/roundStarted, and updating gameState
+      // Sync scores before starting the next round
+      io.to(gameId).emit("updatePlayers", finalPlayersWithScore);
+
+      // startRound is responsible for: sending a new Flashcard to the questioner, 
+      // broadcasting drawerChanged/roundStarted, and updating gameState
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
     } else {
-      io.to(gameId).emit("gameEnded");
+      // Sync scores before emitting gameEnded
+      io.to(gameId).emit("updatePlayers", finalPlayersWithScore);
+      
+      io.to(gameId).emit("gameEnded", { finalPlayers: finalPlayersWithScore });
       clearActiveTimer(gameId);
     }
   } finally {

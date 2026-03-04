@@ -75,6 +75,7 @@ class GameSessionManager {
       currentFlashcard: null,
       canvasData: null,
       // guesses are tracked per-player (p.remainingGuesses)
+      gameEnded: false // flag to indicate if game has ended (after final round)
     });
 
     // init scores
@@ -218,7 +219,10 @@ class GameSessionManager {
 
     // End game when if reached total rounds and last drawer was Blue team
     if (lastDrawer.team === "Blue" 
-        && session.currentRound >= session.totalRounds) return null;
+        && session.currentRound >= session.totalRounds){
+          session.gameEnded = true; // Mark game as ended
+          return null;
+        } 
 
     // Round number only increments after Blue team's turn, as Red always starts first
     if (lastDrawer.team === "Blue") {

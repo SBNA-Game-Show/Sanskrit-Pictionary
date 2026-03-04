@@ -51,6 +51,7 @@ function createGameSocket(io) {
             scores: session.scores,
             canvasData: canvasData,
             remainingGuesses: myRemainingGuesses,
+            gameEnded: session.gameEnded, // get game status
           });
 
           // Notify others that player reconnected

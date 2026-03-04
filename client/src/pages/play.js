@@ -436,7 +436,7 @@ const Play = () => {
       });
     });
 
-    socket.on("gameEnded", () => {
+    socket.on("gameEnded", (data) => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
@@ -444,7 +444,7 @@ const Play = () => {
 
       const currentProfiles = profilesRef.current;
 
-      const withAvatars = base.map((p) => {
+      const withAvatars = data.finalPlayers.map((p) => {
         const prof = currentProfiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
         const style = prof.avatarStyle || "funEmoji";

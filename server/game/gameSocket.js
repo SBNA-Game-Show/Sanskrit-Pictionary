@@ -388,27 +388,24 @@ function proceedToNextRound(io, gameId) {
 
     const nextRoundInfo = gameSessionManager.nextRound(gameId);
 
-    // YUE
-    // 2. 获取当前服务器内存中最新、最全的分数列表
-    const finalPlayers = gameSessionManager.getPlayersWithScores(gameId);
+    // Get latest scores before starting the next round
+    const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);
 
     if (nextRoundInfo) {
-      // --- 情况 A: 还有下一轮 ---
-      // 先强制同步一次分数，确保所有人在新回合开始前分数一致
-      io.to(gameId).emit("updatePlayers", finalPlayers);
+      // Sync scores before starting the next round
+      io.to(gameId).emit("updatePlayers", finalPlayersWithScore);
 
-      // startRound is responsible for: sending a new Flashcard to the questioner, broadcasting drawerChanged/roundStarted, and updating gameState
+      // startRound is responsible for: sending a new Flashcard to the questioner, 
+      // broadcasting drawerChanged/roundStarted, and updating gameState
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
     } else {
-      // --- 情况 B: 游戏真正结束 ---
-      // 关键：先同步最后一次分数
-      io.to(gameId).emit("updatePlayers", finalPlayers);
+      // Sync scores before emitting gameEnded
+      io.to(gameId).emit("updatePlayers", finalPlayersWithScore);
       
-      // 关键：发出结束信号，并直接带上最终分数包
-      io.to(gameId).emit("gameEnded", { finalPlayers: finalPlayers });
+      io.to(gameId).emit("gameEnded", { finalPlayers: finalPlayersWithScore });
       clearActiveTimer(gameId);
     }
   } finally {

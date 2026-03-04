@@ -210,24 +210,19 @@ class GameSessionManager {
     });
   }
 
-  nextRound(gameId, io) {
+  nextRound(gameId) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
 
     const lastDrawer = session.players[session.currentPlayerIndex];
 
-    // End game when if reached total rounds and last drawer was Blue team
+    // No next round if reached total rounds and last drawer was Blue team
     if (lastDrawer.team === "Blue" && session.currentRound >= session.totalRounds) {
-      // Sync final scores before game ends
-      io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
-      console.log(`GameEnd score synced`);
       return null;
     }
 
     // Round number only increments after Blue team's turn, as Red always starts first
     if (lastDrawer.team === "Blue") {
-      // Sync final scores before next round starts
-      io.to(gameId).emit("updatePlayers", this.getPlayersWithScores(gameId));
       console.log(`RoundEnd score synced`);
       session.currentRound++;
     }

@@ -386,16 +386,29 @@ function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId);
+
+    // YUE
+    // 2. 获取当前服务器内存中最新、最全的分数列表
+    const finalPlayers = gameSessionManager.getPlayersWithScores(gameId);
 
     if (nextRoundInfo) {
+      // --- 情况 A: 还有下一轮 ---
+      // 先强制同步一次分数，确保所有人在新回合开始前分数一致
+      io.to(gameId).emit("updatePlayers", finalPlayers);
+
       // startRound is responsible for: sending a new Flashcard to the questioner, broadcasting drawerChanged/roundStarted, and updating gameState
       gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
     } else {
-      io.to(gameId).emit("gameEnded");
+      // --- 情况 B: 游戏真正结束 ---
+      // 关键：先同步最后一次分数
+      io.to(gameId).emit("updatePlayers", finalPlayers);
+      
+      // 关键：发出结束信号，并直接带上最终分数包
+      io.to(gameId).emit("gameEnded", { finalPlayers: finalPlayers });
       clearActiveTimer(gameId);
     }
   } finally {

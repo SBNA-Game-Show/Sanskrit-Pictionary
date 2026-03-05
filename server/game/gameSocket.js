@@ -21,6 +21,14 @@ function createGameSocket(io) {
       // Check if this user is reconnecting to an active game
       const session = gameSessionManager.getSession(roomId);
       if (session) {
+
+          // If the game has already ended, send the final scores without rejoining
+          if (session.gameEnded) {
+          socket.emit("gameEnded", { 
+            finalPlayers: gameSessionManager.getPlayersWithScores(roomId)});
+          return; 
+        }
+
         const reconnected = gameSessionManager.markPlayerReconnected(
           roomId,
           userId,

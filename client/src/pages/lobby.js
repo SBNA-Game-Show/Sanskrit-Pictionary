@@ -240,11 +240,12 @@ const Lobby = () => {
       }, 1000);
     });
 
-    socket.on("gameEnded", () => {
-      toastSuccess("Game Over!");
-      setCurrentRound(null);
-      setTimeLeft(null);
-    });
+    // Keep player in /lobby if game has ended
+    const handleGameEnded = () => {      
+      toastWarning("Game Is Ended");
+      navigate("/lobby", { replace: true });
+    };
+    socket.once("gameEnded", handleGameEnded);
 
     socket.on("leftTeam", (res) => {
       if (!res?.ok) console.warn("leftTeam failed", res?.error);
@@ -302,7 +303,7 @@ const Lobby = () => {
       socket.off("kicked");
       socket.off("roundStarted");
       socket.off("startTimer");
-      socket.off("gameEnded");
+      socket.off("gameEnded", handleGameEnded);
       socket.off("leftTeam");
       socket.off("startGameError");
       socket.off("hostLeftOthers");

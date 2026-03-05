@@ -445,7 +445,7 @@ const Play = () => {
       });
     });
 
-    socket.on("gameEnded", () => {
+    socket.on("gameEnded", (data) => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
@@ -453,7 +453,7 @@ const Play = () => {
 
       const currentProfiles = profilesRef.current;
 
-      const withAvatars = base.map((p) => {
+      const withAvatars = data.finalPlayers.map((p) => {
         const prof = currentProfiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
         const style = prof.avatarStyle || "funEmoji";
@@ -525,15 +525,35 @@ const Play = () => {
       (isExhausted ? " guesses-exhausted" : "");
 
     return (
-      <div className={chipClass} key={user.userId}>
-        <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
-        <span className="chip-name">{displayName}</span>
-        <span className="chip-guesses">G: {user.remainingGuesses ?? 4}</span>
-        {user.userId === drawerId && (
-          <span className="chip-pen" title="Drawing now">
-            ✏️
+      <div className={chipClass} key={user.userId} style={{ display: 'flex', 
+        alignItems: 'center', justifyContent: 'space-between', 
+        padding: '12px 2px', minWidth: '200px'}}>
+        
+        {/* Avatar + DisplayName */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
+          <span className="chip-name" style={{ fontWeight: 'bold', fontSize: '18px', 
+              wordBreak: 'break-word' , minWidth: '95px'}}>
+            {displayName}{user.userId === drawerId && " ✏️"}
           </span>
-        )}
+        </div>
+
+        {/* Points + Atmps*/}
+        <div style={{ display: 'flex', flexDirection: 'column', 
+          alignItems: 'flex-end', fontSize: '13px', minWidth: '55px'}}>
+          {/* Points */}
+          <span style={{ color: '#e1bf00', fontWeight: 'bold' }}>
+            Pts: {user.points ?? 0}
+          </span>
+          {/* Atmps */}
+          <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
+            {[...Array(4)].map((_, i) => (
+              <span key={i} style={{ fontSize: '7px' }}>
+                {i < (user.remainingGuesses ?? 4) ? '❤️' : '🤍'}
+              </span>
+            )).reverse()}
+          </div>
+        </div>
       </div>
     );
   };
@@ -670,40 +690,12 @@ const Play = () => {
         {/* Round result modal */}
         {roundResult && (
           <div className="round-result-modal">
-            {roundResult.type === "correct" && (
-              <div className="modal-card">
-                <h3>Correct!</h3>
-                <p>
-                  {roundResult.displayName} guessed correctly
-                  {typeof roundResult.scoreGained === "number"
-                    ? ` (+${roundResult.scoreGained} pts)`
-                    : ""}
-                </p>
-                {roundResult.answerText && (
-                  <p>
-                    <strong>Answer:</strong> {roundResult.answerText}
-                  </p>
-                )}
-              </div>
-            )}
-            {roundResult.type === "wrong" && (
-              <div className="modal-card wrong-answer">
-                <h3>Wrong Answer</h3>
-                <p>-{roundResult.scoreLost} points 😞</p>
-              </div>
-            )}
-            {roundResult.type === "guessesExhausted" && (
-              <div className="modal-card">
-                <h3>Round Ended</h3>
-                <p>No more guesses remaining!</p>
-              </div>
-            )}
-            {roundResult.type === "gameEnded" && (
-              <div className="modal-card">
-                <h3>Game Over</h3>
-                <p>Thanks for playing — check the scoreboard!</p>
-              </div>
-            )}
+            {/* Removed the JSX popups here as we are using toast 
+                  and roundpopups for all the notifications */}
+            {roundResult.type === "correct" }
+            {roundResult.type === "wrong" }
+            {roundResult.type === "guessesExhausted" }
+            {roundResult.type === "gameEnded" }
           </div>
         )}
 
@@ -746,7 +738,7 @@ const Play = () => {
 
         {/* User List */}
         <div className="user-list">
-          <div className="user-panel-title">User List</div>
+          <div className="user-panel-title">Players List</div>
 
           <div className="team-block">
             <h3 className="team-title red">Red Team</h3>
@@ -855,7 +847,7 @@ const Play = () => {
           />
         </div>
 
-        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
+        <div className={`input-area-wrapper ${isHost &&  "hidden"}`}>
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input

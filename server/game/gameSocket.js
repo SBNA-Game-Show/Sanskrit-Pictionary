@@ -22,12 +22,14 @@ function createGameSocket(io) {
       const session = gameSessionManager.getSession(roomId);
       if (session) {
 
-          // If the game has already ended, send the final scores without rejoining
+          // If the game is ended, send the final scores without rejoining
           if (session.gameEnded) {
           socket.emit("gameEnded", { 
             finalPlayers: gameSessionManager.getPlayersWithScores(roomId)});
           return; 
-        }
+          } else {
+            socket.emit("gameInProgress", { roomId });
+          }
 
         const reconnected = gameSessionManager.markPlayerReconnected(
           roomId,

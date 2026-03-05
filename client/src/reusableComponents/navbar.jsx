@@ -79,7 +79,11 @@ const Navbar = () => {
               // Show Sign Up button for guests
               <button
                 className="logout-btn2"
-                onClick={() => navigate("/signup")}
+                onClick={() =>
+                  navigate(
+                    `/signup?guestName=${encodeURIComponent(displayName)}`,
+                  )
+                }
                 title="Create an account to save your progress"
               >
                 Sign Up

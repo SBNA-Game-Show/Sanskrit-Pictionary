@@ -64,12 +64,15 @@
 
 .chat-box {
   grid-column: 4 / 5;
-  grid-row: 3 / 5;
+  grid-row: 5 / 6;
+  width:320px;
+  margin: auto;
+  
 }
 
 .input-area-wrapper {
   grid-column: 4 / 5;
-  grid-row: 5 / 6;
+  grid-row: 3 / 5;
   margin: 0 auto;
   width: 100%;
   background-color: rgba(242, 210, 182);
@@ -78,6 +81,7 @@
   font-size: 25px;
   text-align: center;
   align-self: center;
+  width:350px;
 }
 
 .input-area-wrapper h5{
@@ -166,6 +170,38 @@
   background: #fff6e3; /* subtle highlight for the active drawer */
 }
 
+.user-chip.correct-answer {
+  background: #c8e6c9; /* light green background */
+  border-color: #4caf50;
+  animation: correctAnswerPulse 0.6s ease-out;
+}
+
+.user-chip.guesses-exhausted {
+  background: #eeeeee !important;
+  border-color: #9e9e9e !important;
+  opacity: 0.7;
+}
+
+.user-chip.guesses-exhausted .chip-name,
+.user-chip.guesses-exhausted .chip-guesses {
+  color: #616161 !important;
+}
+
+.user-chip.guesses-exhausted .chip-pen {
+  opacity: 0.5;
+}
+
+@keyframes correctAnswerPulse {
+  0% {
+    background: #a5d6a7;
+    transform: scale(1.02);
+  }
+  100% {
+    background: #c8e6c9;
+    transform: scale(1);
+  }
+}
+
 /* round result mini modal (top-left) – already in your file; keep if present */
 .round-result-modal {
   position: fixed;
@@ -184,11 +220,11 @@
   background: #ffebee;
   border: 2px solid #c62828;
 }
- 
+
 .round-result-modal .modal-card.wrong-answer h3 {
   color: #c62828;
 }
- 
+
 .round-result-modal .modal-card.wrong-answer p {
   color: #b71c1c;
   font-weight: bold;
@@ -272,3 +308,4 @@
 .choice-tile:hover img {
   transform: scale(1.05);
 }
+

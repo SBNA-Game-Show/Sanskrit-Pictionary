@@ -62,6 +62,9 @@ const Play = () => {
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
 
+  // Track all users who answered correctly this round to highlight their cards
+  const [correctUserIds, setCorrectUserIds] = useState([]);
+
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
   const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
@@ -345,6 +348,7 @@ const Play = () => {
       setAnswer("");
       setTimeLeft(timer || 0);
       setRemainingGuesses(4);
+      setCorrectUserIds([]); // Reset the correct answer highlights
 
       // Reset answer and choices when drawer changes
       setImageChoices([]);
@@ -358,7 +362,12 @@ const Play = () => {
       }
     });
 
-   socket.on("correctAnswer", ({ displayName, scoreGained }) => {
+   socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
+    if (userId) {
+      setCorrectUserIds((prev) =>
+        prev.includes(userId) ? prev : [...prev, userId],
+      );
+    }
     toastSuccess(
       `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
       {
@@ -499,10 +508,21 @@ const Play = () => {
     const seed = prof.avatarSeed || displayName || user.userId;
     const style = prof.avatarStyle;
 
+    // Determine states - exhausted only if not correct and not drawer
+    const isCorrect = correctUserIds.includes(user.userId);
+    const isExhausted = (user.remainingGuesses ?? 4) <= 0 && !isCorrect && user.userId !== drawerId;
+    
+    // Debug logging
+    if (isExhausted) {
+      console.log(`[EXHAUSTED] ${displayName}: guesses=${user.remainingGuesses}, isCorrect=${isCorrect}, isDrawer=${user.userId === drawerId}`);
+    }
+    
     const chipClass =
       "user-chip " +
       (user.team === "Red" ? "chip-red" : "chip-blue") +
-      (user.userId === drawerId ? " is-drawer" : "");
+      (user.userId === drawerId ? " is-drawer" : "") +
+      (isCorrect ? " correct-answer" : "") +
+      (isExhausted ? " guesses-exhausted" : "");
 
     return (
       <div className={chipClass} key={user.userId} style={{ display: 'flex', 

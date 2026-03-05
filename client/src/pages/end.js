@@ -2,9 +2,8 @@ import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./end.css";
 import Fireworks from "./firework.js";
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
-import { faHouse as fasFaHouse } from '@fortawesome/free-solid-svg-icons';
-import { faHouse as farFaHouse } from '@fortawesome/free-regular-svg-icons';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faHouse as fasFaHouse } from "@fortawesome/free-solid-svg-icons";
 
 const End = () => {
   const navigate = useNavigate();
@@ -124,7 +123,7 @@ const End = () => {
                 <div className="rank-badge">#{index + 1}</div>
 
                 {isGuestUser ? (
-                  <div className="guest-leaderboard-avatar">👤</div>
+                  <div className="guest-leaderboard-avatar">🎮</div>
                 ) : (
                   <img
                     src={player.avatar || "/default-avatar.png"}
@@ -174,7 +173,7 @@ const End = () => {
                 <div className="rank-badge">#{index + 1}</div>
 
                 {isGuestUser ? (
-                  <div className="guest-leaderboard-avatar">👤</div>
+                  <div className="guest-leaderboard-avatar">🎮</div>
                 ) : (
                   <img
                     src={player.avatar || "/default-avatar.png"}
@@ -210,7 +209,8 @@ const End = () => {
 
       <div className="gameend-actions">
         <button className="action-button home-button" onClick={handleGoHome}>
-            <FontAwesomeIcon icon={fasFaHouse} className="home-icon" /> Exit to Home
+          <FontAwesomeIcon icon={fasFaHouse} className="home-icon" /> Exit to
+          Home
         </button>
       </div>
     </div>

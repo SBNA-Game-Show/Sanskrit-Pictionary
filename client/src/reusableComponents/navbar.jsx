@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { socket } from "../pages/socket.js";
 import "./navbar.css";
-import { getDisplayName, getUserId, isGuest } from "../utils/authStorage";
+import {
+  getDisplayName,
+  getUserId,
+  isGuest,
+  clearGuestData,
+} from "../utils/authStorage";
 import { logoutUser } from "../utils/authAPI";
 
 const Navbar = () => {
@@ -13,6 +18,7 @@ const Navbar = () => {
   useEffect(() => {
     const handleStorageChange = () => {
       setDisplayName(getDisplayName());
+      setIsGuestUser(isGuest());
     };
 
     setIsGuestUser(isGuest());
@@ -27,6 +33,8 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = async () => {
+    const guestUser = isGuest();
+
     // If socket is connected, clean up presence before disconnect
     if (socket && socket.connected) {
       const userId = getUserId();
@@ -36,8 +44,13 @@ const Navbar = () => {
       socket.disconnect();
     }
 
-    // Call logout API clears HTTP-only cookie and localStorage
-    await logoutUser();
+    // Clear correct storage based on user type
+    if (guestUser) {
+      clearGuestData();
+    } else {
+      // Call logout API clears HTTP-only cookie and localStorage
+      await logoutUser();
+    }
 
     // Notify components to update
     window.dispatchEvent(new Event("displayNameChanged"));
@@ -66,7 +79,6 @@ const Navbar = () => {
               // Show Sign Up button for guests
               <button
                 className="logout-btn2"
-                style={{ marginLeft: 8 }}
                 onClick={() => navigate("/signup")}
                 title="Create an account to save your progress"
               >
@@ -74,11 +86,7 @@ const Navbar = () => {
               </button>
             ) : (
               // Show Logout button for registered users
-              <button
-                className="logout-btn2"
-                style={{ marginLeft: 8 }}
-                onClick={handleLogout}
-              >
+              <button className="logout-btn2" onClick={handleLogout}>
                 Logout
               </button>
             )}

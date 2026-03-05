@@ -327,6 +327,105 @@
   transform: scale(1.05);
 }
 
+/* Avatar Animations & Styling */
+
+/* Avatar floating animation */
+@keyframes avatarBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes avatarGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
+  }
+  50% {
+    filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.18));
+  }
+}
+
+/* Apply floating animation */
+.avatar-anim {
+  animation:
+    avatarBob 4s ease-in-out infinite,
+    avatarGlow 3.2s ease-in-out infinite;
+}
+
+/* Avatar wrapper */
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  perspective: 600px;
+}
+
+/* Avatar hover effect */
+.avatar-interactive:hover {
+  transform: translateY(-2px) scale(1.06) rotate(-1deg);
+}
+
+/* Pop animation on click */
+.pop {
+  animation: pop 240ms ease;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Sparkles on double-click */
+.sparkle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: sparkle 700ms ease forwards;
+  z-index: 2;
+  font-size: 14px;
+}
+
+@keyframes sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -65%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -110%) scale(0.9);
+  }
+}
+
+/* User avatar base styles */
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  position: relative;
+  cursor: pointer;
+  z-index: 1;
+  will-change: transform, filter;
+  transition:
+    transform 0.15s ease,
+    filter 0.15s ease;
+}
+
 /* Guest chip avatar */
 .guest-chip-avatar {
   width: 36px;
@@ -335,8 +434,45 @@
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
   border-radius: 10px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  will-change: transform, filter;
+  transition: transform 0.15s ease-out;
+}
+
+/* Guest avatar interactive styles */
+.guest-avatar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 36px;
+  border-radius: 10px;
+  transition: transform 0.15s ease-out;
+  position: relative;
+  z-index: 1;
+  will-change: transform, filter;
+}
+
+/* Pop animation for guest avatar */
+.guest-avatar.pop {
+  animation: pop 240ms ease;
+}
+
+/* Accessibility: respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .avatar-anim,
+  .pop,
+  .sparkle,
+  .avatar-interactive:hover {
+    animation: none !important;
+  }
+  .user-avatar,
+  .guest-avatar {
+    transition: none !important;
+  }
 }

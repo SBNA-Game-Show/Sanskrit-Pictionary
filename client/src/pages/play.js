@@ -540,7 +540,13 @@ const Play = () => {
       >
         {/* Avatar + DisplayName */}
         <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-          <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
+          <InteractiveAvatar
+            avatarSeed={seed}
+            avatarStyle={style}
+            size={36}
+            isGuest={isGuestUser}
+            className="avatar-anim"
+          />
           <span
             className="chip-name"
             style={{

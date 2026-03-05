@@ -827,7 +827,7 @@ const Play = () => {
           />
         </div>
 
-        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
+        <div className={`input-area-wrapper ${isHost &&  "hidden"}`}>
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input

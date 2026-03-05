@@ -64,12 +64,15 @@
 
 .chat-box {
   grid-column: 4 / 5;
-  grid-row: 3 / 5;
+  grid-row: 5 / 6;
+  width:320px;
+  margin: auto;
+  
 }
 
 .input-area-wrapper {
   grid-column: 4 / 5;
-  grid-row: 5 / 6;
+  grid-row: 3 / 5;
   margin: 0 auto;
   width: 100%;
   background-color: rgba(242, 210, 182);
@@ -78,6 +81,7 @@
   font-size: 25px;
   text-align: center;
   align-self: center;
+  width:350px;
 }
 
 .input-area-wrapper h5{
@@ -272,3 +276,4 @@
 .choice-tile:hover img {
   transform: scale(1.05);
 }
+

@@ -138,7 +138,14 @@ const Lobby = () => {
     isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
   useEffect(() => {
-    if (!myUserId || !roomId) return;
+    // Check if user has valid session (registered OR guest)
+    if (!myUserId) {
+      toastError("Session expired. Please sign in or play as guest.");
+      navigate("/");
+      return;
+    }
+
+    if (!roomId) return;
 
     // unction to rejoin
     const rejoinLobby = () => {
@@ -381,6 +388,7 @@ const Lobby = () => {
     const user = byId[userId] || { userId, displayName: userId };
     const isHostUser = userId === hostId;
     const isMe = userId === myUserId;
+    const isGuestUser = userId.startsWith("guest_");
 
     let actions = null;
     if (isMe) {
@@ -434,17 +442,27 @@ const Lobby = () => {
 
     return (
       <div className="user-row" key={userId}>
-        <InteractiveAvatar
-          avatarStyle={user.avatarStyle}
-          avatarSeed={user.avatarSeed || user.displayName || user.userId}
-          size={44}
-          className="avatar-anim"
-        />
+        {isGuestUser ? (
+          <div className="guest-avatar">👤</div>
+        ) : (
+          <InteractiveAvatar
+            avatarStyle={user.avatarStyle}
+            avatarSeed={user.avatarSeed || user.displayName || user.userId}
+            size={44}
+            className="avatar-anim"
+          />
+        )}
+
         <span className={`user-name ${isHostUser ? "host" : ""}`}>
           {user.displayName}
           {isHostUser && (
             <span title="Host" className="crown">
               👑
+            </span>
+          )}
+          {isGuestUser && (
+            <span title="Guest Player" className="guest-badge">
+              🎮
             </span>
           )}
         </span>

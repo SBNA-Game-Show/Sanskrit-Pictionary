@@ -50,7 +50,6 @@ const Play = () => {
   const [answer, setAnswer] = useState("");
   const [remainingGuesses, setRemainingGuesses] = useState(4);
 
-
   // For multiple-choice image selection (guessers only)
   const [imageChoices, setImageChoices] = useState([]);
   const [showChoices, setShowChoices] = useState(false);
@@ -362,22 +361,22 @@ const Play = () => {
       }
     });
 
-   socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
-    if (userId) {
-      setCorrectUserIds((prev) =>
-        prev.includes(userId) ? prev : [...prev, userId],
-      );
-    }
-    toastSuccess(
-      `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
-      {
-        autoClose: 3000,
-        position: "top-left"
+    socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
+      if (userId) {
+        setCorrectUserIds((prev) =>
+          prev.includes(userId) ? prev : [...prev, userId],
+        );
       }
-    );
-  });
-    
-  socket.on(
+      toastSuccess(
+        `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
+        {
+          autoClose: 3000,
+          position: "top-left",
+        },
+      );
+    });
+
+    socket.on(
       "wrongAnswer",
       ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
         console.log("[Play] wrongAnswer", {
@@ -415,7 +414,6 @@ const Play = () => {
     );
 
     socket.on("guessesExhausted", () => {
-
       console.log("[Play] guessesExhausted");
       setRoundResult({
         type: "guessesExhausted",
@@ -435,9 +433,7 @@ const Play = () => {
 
       setPlayers((prev) => {
         const next = (prev || []).map((p) =>
-          p.userId === drawerId
-            ? { ...p, points: newScore } 
-            : p
+          p.userId === drawerId ? { ...p, points: newScore } : p,
         );
 
         playersRef.current = next;
@@ -507,16 +503,22 @@ const Play = () => {
     const displayName = prof.displayName || user.displayName || user.userId;
     const seed = prof.avatarSeed || displayName || user.userId;
     const style = prof.avatarStyle;
+    const isGuestUser = user.userId.startsWith("guest_");
 
     // Determine states - exhausted only if not correct and not drawer
     const isCorrect = correctUserIds.includes(user.userId);
-    const isExhausted = (user.remainingGuesses ?? 4) <= 0 && !isCorrect && user.userId !== drawerId;
-    
+    const isExhausted =
+      (user.remainingGuesses ?? 4) <= 0 &&
+      !isCorrect &&
+      user.userId !== drawerId;
+
     // Debug logging
     if (isExhausted) {
-      console.log(`[EXHAUSTED] ${displayName}: guesses=${user.remainingGuesses}, isCorrect=${isCorrect}, isDrawer=${user.userId === drawerId}`);
+      console.log(
+        `[EXHAUSTED] ${displayName}: guesses=${user.remainingGuesses}, isCorrect=${isCorrect}, isDrawer=${user.userId === drawerId}`,
+      );
     }
-    
+
     const chipClass =
       "user-chip " +
       (user.team === "Red" ? "chip-red" : "chip-blue") +
@@ -525,33 +527,57 @@ const Play = () => {
       (isExhausted ? " guesses-exhausted" : "");
 
     return (
-      <div className={chipClass} key={user.userId} style={{ display: 'flex', 
-        alignItems: 'center', justifyContent: 'space-between', 
-        padding: '12px 2px', minWidth: '200px'}}>
-        
+      <div
+        className={chipClass}
+        key={user.userId}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 2px",
+          minWidth: "200px",
+        }}
+      >
         {/* Avatar + DisplayName */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
           <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
-          <span className="chip-name" style={{ fontWeight: 'bold', fontSize: '18px', 
-              wordBreak: 'break-word' , minWidth: '95px'}}>
-            {displayName}{user.userId === drawerId && " ✏️"}
+          <span
+            className="chip-name"
+            style={{
+              fontWeight: "bold",
+              fontSize: "18px",
+              wordBreak: "break-word",
+              minWidth: "95px",
+            }}
+          >
+            {displayName}
+            {user.userId === drawerId && " ✏️"}
           </span>
         </div>
 
         {/* Points + Atmps*/}
-        <div style={{ display: 'flex', flexDirection: 'column', 
-          alignItems: 'flex-end', fontSize: '13px', minWidth: '55px'}}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            fontSize: "13px",
+            minWidth: "55px",
+          }}
+        >
           {/* Points */}
-          <span style={{ color: '#e1bf00', fontWeight: 'bold' }}>
+          <span style={{ color: "#e1bf00", fontWeight: "bold" }}>
             Pts: {user.points ?? 0}
           </span>
           {/* Atmps */}
-          <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
-            {[...Array(4)].map((_, i) => (
-              <span key={i} style={{ fontSize: '7px' }}>
-                {i < (user.remainingGuesses ?? 4) ? '❤️' : '🤍'}
-              </span>
-            )).reverse()}
+          <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
+            {[...Array(4)]
+              .map((_, i) => (
+                <span key={i} style={{ fontSize: "7px" }}>
+                  {i < (user.remainingGuesses ?? 4) ? "❤️" : "🤍"}
+                </span>
+              ))
+              .reverse()}
           </div>
         </div>
       </div>
@@ -560,59 +586,58 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-
   //-------------------------------------------------------
   //------------ cards and audio PLAYBACK LOGIC -----------
   //-------------------------------------------------------
-  
-     const DIFFICULTY_FOLDERS = {
-      Easy: [
-        "/FlashCardEasy/bird.png",
-        "/FlashCardEasy/book.png",
-        "/FlashCardEasy/cow.png",
-        "/FlashCardEasy/elephant.png",
-        "/FlashCardEasy/father.png",
-        "/FlashCardEasy/flower.png",
-        "/FlashCardEasy/friend.png",
-        "/FlashCardEasy/fruit.png",
-        "/FlashCardEasy/house.png",
-        "/FlashCardEasy/king.png",
-        "/FlashCardEasy/moon.png",
-        "/FlashCardEasy/mother.png",
-        "/FlashCardEasy/river.png",
-        "/FlashCardEasy/sun.png",
-        "/FlashCardEasy/tree.png",
-        "/FlashCardEasy/water.png",
-      ],
-  
-      Medium: [
-        "/FlashCardMedium/child.png",
-        "/FlashCardMedium/earth.png",
-        "/FlashCardMedium/fire.png",
-        "/FlashCardMedium/king.png",
-        "/FlashCardMedium/mountain.png",
-        "/FlashCardMedium/ocean.png",
-        "/FlashCardMedium/queen.png",
-        "/FlashCardMedium/sky.png",
-        "/FlashCardMedium/teacher.png",
-        "/FlashCardMedium/time.png",
-      ],
-  
-      Hard: [
-        "/FlashCardHard/compassion.png",
-        "/FlashCardHard/energy.png",
-        "/FlashCardHard/freedom.png",
-        "/FlashCardHard/Happiness.png",
-        "/FlashCardHard/knowledge.png",
-        "/FlashCardHard/mind.png",
-        "/FlashCardHard/speech.png",
-        "/FlashCardHard/student.png",
-        "/FlashCardHard/truth.png",
-        "/FlashCardHard/universe.png",
-      ],
-    };
-  
-    function shuffle(arr) {
+
+  const DIFFICULTY_FOLDERS = {
+    Easy: [
+      "/FlashCardEasy/bird.png",
+      "/FlashCardEasy/book.png",
+      "/FlashCardEasy/cow.png",
+      "/FlashCardEasy/elephant.png",
+      "/FlashCardEasy/father.png",
+      "/FlashCardEasy/flower.png",
+      "/FlashCardEasy/friend.png",
+      "/FlashCardEasy/fruit.png",
+      "/FlashCardEasy/house.png",
+      "/FlashCardEasy/king.png",
+      "/FlashCardEasy/moon.png",
+      "/FlashCardEasy/mother.png",
+      "/FlashCardEasy/river.png",
+      "/FlashCardEasy/sun.png",
+      "/FlashCardEasy/tree.png",
+      "/FlashCardEasy/water.png",
+    ],
+
+    Medium: [
+      "/FlashCardMedium/child.png",
+      "/FlashCardMedium/earth.png",
+      "/FlashCardMedium/fire.png",
+      "/FlashCardMedium/king.png",
+      "/FlashCardMedium/mountain.png",
+      "/FlashCardMedium/ocean.png",
+      "/FlashCardMedium/queen.png",
+      "/FlashCardMedium/sky.png",
+      "/FlashCardMedium/teacher.png",
+      "/FlashCardMedium/time.png",
+    ],
+
+    Hard: [
+      "/FlashCardHard/compassion.png",
+      "/FlashCardHard/energy.png",
+      "/FlashCardHard/freedom.png",
+      "/FlashCardHard/Happiness.png",
+      "/FlashCardHard/knowledge.png",
+      "/FlashCardHard/mind.png",
+      "/FlashCardHard/speech.png",
+      "/FlashCardHard/student.png",
+      "/FlashCardHard/truth.png",
+      "/FlashCardHard/universe.png",
+    ],
+  };
+
+  function shuffle(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -620,41 +645,41 @@ const Play = () => {
     }
     return a;
   }
-  
+
   useEffect(() => {
     if (!canAnswer || !flashcard?.imageSrc) {
       setShowChoices(false);
       setImageChoices([]);
       return;
     }
-  
+
     // Detect difficulty from the imageSrc path
     let difficulty = "Easy";
     const src = flashcard.imageSrc;
     if (src.includes("FlashCardMedium")) difficulty = "Medium";
     if (src.includes("FlashCardHard")) difficulty = "Hard";
-  
+
     const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
-  
+
     // Filter out correct image from distractors
     const distractorPool = folderImages.filter((img) => img !== src);
-  
+
     // Pick 4 random distractors
     const validDistractors = shuffle(distractorPool).slice(0, 4);
-  
+
     // Mix correct + distractors and shuffle
     const mixed = shuffle([
       { src, isCorrect: true },
       ...validDistractors.map((s) => ({ src: s, isCorrect: false })),
     ]);
-  
+
     setImageChoices(mixed);
     setShowChoices(mixed.length === 5);
   }, [canAnswer, flashcard?.imageSrc, roundKey]);
-  
+
   const handlePickChoice = (choice) => {
     if (!canAnswer) return;
-  
+
     if (choice.isCorrect) {
       // Correct click → send real answer
       socket.emit("submitAnswer", {
@@ -662,7 +687,7 @@ const Play = () => {
         userId: getUserId(),
         answer: flashcard?.word || "",
       });
-  
+
       setShowChoices(false);
       setImageChoices([]);
     } else {
@@ -672,16 +697,13 @@ const Play = () => {
         userId: getUserId(),
         answer: "__wrong_choice__", // something that will never match
       });
-  
-      
+
       setShowChoices(false);
       setTimeout(() => {
         setShowChoices(true);
       }, 400);
     }
   };
-
-
 
   return (
     <>
@@ -692,10 +714,10 @@ const Play = () => {
           <div className="round-result-modal">
             {/* Removed the JSX popups here as we are using toast 
                   and roundpopups for all the notifications */}
-            {roundResult.type === "correct" }
-            {roundResult.type === "wrong" }
-            {roundResult.type === "guessesExhausted" }
-            {roundResult.type === "gameEnded" }
+            {roundResult.type === "correct"}
+            {roundResult.type === "wrong"}
+            {roundResult.type === "guessesExhausted"}
+            {roundResult.type === "gameEnded"}
           </div>
         )}
 
@@ -759,7 +781,10 @@ const Play = () => {
           </div>
         </div>
 
-        <div className="drawer-name" style={{ textAlign: "center", marginBottom: "5px" }}>
+        <div
+          className="drawer-name"
+          style={{ textAlign: "center", marginBottom: "5px" }}
+        >
           <strong>Drawing by:</strong>{" "}
           <span
             style={{
@@ -791,7 +816,10 @@ const Play = () => {
         <div className="canvascontrols">
           {!isHost ? (
             <>
-              <button onClick={handlePenClick} disabled={!isDrawer || !eraseMode}>
+              <button
+                onClick={handlePenClick}
+                disabled={!isDrawer || !eraseMode}
+              >
                 Pen
               </button>
               <input
@@ -809,7 +837,10 @@ const Play = () => {
                 onChange={handleStrokeColorChange}
                 disabled={!isDrawer}
               />
-              <button onClick={handleEraserClick} disabled={!isDrawer || eraseMode}>
+              <button
+                onClick={handleEraserClick}
+                disabled={!isDrawer || eraseMode}
+              >
                 Eraser
               </button>
               <input
@@ -825,13 +856,12 @@ const Play = () => {
                 Clear
               </button>
             </>
-          ): (
+          ) : (
             <>
-            <button onClick={handleWarnDrawer}>Warn Drawer</button>
-            <button onClick={handleForceSkip}>Force Skip Round</button>
+              <button onClick={handleWarnDrawer}>Warn Drawer</button>
+              <button onClick={handleForceSkip}>Force Skip Round</button>
             </>
           )}
-          
         </div>
 
         <div className="chat-box">
@@ -847,7 +877,7 @@ const Play = () => {
           />
         </div>
 
-        <div className={`input-area-wrapper ${isHost &&  "hidden"}`}>
+        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input
@@ -862,7 +892,7 @@ const Play = () => {
             </button>
           </div>
 
-              {showChoices && canAnswer && imageChoices.length === 5 && (
+          {showChoices && canAnswer && imageChoices.length === 5 && (
             <div className="choice-modal">
               <div className="choice-card">
                 <h3>Pick the correct image</h3>

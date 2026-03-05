@@ -1,4 +1,3 @@
-// export default End;
 import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./end.css";
@@ -10,6 +9,7 @@ import { faHouse as farFaHouse } from '@fortawesome/free-regular-svg-icons';
 const End = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
   // Expect players: [{userId, displayName, points, imageSrc, team}]
   const players = useMemo(() => {
     const p = (location.state && location.state.players) || [];
@@ -80,7 +80,7 @@ const End = () => {
       <div className="gameend-container">
         <h2 className="gameend-title">Game Over</h2>
         <p>
-          No results to show. It looks like the game didn’t send final scores.
+          No results to show. It looks like the game didn't send final scores.
         </p>
         <div className="gameend-actions">
           <button
@@ -103,112 +103,109 @@ const End = () => {
       <Fireworks colors={winningFireworkColors(winningTeam)} />
       <p className="winning-team" style={winningStyle(winningTeam)}>
         {winningTeam === "tie"
-          ? "It’s a Tie!"
+          ? "It's a Tie!"
           : `${winningTeam === "red" ? "Red" : "Blue"} Team Wins!`}{" "}
       </p>
       <div className="leaderboard-list">
+        {/* RED TEAM */}
         <div className={`teamRed ${winningTeam === "red" ? "winner" : ""}`}>
           <p className="team-title" id="red">
             Red Team{" "}
           </p>
           <div className="team-score">Total: {redPoints}</div>
-          {redTeam.map((player, index) => (
-            <div
-              className={`leaderboard-card ${index === 0 ? "first" : index === 1 ? "second" : index === 2 ? "third" : ""}`}
-              key={player.id}
-            >
-              <div className="rank-badge">#{index + 1}</div>
-              <img
-                src={player.avatar || "/default-avatar.png"}
-                alt={`${player.name}'s avatar`}
-                className="player-avatar"
-                onError={(e) => {
-                  e.currentTarget.src = "/default-avatar.png";
-                }}
-              />
-              <div className="player-info">
-                <span className="player-name">
-                  {player.name}
-                  {index === 0 && <span className="medal">🥇</span>}
-                  {index === 1 && <span className="medal">🥈</span>}
-                  {index === 2 && <span className="medal">🥉</span>}
-                </span>
+          {redTeam.map((player, index) => {
+            const isGuestUser = player.id.startsWith("guest_"); // CHECK IF GUEST
 
-                {player.team && (
-                  <span
-                    className={`team-tag team-${player.team.toLowerCase()}`}
-                  >
-                    {player.team}
-                  </span>
+            return (
+              <div
+                className={`leaderboard-card ${index === 0 ? "first" : index === 1 ? "second" : index === 2 ? "third" : ""}`}
+                key={player.id}
+              >
+                <div className="rank-badge">#{index + 1}</div>
+
+                {isGuestUser ? (
+                  <div className="guest-leaderboard-avatar">👤</div>
+                ) : (
+                  <img
+                    src={player.avatar || "/default-avatar.png"}
+                    alt={`${player.name}'s avatar`}
+                    className="player-avatar"
+                    onError={(e) => {
+                      e.currentTarget.src = "/default-avatar.png";
+                    }}
+                  />
                 )}
+
+                <div className="player-info">
+                  <span className="player-name">
+                    {player.name}
+                    {index === 0 && <span className="medal">🥇</span>}
+                    {index === 1 && <span className="medal">🥈</span>}
+                    {index === 2 && <span className="medal">🥉</span>}
+                  </span>
+                  {player.team && (
+                    <span
+                      className={`team-tag team-${player.team.toLowerCase()}`}
+                    >
+                      {player.team}
+                    </span>
+                  )}
+                </div>
+                <span className="player-score">{player.points} pts</span>
               </div>
-              <span className="player-score">{player.points} pts</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
+        {/* BLUE TEAM */}
         <div className={`teamBlue ${winningTeam === "blue" ? "winner" : ""}`}>
           <p className="team-title" id="blue">
             Blue Team
           </p>
           <div className="team-score">Total: {bluePoints}</div>
-          {blueTeam.map((player, index) => (
-            <div
-              className={`leaderboard-card ${index === 0 ? "first" : index === 1 ? "second" : index === 2 ? "third" : ""}`}
-              key={player.id}
-            >
-              <div className="rank-badge">#{index + 1}</div>
-              <img
-                src={player.avatar || "/default-avatar.png"}
-                alt={`${player.name}'s avatar`}
-                className="player-avatar"
-                onError={(e) => {
-                  e.currentTarget.src = "/default-avatar.png";
-                }}
-              />
-              <div className="player-info">
-                <span className="player-name">
-                  {player.name}
-                  {index === 0 && <span className="medal">🥇</span>}
-                  {index === 1 && <span className="medal">🥈</span>}
-                  {index === 2 && <span className="medal">🥉</span>}
-                </span>
+          {blueTeam.map((player, index) => {
+            const isGuestUser = player.id.startsWith("guest_"); // CHECK IF GUEST
 
-                {player.team && (
-                  <span
-                    className={`team-tag team-${player.team.toLowerCase()}`}
-                  >
-                    {player.team}
-                  </span>
+            return (
+              <div
+                className={`leaderboard-card ${index === 0 ? "first" : index === 1 ? "second" : index === 2 ? "third" : ""}`}
+                key={player.id}
+              >
+                <div className="rank-badge">#{index + 1}</div>
+
+                {isGuestUser ? (
+                  <div className="guest-leaderboard-avatar">👤</div>
+                ) : (
+                  <img
+                    src={player.avatar || "/default-avatar.png"}
+                    alt={`${player.name}'s avatar`}
+                    className="player-avatar"
+                    onError={(e) => {
+                      e.currentTarget.src = "/default-avatar.png";
+                    }}
+                  />
                 )}
+
+                <div className="player-info">
+                  <span className="player-name">
+                    {player.name}
+                    {index === 0 && <span className="medal">🥇</span>}
+                    {index === 1 && <span className="medal">🥈</span>}
+                    {index === 2 && <span className="medal">🥉</span>}
+                  </span>
+                  {player.team && (
+                    <span
+                      className={`team-tag team-${player.team.toLowerCase()}`}
+                    >
+                      {player.team}
+                    </span>
+                  )}
+                </div>
+                <span className="player-score">{player.points} pts</span>
               </div>
-              <span className="player-score">{player.points} pts</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
-
-        {/* {sorted.map((player, index) => (
-          <div className={`leaderboard-card ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`} key={player.id}>
-            <div className="rank-badge">#{index + 1}</div>
-            <img
-              src={player.avatar || '/default-avatar.png'}
-              alt={`${player.name}'s avatar`}
-              className="player-avatar"
-              onError={(e) => { e.currentTarget.src = '/default-avatar.png'; }}
-            />
-            <div className="player-info">
-              <span className="player-name">
-                {player.name}
-                {index === 0 && <span className="medal">🥇</span>}
-                {index === 1 && <span className="medal">🥈</span>}
-                {index === 2 && <span className="medal">🥉</span>}
-              </span>
-
-              {player.team && <span className={`team-tag team-${player.team.toLowerCase()}`}>{player.team}</span>}
-            </div>
-            <span className="player-score">{player.points} pts</span>
-          </div>
-        ))} */}
       </div>
 
       <div className="gameend-actions">

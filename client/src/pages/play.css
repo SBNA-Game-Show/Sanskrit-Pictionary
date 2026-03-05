@@ -1,7 +1,7 @@
 .play-grid {
   display: grid;
   grid-template-columns: 1fr 3fr 3fr 1fr;
-  grid-template-rows: auto 0.10fr 1fr 1fr auto;
+  grid-template-rows: auto 0.1fr 1fr 1fr auto;
   gap: 20px;
   padding: 20px;
   max-width: 1300px;
@@ -10,7 +10,7 @@
 
 .score-box,
 .time-box,
-.guesses-box{
+.guesses-box {
   background-color: rgba(242, 210, 182);
   border-radius: 15px;
   padding: 10px;
@@ -19,7 +19,7 @@
   align-self: center;
 }
 
-.score-box{
+.score-box {
   font-size: 30px;
 }
 
@@ -35,7 +35,7 @@
   border-radius: 15px;
   padding: 10px;
   width: 100%;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .user-list h2 {
@@ -65,9 +65,8 @@
 .chat-box {
   grid-column: 4 / 5;
   grid-row: 5 / 6;
-  width:320px;
+  width: 320px;
   margin: auto;
-  
 }
 
 .input-area-wrapper {
@@ -81,10 +80,10 @@
   font-size: 25px;
   text-align: center;
   align-self: center;
-  width:350px;
+  width: 350px;
 }
 
-.input-area-wrapper h5{
+.input-area-wrapper h5 {
   text-align: center;
   color: black;
   margin-bottom: 10px;
@@ -119,13 +118,12 @@
   background-color: #e65100;
 }
 
-
 /* === Clean user list chips with avatars === */
 .user-list {
   background: #f0d2b8;
   border-radius: 16px;
   padding: 16px 14px;
-  box-shadow: 0 2px 14px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
 }
 
 .user-panel-title {
@@ -135,10 +133,19 @@
   text-align: left;
 }
 
-.team-block { margin-top: 8px; }
-.team-title { margin: 6px 0 8px; font-weight: 800; }
-.team-title.red { color: crimson; }
-.team-title.blue { color: royalblue; }
+.team-block {
+  margin-top: 8px;
+}
+.team-title {
+  margin: 6px 0 8px;
+  font-weight: 800;
+}
+.team-title.red {
+  color: crimson;
+}
+.team-title.blue {
+  color: royalblue;
+}
 
 .user-chip {
   display: flex;
@@ -149,11 +156,17 @@
   border-radius: 12px;
   background: #fffdf8;
   border: 2px solid transparent;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
-.user-chip .avatar-wrap { width: 36px; height: 36px; }
-.user-chip .chip-name { font-weight: 700; line-height: 1; }
+.user-chip .avatar-wrap {
+  width: 36px;
+  height: 36px;
+}
+.user-chip .chip-name {
+  font-weight: 700;
+  line-height: 1;
+}
 
 .user-chip .chip-guesses {
   margin-left: auto;
@@ -161,10 +174,16 @@
   opacity: 0.9;
 }
 
-.user-chip .chip-pen { margin-left: 8px; }
+.user-chip .chip-pen {
+  margin-left: 8px;
+}
 
-.user-chip.chip-red { border-color: #d62a2a; }
-.user-chip.chip-blue { border-color: #3f6fe0; }
+.user-chip.chip-red {
+  border-color: #d62a2a;
+}
+.user-chip.chip-blue {
+  border-color: #3f6fe0;
+}
 
 .user-chip.is-drawer {
   background: #fff6e3; /* subtle highlight for the active drawer */
@@ -213,7 +232,7 @@
   background: #fff;
   border-radius: 12px;
   padding: 12px 14px;
-  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
 .round-result-modal .modal-card.wrong-answer {
@@ -230,17 +249,14 @@
   font-weight: bold;
 }
 
-.drawer-name{
-  font-size: 2.0em;
+.drawer-name {
+  font-size: 2em;
   font-weight: 700;
   align-self: center;
 }
 .hidden {
   visibility: hidden;
 }
-
-
-
 
 /* ============================= */
 /* INLINE CHOICE STYLING (SMALL BOX) */
@@ -284,28 +300,43 @@
   cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 /* Image size (small box size) */
 .choice-tile img {
   width: 100%;
-  height: 70px;      /* small height */
+  height: 70px; /* small height */
   object-fit: cover;
   display: block;
-  transition: transform 0.18s ease, filter 0.18s ease;
-
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
 }
 
 /* Hover effect */
 .choice-tile:hover {
   transform: scale(1.07);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-    filter: grayscale(100%);
-
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  filter: grayscale(100%);
 }
 
 .choice-tile:hover img {
   transform: scale(1.05);
 }
 
+/* Guest chip avatar */
+.guest-chip-avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
+  border-radius: 10px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}

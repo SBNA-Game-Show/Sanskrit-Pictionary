@@ -17,8 +17,9 @@ function createLobbyManager(io, UserModel) {
     console.log("Socket connected:", socket.id);
 
     // --- REGISTER LOBBY ---
-    socket.on("registerLobby", async ({ userId, roomId /*, displayName*/ }) => {
+    socket.on("registerLobby", async ({ userId, roomId, displayName }) => {
       socket.userId = userId;
+      socket.displayName = displayName; // Store for guests
       socket.roomId = roomId;
       socket.join(roomId);
 
@@ -37,21 +38,35 @@ function createLobbyManager(io, UserModel) {
       io.to(roomId).emit("teamsUpdate", rooms[roomId].teams);
       io.to(roomId).emit("gameSettingsUpdate", rooms[roomId].settings);
 
-      // mark user online in DB and tell lobby
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-        const user = await UserModel.findByIdAndUpdate(
-          userId,
-          { isOnline: true },
-          { new: true },
-        );
-        if (user) {
-          io.to(roomId).emit("userJoinedLobby", {
-            userId: user._id.toString(),
-            displayName: user.displayName,
-            avatarSeed: user.avatarSeed,
-            avatarStyle: user.avatarStyle,
-            avatarData: user.avatarData,
-          });
+      // Handle both guests and registered users
+      if (userId.startsWith("guest_")) {
+        // Guest user - use provided displayName
+        console.log(`[registerLobby] Guest ${userId} joined: ${displayName}`);
+
+        io.to(roomId).emit("userJoinedLobby", {
+          userId: userId,
+          displayName: displayName || "Guest",
+          avatarSeed: displayName || "guest",
+          avatarStyle: "funEmoji",
+          avatarData: null,
+        });
+      } else {
+        // Registered user - fetch from MongoDB
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          const user = await UserModel.findByIdAndUpdate(
+            userId,
+            { isOnline: true },
+            { new: true },
+          );
+          if (user) {
+            io.to(roomId).emit("userJoinedLobby", {
+              userId: user._id.toString(),
+              displayName: user.displayName,
+              avatarSeed: user.avatarSeed,
+              avatarStyle: user.avatarStyle,
+              avatarData: user.avatarData,
+            });
+          }
         }
       }
     });
@@ -91,16 +106,29 @@ function createLobbyManager(io, UserModel) {
       if (socketsInRoom) {
         for (const sid of socketsInRoom) {
           const s = io.sockets.sockets.get(sid);
-          if (s?.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
-            const user = await UserModel.findById(s.userId);
-            if (user) {
+          if (s?.userId) {
+            // Handle guests
+            if (s.userId.startsWith("guest_")) {
+              // Guest user - use socket data
               users.push({
-                userId: user._id.toString(),
-                displayName: user.displayName,
-                avatarSeed: user.avatarSeed,
-                avatarStyle: user.avatarStyle,
-                avatarData: user.avatarData,
+                userId: s.userId,
+                displayName: s.displayName || "Guest",
+                avatarSeed: s.displayName || "guest",
+                avatarStyle: "funEmoji",
+                avatarData: null,
               });
+            } else if (mongoose.Types.ObjectId.isValid(s.userId)) {
+              // Registered user - fetch from MongoDB
+              const user = await UserModel.findById(s.userId);
+              if (user) {
+                users.push({
+                  userId: user._id.toString(),
+                  displayName: user.displayName,
+                  avatarSeed: user.avatarSeed,
+                  avatarStyle: user.avatarStyle,
+                  avatarData: user.avatarData,
+                });
+              }
             }
           }
         }
@@ -306,7 +334,10 @@ function createLobbyManager(io, UserModel) {
 
       // Get user display name for notifications
       let userDisplayName = "A player";
-      if (mongoose.Types.ObjectId.isValid(finalUserId)) {
+      if (finalUserId.startsWith("guest_")) {
+        // Guest user
+        userDisplayName = socket.displayName || "Guest";
+      } else if (mongoose.Types.ObjectId.isValid(finalUserId)) {
         const user = await UserModel.findById(finalUserId);
         if (user) userDisplayName = user.displayName;
       }
@@ -334,8 +365,12 @@ function createLobbyManager(io, UserModel) {
               s.leave(finalRoomId);
               s.roomId = null;
 
-              // Mark user offline in DB
-              if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
+              // Only mark registered users offline in DB
+              if (
+                s.userId &&
+                !s.userId.startsWith("guest_") &&
+                mongoose.Types.ObjectId.isValid(s.userId)
+              ) {
                 await UserModel.findByIdAndUpdate(s.userId, {
                   isOnline: false,
                 });
@@ -348,7 +383,11 @@ function createLobbyManager(io, UserModel) {
         socket.leave(finalRoomId);
         socket.roomId = null;
 
-        if (mongoose.Types.ObjectId.isValid(finalUserId)) {
+        // Only mark registered host offline in DB
+        if (
+          !finalUserId.startsWith("guest_") &&
+          mongoose.Types.ObjectId.isValid(finalUserId)
+        ) {
           await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
         }
 
@@ -375,7 +414,11 @@ function createLobbyManager(io, UserModel) {
       socket.leave(roomId);
       socket.roomId = null;
 
-      if (mongoose.Types.ObjectId.isValid(userId)) {
+      // Only mark registered users offline in DB
+      if (
+        !userId.startsWith("guest_") &&
+        mongoose.Types.ObjectId.isValid(userId)
+      ) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
       }
     });
@@ -388,7 +431,9 @@ function createLobbyManager(io, UserModel) {
 
       // Get user display name
       let userDisplayName = "A player";
-      if (mongoose.Types.ObjectId.isValid(userId)) {
+      if (userId.startsWith("guest_")) {
+        userDisplayName = socket.displayName || "Guest";
+      } else if (mongoose.Types.ObjectId.isValid(userId)) {
         const user = await UserModel.findById(userId);
         if (user) userDisplayName = user.displayName;
       }
@@ -398,15 +443,12 @@ function createLobbyManager(io, UserModel) {
           `[disconnect] Host ${userId} disconnected - kicking everyone from ${roomId}`,
         );
 
-        // Send different message for disconnect
         io.to(roomId).emit("hostDisconnectedOthers", {
           hostName: userDisplayName,
         });
 
-        // Delete the room
         delete rooms[roomId];
 
-        // Make all sockets leave the room and mark offline
         const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
         if (socketsInRoom) {
           for (const sid of socketsInRoom) {
@@ -415,7 +457,12 @@ function createLobbyManager(io, UserModel) {
               s.leave(roomId);
               s.roomId = null;
 
-              if (s.userId && mongoose.Types.ObjectId.isValid(s.userId)) {
+              // Only mark registered users offline
+              if (
+                s.userId &&
+                !s.userId.startsWith("guest_") &&
+                mongoose.Types.ObjectId.isValid(s.userId)
+              ) {
                 await UserModel.findByIdAndUpdate(s.userId, {
                   isOnline: false,
                 });
@@ -424,7 +471,6 @@ function createLobbyManager(io, UserModel) {
           }
         }
       } else {
-        // Non-host disconnected
         console.log(
           `[disconnect] Player ${userDisplayName} disconnected from ${roomId}`,
         );
@@ -441,7 +487,12 @@ function createLobbyManager(io, UserModel) {
         io.to(roomId).emit("teamsUpdate", room.teams);
       }
 
-      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      // Only mark registered users offline
+      if (
+        userId &&
+        !userId.startsWith("guest_") &&
+        mongoose.Types.ObjectId.isValid(userId)
+      ) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
       }
 

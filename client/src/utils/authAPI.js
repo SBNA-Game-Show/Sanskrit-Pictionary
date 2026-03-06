@@ -1,5 +1,10 @@
 import axios from "axios";
-import { saveUserData, clearUserData, getUserData } from "./authStorage";
+import {
+  saveUserData,
+  clearUserData,
+  getUserData,
+  isGuest,
+} from "./authStorage";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
 
@@ -15,11 +20,19 @@ const apiClient = axios.create({
 // Add request interceptor to this instance
 apiClient.interceptors.request.use(
   (config) => {
+    // Skip token check for guests
+    if (isGuest()) {
+      return config;
+    }
+
     const userData = getUserData();
     if (userData?.token) {
       config.headers.Authorization = `Bearer ${userData.token}`;
     } else {
-      console.warn("⚠️ No token found in localStorage");
+      // Only warn for non-guests
+      if (!isGuest()) {
+        console.warn("⚠️ No token found in localStorage");
+      }
     }
     return config;
   },
@@ -71,6 +84,11 @@ export async function logoutUser() {
 
 export async function verifyAuth() {
   try {
+    // Skip verification for guests silently
+    if (isGuest()) {
+      return { valid: false };
+    }
+
     const userData = getUserData();
     const response = await apiClient.get("/api/auth/verify");
 
@@ -84,10 +102,13 @@ export async function verifyAuth() {
     console.warn("Auth verification failed: invalid response");
     return { valid: false };
   } catch (error) {
-    console.error(
-      "Token verification error:",
-      error.response?.data || error.message,
-    );
+    // Only log errors for non-guests
+    if (!isGuest()) {
+      console.error(
+        "Token verification error:",
+        error.response?.data || error.message,
+      );
+    }
     return { valid: false };
   }
 }

@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { socket } from "./socket";
-import { createAvatar } from "@dicebear/core";
-import * as Dice from "@dicebear/collection";
 import Chat from "../reusableComponents/chat";
 import "./lobby.css";
 import { getUserId, getDisplayName } from "../utils/authStorage";
@@ -12,90 +10,7 @@ import {
   toastError,
   toastWarning,
 } from "../utils/toast";
-
-/** Inline interactive DiceBear avatar (no extra files) */
-function InteractiveAvatar({
-  avatarStyle = "funEmoji",
-  avatarSeed = "player",
-  size = 44,
-  className = "",
-}) {
-  const wrapRef = useRef(null);
-  const [pop, setPop] = useState(false);
-  const [sparkles, setSparkles] = useState([]);
-  const [tilt, setTilt] = useState({ tx: 0, ty: 0, rot: 0 });
-
-  const dataUrl = useMemo(() => {
-    const style = Dice[avatarStyle] || Dice.funEmoji;
-    const svg = createAvatar(style, { seed: avatarSeed }).toString();
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  }, [avatarStyle, avatarSeed]);
-
-  const onPointerMove = (e) => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    const dx = (x - 0.5) * 2;
-    const dy = (y - 0.5) * 2;
-    const maxShift = 4;
-    const maxRot = 6;
-    setTilt({ tx: dx * maxShift, ty: dy * maxShift, rot: dx * -maxRot });
-  };
-
-  const onPointerLeave = () => setTilt({ tx: 0, ty: 0, rot: 0 });
-  const onClick = () => {
-    setPop(true);
-    setTimeout(() => setPop(false), 240);
-  };
-  const onDoubleClick = () => {
-    const now = Date.now();
-    const burst = Array.from({ length: 7 }).map((_, i) => ({
-      id: `${now}-${i}`,
-      left: 40 + Math.random() * (size - 80),
-      top: 40 + Math.random() * (size - 80),
-      emoji: ["✨", "★", "✦", "✳︎", "❈"][Math.floor(Math.random() * 5)],
-    }));
-    setSparkles((prev) => [...prev, ...burst]);
-    setTimeout(() => {
-      setSparkles((prev) =>
-        prev.filter((s) => !burst.find((b) => b.id === s.id)),
-      );
-    }, 700);
-  };
-
-  return (
-    <div
-      ref={wrapRef}
-      className={`avatar-wrap ${className}`}
-      style={{ width: size, height: size }}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      title="Drag, click, or double-click me ✨"
-    >
-      <img
-        alt=""
-        className={`user-avatar avatar-anim avatar-interactive ${pop ? "pop" : ""}`}
-        src={dataUrl}
-        style={{
-          transform: `translate(${tilt.tx}px, ${tilt.ty}px) rotate(${tilt.rot}deg)`,
-        }}
-      />
-      {sparkles.map((s) => (
-        <span
-          key={s.id}
-          className="sparkle"
-          style={{ left: s.left, top: s.top }}
-        >
-          {s.emoji}
-        </span>
-      ))}
-    </div>
-  );
-}
+import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
 
 const Lobby = () => {
   const { roomId } = useParams();
@@ -138,7 +53,14 @@ const Lobby = () => {
     isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
   useEffect(() => {
-    if (!myUserId || !roomId) return;
+    // Check if user has valid session (registered OR guest)
+    if (!myUserId) {
+      toastError("Session expired. Please sign in or play as guest.");
+      navigate("/");
+      return;
+    }
+
+    if (!roomId) return;
 
     // unction to rejoin
     const rejoinLobby = () => {
@@ -389,6 +311,7 @@ const Lobby = () => {
     const user = byId[userId] || { userId, displayName: userId };
     const isHostUser = userId === hostId;
     const isMe = userId === myUserId;
+    const isGuestUser = userId.startsWith("guest_");
 
     let actions = null;
     if (isMe) {
@@ -447,6 +370,7 @@ const Lobby = () => {
           avatarSeed={user.avatarSeed || user.displayName || user.userId}
           size={44}
           className="avatar-anim"
+          isGuest={isGuestUser}
         />
         <span className={`user-name ${isHostUser ? "host" : ""}`}>
           {user.displayName}

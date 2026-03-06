@@ -921,18 +921,6 @@ const Play = () => {
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
               Only the {drawerTeam} team can answer, and not the drawer.
-              <button
-                onClick={() =>
-                  console.log("DBG state", {
-                    currentUserId: getUserId(),
-                    drawerId,
-                    isDrawer,
-                    flashcard,
-                  })
-                }
-              >
-                DEBUG
-              </button>
             </small>
           )}
         </div>

@@ -20,6 +20,7 @@ function isLocalStorageAvailable() {
 // Fallback to sessionStorage if localStorage is blocked
 const storage = isLocalStorageAvailable() ? localStorage : sessionStorage;
 
+// REGISTERED USER FUNCTIONS
 export function saveUserData(userId, displayName, email, token) {
   try {
     storage.setItem(STORAGE_KEYS.USER_ID, userId);
@@ -62,12 +63,55 @@ export function clearUserData() {
   }
 }
 
+// GUEST USER FUNCTIONS
+export function saveGuestData(displayName) {
+  try {
+    // Generate unique guest ID
+    const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store ONLY in sessionStorage
+    sessionStorage.setItem(STORAGE_KEYS.USER_ID, guestId);
+    sessionStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, displayName);
+    sessionStorage.setItem("isGuest", "true");
+    sessionStorage.setItem("avatarSeed", displayName || "guest");
+    sessionStorage.setItem("avatarStyle", "funEmoji");
+
+    return { guestId, displayName };
+  } catch (error) {
+    console.error("Failed to save guest data:", error);
+    return null;
+  }
+}
+
+export function clearGuestData() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.USER_ID);
+    sessionStorage.removeItem(STORAGE_KEYS.DISPLAY_NAME);
+    sessionStorage.removeItem("isGuest");
+    sessionStorage.removeItem("avatarSeed");
+    sessionStorage.removeItem("avatarStyle");
+  } catch (error) {
+    console.error("Failed to clear guest data:", error);
+  }
+}
+
+// UNIVERSAL GETTERS, check both storages
 export function getUserId() {
-  return storage.getItem(STORAGE_KEYS.USER_ID);
+  return (
+    sessionStorage.getItem(STORAGE_KEYS.USER_ID) ||
+    storage.getItem(STORAGE_KEYS.USER_ID)
+  );
 }
 
 export function getDisplayName() {
-  return storage.getItem(STORAGE_KEYS.DISPLAY_NAME);
+  return (
+    sessionStorage.getItem(STORAGE_KEYS.DISPLAY_NAME) ||
+    storage.getItem(STORAGE_KEYS.DISPLAY_NAME)
+  );
+}
+
+export function isGuest() {
+  return sessionStorage.getItem("isGuest") === "true";
 }
 
 export function getEmail() {

@@ -163,11 +163,10 @@ const Lobby = () => {
     });
 
     // Keep player in /lobby if game has ended
-    const handleGameEnded = () => {      
+    socket.once("gameEnded", () => {
       toastWarning("Game is over!");
       navigate("/lobby", { replace: true });
-    };
-    socket.once("gameEnded", handleGameEnded);
+    });
 
     // Redirect player to /play/roomId
     socket.once("gameInProgress", (data) => {
@@ -231,7 +230,7 @@ const Lobby = () => {
       socket.off("kicked");
       socket.off("roundStarted");
       socket.off("startTimer");
-      socket.off("gameEnded", handleGameEnded);
+      socket.off("gameEnded");
       socket.off("leftTeam");
       socket.off("startGameError");
       socket.off("hostLeftOthers");

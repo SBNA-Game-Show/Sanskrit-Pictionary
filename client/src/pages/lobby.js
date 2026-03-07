@@ -131,17 +131,6 @@ const Lobby = () => {
       setSelectedDifficulty(settings.difficulty);
     });
 
-    socket.on("userKicked", ({ userId }) => {
-      if (userId === myUserId) {
-        toastInfo("You were kicked from the lobby.");
-        navigate("/lobby");
-      }
-    });
-    socket.on("kicked", () => {
-      toastInfo("You were kicked from the lobby.");
-      navigate("/lobby");
-    });
-
     socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
       setCurrentRound(currentRound);
       setCurrentPlayer(currentPlayer);
@@ -220,8 +209,6 @@ const Lobby = () => {
       socket.off("hostSet");
       socket.off("teamsUpdate");
       socket.off("gameSettingsUpdate");
-      socket.off("userKicked");
-      socket.off("kicked");
       socket.off("roundStarted");
       socket.off("startTimer");
       socket.off("gameEnded");

@@ -286,24 +286,6 @@ function createLobbyManager(io, UserModel) {
       }
     });
 
-    socket.on("kickUser", ({ roomId, targetUserId }) => {
-      const room = rooms[roomId];
-      if (!room) return;
-
-      if (socket.userId === room.hostId && targetUserId) {
-        room.teams.Red = room.teams.Red.filter((id) => id !== targetUserId);
-        room.teams.Blue = room.teams.Blue.filter((id) => id !== targetUserId);
-        io.to(roomId).emit("userKicked", { userId: targetUserId });
-
-        const targetSocket = findSocketByUserId(targetUserId);
-        if (targetSocket) {
-          targetSocket.emit("kicked");
-          targetSocket.leave(roomId);
-          targetSocket.roomId = null;
-        }
-      }
-    });
-
     // --- CHAT (kept) ---
     socket.on("chat", ({ roomId, userId, displayName, team, message }) => {
       if (!rooms[roomId]) {

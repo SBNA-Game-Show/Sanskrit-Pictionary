@@ -210,18 +210,18 @@ class GameSessionManager {
     });
   }
 
-  nextRound(gameId, io) {
+  nextRound(gameId, io, lastDrawerOverride = null) {
     const session = this.sessions.get(gameId);
     if (!session) return null;
 
-    const lastDrawer = session.players[session.currentPlayerIndex];
+    const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
 
     // No next round if reached total rounds and last drawer was Blue team
-    if (lastDrawer.team === "Blue" 
+    if (lastDrawer && lastDrawer.team === "Blue" 
         && session.currentRound >= session.totalRounds) return null;
 
     // Round number only increments after Blue team's turn, as Red always starts first
-    if (lastDrawer.team === "Blue") {
+    if (lastDrawer && lastDrawer.team === "Blue") {
       // Trigger roundEnded popup message
       io.to(gameId).emit("roundEnded", {
         roundNumber: session.currentRound
@@ -232,6 +232,8 @@ class GameSessionManager {
 
     // The turn should cycle through the target team members based on the round count
     session.currentPlayerIndex = this._getNextDrawerIndex(session, lastDrawer);
+    if (session.currentPlayerIndex === -1) return null;
+
     session.roundInProgress = true;
 
     return {
@@ -246,13 +248,15 @@ class GameSessionManager {
   // where n corresponds to the current round number (modulo team size).
   _getNextDrawerIndex(session, lastDrawer) {
     // Next drawer should be from the opposite team of last drawer
-    const targetTeam = (lastDrawer.team === "Blue") ? "Red" : "Blue";
+    const targetTeam = (lastDrawer && lastDrawer.team === "Blue") ? "Red" : "Blue";
 
     // Find all players and their indexes in the target team
     const targetTeamMembers = session.players
         .map((player, index) => ({ player, index }))
         .filter(item => item.player.team === targetTeam)
         .map(item => item.index);
+
+    if (targetTeamMembers.length === 0) return -1;
 
     // Find the next drawer index based on current round number, ensuring it cycles through team members
     const nextDrawerIndex = (session.currentRound - 1) % targetTeamMembers.length;
@@ -489,6 +493,39 @@ class GameSessionManager {
       return true;
     }
     return false;
+  }
+
+  // Kick player from session
+  kickPlayer(gameId, userId) {
+    const session = this.sessions.get(gameId);
+    if (!session) return null;
+
+    const playerIndex = session.players.findIndex((p) => p.userId === userId);
+    if (playerIndex === -1) return null;
+
+    const isCurrentDrawer = session.currentPlayerIndex === playerIndex;
+    const kickedPlayer = session.players[playerIndex];
+
+    // Remove player
+    session.players.splice(playerIndex, 1);
+
+    // Clean up score
+    delete session.scores[userId];
+
+    // Adjust currentPlayerIndex if they were before the current drawer
+    // If the kicked player index is less than the current player index, 
+    // then the current player index should be decremented by 1
+    if (playerIndex < session.currentPlayerIndex) {
+      session.currentPlayerIndex--;
+    }
+    // If the kicked player index is outside of the array length,
+    // set current player index back to 0 
+    else if (session.currentPlayerIndex >= session.players.length) {
+      session.currentPlayerIndex = 0;
+    }
+
+    console.log(`[Session] Kicked player ${userId} from ${gameId}`);
+    return { isCurrentDrawer, kickedPlayer };
   }
 
   // ✅ ADD: Update canvas data

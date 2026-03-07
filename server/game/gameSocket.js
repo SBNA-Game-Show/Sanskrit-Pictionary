@@ -71,6 +71,9 @@ function createGameSocket(io) {
           });
         }
       }
+      else {
+        socket.emit("newGame", { roomId:roomId });
+      }
     });
 
     socket.on("getGameState", ({ roomId }) => {

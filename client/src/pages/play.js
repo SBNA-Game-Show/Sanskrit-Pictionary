@@ -12,6 +12,9 @@ import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
 import { toastWarning, toastInfo, toastSuccess } from "../utils/toast";
 
+import correctSound from "../assets/sounds/correct.wav";
+import wrongSound from "../assets/sounds/wrong.wav";
+
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
@@ -109,6 +112,9 @@ const Play = () => {
       });
     }
   };
+
+  const correctAudioRef = useRef(new Audio(correctSound));
+  const wrongAudioRef = useRef(new Audio(wrongSound));
 
   // ---------- Socket setup ----------
   useEffect(() => {
@@ -313,11 +319,31 @@ const Play = () => {
     });
 
    socket.on("correctAnswer", ({ displayName, scoreGained }) => {
+    if (userId === getUserId()) {
+      correctAudioRef.current.currentTime = 0;
+      correctAudioRef.current.play();
+    }
+
     toastSuccess(
       `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
       {
         autoClose: 3000,
         position: "top-left"
+      }
+    );
+  });
+
+    socket.on("wrongAnswer", ({ displayName, scoreLost }) => {
+      if (userId === getUserId()) {
+        wrongAudioRef.current.currentTime = 0;
+        wrongAudioRef.current.play();
+      }
+
+    toastWarning(
+      `❌ ${displayName || "Someone"} ran out of guesses and lost ${scoreLost} points.`,
+      {
+        autoClose: 3000,
+        position: "top-left",
       }
     );
   });

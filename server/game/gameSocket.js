@@ -21,6 +21,16 @@ function createGameSocket(io) {
       // Check if this user is reconnecting to an active game
       const session = gameSessionManager.getSession(roomId);
       if (session) {
+
+          // If the game is ended, send the final scores without rejoining
+          if (session.gameEnded) {
+          socket.emit("gameEnded", { 
+            finalPlayers: gameSessionManager.getPlayersWithScores(roomId)});
+          return; 
+          } else {
+            socket.emit("gameInProgress", { roomId });
+          }
+
         const reconnected = gameSessionManager.markPlayerReconnected(
           roomId,
           userId,
@@ -51,6 +61,7 @@ function createGameSocket(io) {
             scores: session.scores,
             canvasData: canvasData,
             remainingGuesses: myRemainingGuesses,
+            gameEnded: session.gameEnded, // get game status
           });
 
           // Notify others that player reconnected
@@ -59,6 +70,9 @@ function createGameSocket(io) {
             displayName,
           });
         }
+      }
+      else {
+        socket.emit("newGame", { roomId:roomId });
       }
     });
 
@@ -190,6 +204,35 @@ function createGameSocket(io) {
 
       clearActiveTimer(gameId);
       proceedToNextRound(io, gameId);
+    });
+
+    // ---- kick user ----
+    socket.on("kickUser", ({ roomId, targetUserId }) => {
+      const session = gameSessionManager.getSession(roomId);
+      if (!session) return; // If game hasn't started, ignore
+
+      // Verify host
+      if (socket.userId !== session.hostData.hostId) return;
+
+      const kickResult = gameSessionManager.kickPlayer(roomId, targetUserId);
+      if (!kickResult) return;
+
+      const { isCurrentDrawer, kickedPlayer } = kickResult;
+
+      if (kickedPlayer) {
+        io.to(roomId).emit("userKicked", kickedPlayer);
+      }
+
+      // Emit updated players list so leaderboard updates
+      io.to(roomId).emit(
+        "updatePlayers",
+        gameSessionManager.getPlayersWithScores(roomId),
+      );
+
+      if (isCurrentDrawer) {
+        clearActiveTimer(roomId);
+        proceedToNextRound(io, roomId, kickedPlayer);
+      }
     });
 
     // ---- submit answer ----
@@ -377,7 +420,7 @@ function clearActiveTimer(gameId) {
 }
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
-async function proceedToNextRound(io, gameId) {
+function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   if (advancingRounds.has(gameId)) return; // Prevent repeated entry into the next round
   advancingRounds.add(gameId);
 
@@ -386,7 +429,7 @@ async function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io, lastDrawerOverride);
 
     // Get latest scores before starting the next round
     const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import "./play.css";
 import Chat from "../reusableComponents/chat";
@@ -66,6 +67,10 @@ const Play = () => {
 
   // Track all users who answered correctly this round to highlight their cards
   const [correctUserIds, setCorrectUserIds] = useState([]);
+
+  // Modal state for kicking
+  const [showKickModal, setShowKickModal] = useState(false);
+  const [kickTarget, setKickTarget] = useState(null); // { userId, displayName }
 
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
@@ -149,6 +154,24 @@ const Play = () => {
     }
   };
 
+  const handleKickClick = (user, displayName) => {
+    setKickTarget({ userId: user.userId, displayName });
+    setShowKickModal(true);
+  };
+
+  const handleKickConfirm = () => {
+    if (kickTarget) {
+      socket.emit("kickUser", { roomId, targetUserId: kickTarget.userId });
+    }
+    setShowKickModal(false);
+    setKickTarget(null);
+  };
+
+  const handleKickCancel = () => {
+    setShowKickModal(false);
+    setKickTarget(null);
+  };
+
   // ---------- Socket setup ----------
   useEffect(() => {
     const userId = getUserId();
@@ -183,6 +206,16 @@ const Play = () => {
 
     socket.on("playerReconnected", ({ userId, displayName }) => {
       toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
+    });
+
+    socket.on("userKicked", ( kickedPlayer ) => {
+      if (kickedPlayer.userId === getUserId()) {
+        toastInfo("You were kicked from the game.");
+        navigate("/lobby");
+      }
+      else {
+        toastInfo(`${kickedPlayer.displayName} was kicked from the game.`);
+      }
     });
 
     const onLobbyUsers = (users) => {
@@ -501,6 +534,7 @@ const Play = () => {
       socket.off("connect", handleReconnect);
       socket.off("playerDisconnected");
       socket.off("playerReconnected");
+      socket.off("userKicked");
       socket.off("lobbyUsers", onLobbyUsers);
       socket.off("newGame");
       socket.off("profileUpdated", onProfileUpdated);
@@ -568,6 +602,25 @@ const Play = () => {
       >
         {/* Avatar + DisplayName */}
         <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+          {isHost && user.userId !== currentUserId && (
+            <button
+              onClick={() => handleKickClick(user, displayName)}
+              style={{
+                background: "crimson",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                padding: "2px 6px",
+                cursor: "pointer",
+                fontSize: "10px",
+                fontWeight: "bold",
+                marginRight: "4px"
+              }}
+              title="Kick Player"
+            >
+              Kick
+            </button>
+          )}
           <InteractiveAvatar
             avatarSeed={seed}
             avatarStyle={style}
@@ -963,6 +1016,46 @@ const Play = () => {
           )}
         </div>
       </div>
+
+      {/* Kick Confirmation Modal */}
+      {showKickModal && createPortal(
+        <div className="modal-overlay" onClick={handleKickCancel}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Kick Player</h2>
+              <button className="modal-close" onClick={handleKickCancel}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: "16px", color: "#333", marginBottom: "10px" }}>
+                Are you sure you want to kick <strong>{kickTarget?.displayName}</strong> from the game?
+              </p>
+              <div className="modal-note">
+                <span className="note-icon">ⓘ</span>
+                <span>
+                  Kicked players will be removed from the leaderboard and cannot rejoin until a new game starts.
+                </span>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="modal-button cancel"
+                onClick={handleKickCancel}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-button kick"
+                onClick={handleKickConfirm}
+              >
+                Kick Player
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 };

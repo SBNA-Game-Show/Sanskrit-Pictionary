@@ -206,6 +206,35 @@ function createGameSocket(io) {
       proceedToNextRound(io, gameId);
     });
 
+    // ---- kick user ----
+    socket.on("kickUser", ({ roomId, targetUserId }) => {
+      const session = gameSessionManager.getSession(roomId);
+      if (!session) return; // If game hasn't started, ignore
+
+      // Verify host
+      if (socket.userId !== session.hostData.hostId) return;
+
+      const kickResult = gameSessionManager.kickPlayer(roomId, targetUserId);
+      if (!kickResult) return;
+
+      const { isCurrentDrawer, kickedPlayer } = kickResult;
+
+      if (kickedPlayer) {
+        io.to(roomId).emit("userKicked", kickedPlayer);
+      }
+
+      // Emit updated players list so leaderboard updates
+      io.to(roomId).emit(
+        "updatePlayers",
+        gameSessionManager.getPlayersWithScores(roomId),
+      );
+
+      if (isCurrentDrawer) {
+        clearActiveTimer(roomId);
+        proceedToNextRound(io, roomId, kickedPlayer);
+      }
+    });
+
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
       const session = gameSessionManager.getSession(gameId);
@@ -391,7 +420,7 @@ function clearActiveTimer(gameId) {
 }
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
-function proceedToNextRound(io, gameId) {
+function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   if (advancingRounds.has(gameId)) return; // Prevent repeated entry into the next round
   advancingRounds.add(gameId);
 
@@ -400,7 +429,7 @@ function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io, lastDrawerOverride);
 
     // Get latest scores before starting the next round
     const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);

@@ -32,6 +32,7 @@ function maskPhraseToUnderscores(phrase) {
 const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // holds freshest players for end screen
+  const profilesRef = useRef({});
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
 
@@ -52,11 +53,19 @@ const Play = () => {
   const [answer, setAnswer] = useState("");
   const [remainingGuesses, setRemainingGuesses] = useState(4);
 
+  // For multiple-choice image selection (guessers only)
+  const [imageChoices, setImageChoices] = useState([]);
+  const [showChoices, setShowChoices] = useState(false);
+  const [roundKey, setRoundKey] = useState(0);
+
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
+
+  // Track all users who answered correctly this round to highlight their cards
+  const [correctUserIds, setCorrectUserIds] = useState([]);
 
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
@@ -113,8 +122,26 @@ const Play = () => {
     }
   };
 
-  const correctAudioRef = useRef(new Audio(correctSound));
-  const wrongAudioRef = useRef(new Audio(wrongSound));
+  // Warn current drawer
+  const handleWarnDrawer = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("warnDrawer", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
+
+  const handleForceSkip = () => {
+    canvasRef.current?.clearCanvas();
+    if (isHost) {
+      socket.emit("forceSkipRound", {
+        gameId: roomId,
+        userId: getUserId(),
+      });
+    }
+  };
 
   // ---------- Socket setup ----------
   useEffect(() => {
@@ -159,9 +186,11 @@ const Play = () => {
           displayName: u.displayName,
           avatarSeed: u.avatarSeed,
           avatarStyle: u.avatarStyle,
+          avatarData: u.avatarData,
         };
       });
       setProfiles(map);
+      profilesRef.current = map;
     };
     socket.on("lobbyUsers", onLobbyUsers);
 
@@ -170,15 +199,21 @@ const Play = () => {
       displayName,
       avatarSeed,
       avatarStyle,
+      avatarData,
     }) => {
-      setProfiles((prev) => ({
-        ...prev,
-        [userId]: {
-          displayName: displayName ?? prev[userId]?.displayName,
-          avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
-          avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
-        },
-      }));
+      setProfiles((prev) => {
+        const updated = {
+          ...prev,
+          [userId]: {
+            displayName: displayName ?? prev[userId]?.displayName,
+            avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
+            avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
+            avatarData: avatarData ?? prev[userId]?.avatarData,
+          },
+        };
+        profilesRef.current = updated;
+        return updated;
+      });
     };
     socket.on("profileUpdated", onProfileUpdated);
 
@@ -210,7 +245,9 @@ const Play = () => {
 
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
-      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
+      setRemainingGuesses(
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+      );
 
       // ✅ Handle canvas data from gameState
       if (canvasRef.current) {
@@ -244,7 +281,9 @@ const Play = () => {
 
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
-      setRemainingGuesses(me?.remainingGuesses !== undefined ? me.remainingGuesses : 4);
+      setRemainingGuesses(
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+      );
     });
 
     // drawerChanged clears canvas
@@ -311,6 +350,13 @@ const Play = () => {
       setAnswer("");
       setTimeLeft(timer || 0);
       setRemainingGuesses(4);
+      setCorrectUserIds([]); // Reset the correct answer highlights
+
+      // Reset answer and choices when drawer changes
+      setImageChoices([]);
+      setRoundKey((k) => k + 1);
+      setFlashcard(null); //  clear old card instantly
+      socket.emit("getGameState", { roomId }); //  fetch new card
 
       // Clear canvas when new round starts
       if (canvasRef.current) {
@@ -318,35 +364,66 @@ const Play = () => {
       }
     });
 
-   socket.on("correctAnswer", ({ displayName, scoreGained }) => {
-    if (userId === getUserId()) {
-      correctAudioRef.current.currentTime = 0;
-      correctAudioRef.current.play();
-    }
-
-    toastSuccess(
-      `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
-      {
-        autoClose: 3000,
-        position: "top-left"
+    socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
+      if (userId) {
+        setCorrectUserIds((prev) =>
+          prev.includes(userId) ? prev : [...prev, userId],
+        );
       }
+      toastSuccess(
+        `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
+        {
+          autoClose: 3000,
+          position: "top-left",
+        },
+      );
+    });
+
+    socket.on(
+      "wrongAnswer",
+      ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
+        console.log("[Play] wrongAnswer", {
+          wrongUserId,
+          displayName,
+          remainingGuesses,
+          scoreLost,
+        });
+        if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
+          setRemainingGuesses(remainingGuesses);
+        }
+
+        // Update the user list for everyone immediately (server also emits updatePlayers,
+        // but this makes the UI responsive even if packets arrive out-of-order)
+        if (wrongUserId && remainingGuesses !== undefined) {
+          setPlayers((prev) => {
+            const next = (prev || []).map((p) =>
+              p.userId === wrongUserId ? { ...p, remainingGuesses } : p,
+            );
+            playersRef.current = next;
+            return next;
+          });
+        }
+
+        // Show penalty notification if this is the current user
+        if (scoreLost && wrongUserId === getUserId()) {
+          setRoundResult({
+            type: "wrong",
+            displayName: displayName || "You",
+            scoreLost: scoreLost,
+          });
+          setTimeout(() => setRoundResult(null), 1200);
+        }
+      },
     );
-  });
 
-    socket.on("wrongAnswer", ({ displayName, scoreLost }) => {
-      if (userId === getUserId()) {
-        wrongAudioRef.current.currentTime = 0;
-        wrongAudioRef.current.play();
-      }
-
-    toastWarning(
-      `❌ ${displayName || "Someone"} ran out of guesses and lost ${scoreLost} points.`,
-      {
-        autoClose: 3000,
-        position: "top-left",
-      }
-    );
-  });
+    socket.on("guessesExhausted", () => {
+      console.log("[Play] guessesExhausted");
+      setRoundResult({
+        type: "guessesExhausted",
+        displayName: "Out of guesses!",
+      });
+      setTimeout(() => setRoundResult(null), 1500);
+    });
 
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
@@ -354,22 +431,42 @@ const Play = () => {
       setEraseMode(false);
     });
 
-    socket.on("gameEnded", () => {
+    socket.on("warnDrawer", (drawerId, newScore) => {
+      canvasRef.current?.clearCanvas();
+
+      setPlayers((prev) => {
+        const next = (prev || []).map((p) =>
+          p.userId === drawerId ? { ...p, points: newScore } : p,
+        );
+
+        playersRef.current = next;
+        return next;
+      });
+    });
+
+    socket.on("gameEnded", (data) => {
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
         : players;
-      const withAvatars = base.map((p) => {
-        const prof = profiles[p.userId] || {};
+
+      const currentProfiles = profilesRef.current;
+
+      const withAvatars = data.finalPlayers.map((p) => {
+        const prof = currentProfiles[p.userId] || {};
         const seed = prof.avatarSeed || p.displayName || p.userId || "player";
         const style = prof.avatarStyle || "funEmoji";
+
+        // Use custom avatar if available
+        const avatarUrl = prof.avatarData || makeAvatarDataUrl(style, seed);
         return {
           ...p,
-          avatar: makeAvatarDataUrl(style, seed),
+          avatar: avatarUrl,
           avatarSeed: seed,
           avatarStyle: style,
         };
       });
+
       setTimeout(() => {
         setRoundResult(null);
         navigate("/end", { state: { players: withAvatars } });
@@ -393,6 +490,7 @@ const Play = () => {
       socket.off("wrongAnswer");
       socket.off("guessesExhausted");
       socket.off("clear-canvas");
+      socket.off("warnDrawer");
       socket.off("gameEnded");
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -408,34 +506,213 @@ const Play = () => {
     const displayName = prof.displayName || user.displayName || user.userId;
     const seed = prof.avatarSeed || displayName || user.userId;
     const style = prof.avatarStyle;
+    const isGuestUser = user.userId.startsWith("guest_");
+
+    // Determine states - exhausted only if not correct and not drawer
+    const isCorrect = correctUserIds.includes(user.userId);
+    const isExhausted =
+      (user.remainingGuesses ?? 4) <= 0 &&
+      !isCorrect &&
+      user.userId !== drawerId;
+
+    // Debug logging
+    if (isExhausted) {
+      console.log(
+        `[EXHAUSTED] ${displayName}: guesses=${user.remainingGuesses}, isCorrect=${isCorrect}, isDrawer=${user.userId === drawerId}`,
+      );
+    }
 
     const chipClass =
       "user-chip " +
       (user.team === "Red" ? "chip-red" : "chip-blue") +
-      (user.userId === drawerId ? " is-drawer" : "");
+      (user.userId === drawerId ? " is-drawer" : "") +
+      (isCorrect ? " correct-answer" : "") +
+      (isExhausted ? " guesses-exhausted" : "");
 
     return (
-      <div className={chipClass} key={user.userId}>
-        <InteractiveAvatar avatarSeed={seed} avatarStyle={style} size={36} />
-        <span className="chip-name">{displayName}</span>
-        <span className="chip-guesses">G: {user.remainingGuesses ?? 4}</span>
-        {user.userId === drawerId && (
-          <span className="chip-pen" title="Drawing now">
-            ✏️
+      <div
+        className={chipClass}
+        key={user.userId}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 2px",
+          minWidth: "200px",
+        }}
+      >
+        {/* Avatar + DisplayName */}
+        <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+          <InteractiveAvatar
+            avatarSeed={seed}
+            avatarStyle={style}
+            size={36}
+            isGuest={isGuestUser}
+            className="avatar-anim"
+          />
+          <span
+            className="chip-name"
+            style={{
+              fontWeight: "bold",
+              fontSize: "18px",
+              wordBreak: "break-word",
+              minWidth: "95px",
+            }}
+          >
+            {displayName}
+            {user.userId === drawerId && " ✏️"}
           </span>
-        )}
+        </div>
+
+        {/* Points + Atmps*/}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            fontSize: "13px",
+            minWidth: "55px",
+          }}
+        >
+          {/* Points */}
+          <span style={{ color: "#e1bf00", fontWeight: "bold" }}>
+            Pts: {user.points ?? 0}
+          </span>
+          {/* Atmps */}
+          <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
+            {[...Array(4)]
+              .map((_, i) => (
+                <span key={i} style={{ fontSize: "7px" }}>
+                  {i < (user.remainingGuesses ?? 4) ? "❤️" : "🤍"}
+                </span>
+              ))
+              .reverse()}
+          </div>
+        </div>
       </div>
     );
   };
 
   const targetPhrase = flashcard?.transliteration || "";
 
-  const hintDisplay = !isDrawer
-    ? maskPhraseToUnderscores(targetPhrase)
-    : flashcard?.word ||
-      flashcard?.translation ||
-      flashcard?.transliteration ||
-      "";
+  //-------------------------------------------------------
+  //------------ cards and audio PLAYBACK LOGIC -----------
+  //-------------------------------------------------------
+
+  const DIFFICULTY_FOLDERS = {
+    Easy: [
+      "/FlashCardEasy/bird.png",
+      "/FlashCardEasy/book.png",
+      "/FlashCardEasy/cow.png",
+      "/FlashCardEasy/elephant.png",
+      "/FlashCardEasy/father.png",
+      "/FlashCardEasy/flower.png",
+      "/FlashCardEasy/friend.png",
+      "/FlashCardEasy/fruit.png",
+      "/FlashCardEasy/house.png",
+      "/FlashCardEasy/king.png",
+      "/FlashCardEasy/moon.png",
+      "/FlashCardEasy/mother.png",
+      "/FlashCardEasy/river.png",
+      "/FlashCardEasy/sun.png",
+      "/FlashCardEasy/tree.png",
+      "/FlashCardEasy/water.png",
+    ],
+
+    Medium: [
+      "/FlashCardMedium/child.png",
+      "/FlashCardMedium/earth.png",
+      "/FlashCardMedium/fire.png",
+      "/FlashCardMedium/king.png",
+      "/FlashCardMedium/mountain.png",
+      "/FlashCardMedium/ocean.png",
+      "/FlashCardMedium/queen.png",
+      "/FlashCardMedium/sky.png",
+      "/FlashCardMedium/teacher.png",
+      "/FlashCardMedium/time.png",
+    ],
+
+    Hard: [
+      "/FlashCardHard/compassion.png",
+      "/FlashCardHard/energy.png",
+      "/FlashCardHard/freedom.png",
+      "/FlashCardHard/Happiness.png",
+      "/FlashCardHard/knowledge.png",
+      "/FlashCardHard/mind.png",
+      "/FlashCardHard/speech.png",
+      "/FlashCardHard/student.png",
+      "/FlashCardHard/truth.png",
+      "/FlashCardHard/universe.png",
+    ],
+  };
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  useEffect(() => {
+    if (!canAnswer || !flashcard?.imageSrc) {
+      setShowChoices(false);
+      setImageChoices([]);
+      return;
+    }
+
+    // Detect difficulty from the imageSrc path
+    let difficulty = "Easy";
+    const src = flashcard.imageSrc;
+    if (src.includes("FlashCardMedium")) difficulty = "Medium";
+    if (src.includes("FlashCardHard")) difficulty = "Hard";
+
+    const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
+
+    // Filter out correct image from distractors
+    const distractorPool = folderImages.filter((img) => img !== src);
+
+    // Pick 4 random distractors
+    const validDistractors = shuffle(distractorPool).slice(0, 4);
+
+    // Mix correct + distractors and shuffle
+    const mixed = shuffle([
+      { src, isCorrect: true },
+      ...validDistractors.map((s) => ({ src: s, isCorrect: false })),
+    ]);
+
+    setImageChoices(mixed);
+    setShowChoices(mixed.length === 5);
+  }, [canAnswer, flashcard?.imageSrc, roundKey]);
+
+  const handlePickChoice = (choice) => {
+    if (!canAnswer) return;
+
+    if (choice.isCorrect) {
+      // Correct click → send real answer
+      socket.emit("submitAnswer", {
+        gameId: roomId,
+        userId: getUserId(),
+        answer: flashcard?.word || "",
+      });
+
+      setShowChoices(false);
+      setImageChoices([]);
+    } else {
+      // ❌ Wrong click → send intentionally wrong answer
+      socket.emit("submitAnswer", {
+        gameId: roomId,
+        userId: getUserId(),
+        answer: "__wrong_choice__", // something that will never match
+      });
+
+      setShowChoices(false);
+      setTimeout(() => {
+        setShowChoices(true);
+      }, 400);
+    }
+  };
 
   return (
     <>
@@ -444,40 +721,12 @@ const Play = () => {
         {/* Round result modal */}
         {roundResult && (
           <div className="round-result-modal">
-            {roundResult.type === "correct" && (
-              <div className="modal-card">
-                <h3>Correct!</h3>
-                <p>
-                  {roundResult.displayName} guessed correctly
-                  {typeof roundResult.scoreGained === "number"
-                    ? ` (+${roundResult.scoreGained} pts)`
-                    : ""}
-                </p>
-                {roundResult.answerText && (
-                  <p>
-                    <strong>Answer:</strong> {roundResult.answerText}
-                  </p>
-                )}
-              </div>
-            )}
-            {roundResult.type === "wrong" && (
-              <div className="modal-card wrong-answer">
-                <h3>Wrong Answer</h3>
-                <p>-{roundResult.scoreLost} points 😞</p>
-              </div>
-            )}
-            {roundResult.type === "guessesExhausted" && (
-              <div className="modal-card">
-                <h3>Round Ended</h3>
-                <p>No more guesses remaining!</p>
-              </div>
-            )}
-            {roundResult.type === "gameEnded" && (
-              <div className="modal-card">
-                <h3>Game Over</h3>
-                <p>Thanks for playing — check the scoreboard!</p>
-              </div>
-            )}
+            {/* Removed the JSX popups here as we are using toast 
+                  and roundpopups for all the notifications */}
+            {roundResult.type === "correct"}
+            {roundResult.type === "wrong"}
+            {roundResult.type === "guessesExhausted"}
+            {roundResult.type === "gameEnded"}
           </div>
         )}
 
@@ -505,7 +754,9 @@ const Play = () => {
               htmlFor="guessesleft"
               style={{
                 color:
-                  isEligibleGuesser && remainingGuesses <= 2 ? "red" : "inherit",
+                  isEligibleGuesser && remainingGuesses <= 2
+                    ? "red"
+                    : "inherit",
               }}
             >
               {isEligibleGuesser ? remainingGuesses : "—"}
@@ -513,21 +764,12 @@ const Play = () => {
           </a>
         </div>
 
-        <div className="hint-box">
-          <strong>Word Hint: </strong>
-          <label htmlFor="wordhint">
-            {flashcard && !isDrawer
-              ? maskPhraseToUnderscores(flashcard.word || "")
-              : "..."}
-          </label>
-        </div>
-
         {/* Drawer and host see the full flashcard */}
         {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
 
         {/* User List */}
         <div className="user-list">
-          <div className="user-panel-title">User List</div>
+          <div className="user-panel-title">Players List</div>
 
           <div className="team-block">
             <h3 className="team-title red">Red Team</h3>
@@ -548,7 +790,10 @@ const Play = () => {
           </div>
         </div>
 
-        <div style={{ textAlign: "center", marginBottom: "5px" }}>
+        <div
+          className="drawer-name"
+          style={{ textAlign: "center", marginBottom: "5px" }}
+        >
           <strong>Drawing by:</strong>{" "}
           <span
             style={{
@@ -578,39 +823,54 @@ const Play = () => {
         />
 
         <div className="canvascontrols">
-          <button onClick={handlePenClick} disabled={!isDrawer || !eraseMode}>
-            Pen
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="30"
-            step="1"
-            value={strokeWidth}
-            onChange={handleStrokeWidthChange}
-            disabled={!isDrawer || eraseMode}
-          />
-          <input
-            type="color"
-            value={strokeColor}
-            onChange={handleStrokeColorChange}
-            disabled={!isDrawer}
-          />
-          <button onClick={handleEraserClick} disabled={!isDrawer || eraseMode}>
-            Eraser
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="100"
-            step="1"
-            value={eraserWidth}
-            onChange={handleEraserWidthChange}
-            disabled={!isDrawer || !eraseMode}
-          />
-          <button onClick={handleClear} disabled={!isDrawer}>
-            Clear
-          </button>
+          {!isHost ? (
+            <>
+              <button
+                onClick={handlePenClick}
+                disabled={!isDrawer || !eraseMode}
+              >
+                Pen
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="30"
+                step="1"
+                value={strokeWidth}
+                onChange={handleStrokeWidthChange}
+                disabled={!isDrawer || eraseMode}
+              />
+              <input
+                type="color"
+                value={strokeColor}
+                onChange={handleStrokeColorChange}
+                disabled={!isDrawer}
+              />
+              <button
+                onClick={handleEraserClick}
+                disabled={!isDrawer || eraseMode}
+              >
+                Eraser
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={eraserWidth}
+                onChange={handleEraserWidthChange}
+                disabled={!isDrawer || !eraseMode}
+              />
+              <button onClick={handleClear} disabled={!isDrawer}>
+                Clear
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={handleWarnDrawer}>Warn Drawer</button>
+              <button onClick={handleForceSkip}>Force Skip Round</button>
+            </>
+          )}
         </div>
 
         <div className="chat-box">
@@ -640,21 +900,30 @@ const Play = () => {
               Send
             </button>
           </div>
+
+          {showChoices && canAnswer && imageChoices.length === 5 && (
+            <div className="choice-modal">
+              <div className="choice-card">
+                <h3>Pick the correct image</h3>
+
+                <div className="choice-grid">
+                  {imageChoices.map((c, index) => (
+                    <button
+                      key={index}
+                      className="choice-tile"
+                      onClick={() => handlePickChoice(c)}
+                    >
+                      <img src={c.src} alt="choice" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
               Only the {drawerTeam} team can answer, and not the drawer.
-              <button
-                onClick={() =>
-                  console.log("DBG state", {
-                    currentUserId: getUserId(),
-                    drawerId,
-                    isDrawer,
-                    flashcard,
-                  })
-                }
-              >
-                DEBUG
-              </button>
             </small>
           )}
         </div>

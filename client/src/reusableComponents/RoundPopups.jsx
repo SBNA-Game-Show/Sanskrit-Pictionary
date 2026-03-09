@@ -97,22 +97,11 @@ export default function RoundPopups() {
       if (dname) drawerNameRef.current = dname;
     };
 
-    // ---- Correct answer ----
-    const onCorrectAnswer = ({ displayName, scoreGained, answerText }) => {
-      const pts = Number.isFinite(Number(scoreGained)) ? Number(scoreGained) : null;
-      const ans = typeof answerText === "string" && answerText.trim() ? answerText.trim() : "";
+    // ---- Round Ended ----
+    const onRoundEnded = ({ roundNumber }) => {
       enqueue({
-        title: `${displayName} Answered Correctly!`,
-        subtitle:
-          displayName && pts !== null
-            ? `Guesser: ${displayName} (+${pts} pts)${ans ? ` — Answer: ${ans}` : ""}`
-            : displayName
-              ? `Guesser: ${displayName}`
-              : pts !== null
-                ? `+${pts} pts`
-                : undefined,
+        title: `Round ${roundNumber} Complete!`,
         kind: "end",
-        team: drawerTeamRef.current, // keep outline with the drawer team for that round
         duration: 2000,
       });
     };
@@ -139,16 +128,31 @@ export default function RoundPopups() {
       });
     };
 
+    // ---- Warn player ----
+    const onWarnPlayer = () => {
+      enqueue({
+        title: "Warning Drawer",
+        subtitle: "Reminder: All drawings must be appropriate and respectful for all players.",
+        kind: "warning",
+        team: drawerTeamRef.current,
+        duration: 5000,
+      });
+    };
+
     socket.on("roundStarted", onRoundStarted);
     socket.on("drawerChanged", onDrawerChanged);
-    socket.on("correctAnswer", onCorrectAnswer);
+    socket.on("roundEnded", onRoundEnded);
+    // socket.on("correctAnswer", onCorrectAnswer);
+    socket.on("warnDrawer", onWarnPlayer);
     socket.on("gameEnded", onGameEnded);
     socket.on("guessesExhausted", onGuessesExhausted);
 
     return () => {
       socket.off("roundStarted", onRoundStarted);
       socket.off("drawerChanged", onDrawerChanged);
-      socket.off("correctAnswer", onCorrectAnswer);
+      socket.off("roundEnded", onRoundEnded);
+      // socket.off("correctAnswer", onCorrectAnswer);
+      socket.off("warnDrawer", onWarnPlayer);
       socket.off("gameEnded", onGameEnded);
       socket.off("guessesExhausted", onGuessesExhausted);
     };

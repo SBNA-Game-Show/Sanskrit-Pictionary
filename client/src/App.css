@@ -2,7 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #F0F8FF;
+  background-color: #f0f8ff;
   position: relative;
   overflow-x: hidden;
 }
@@ -23,4 +23,21 @@
   opacity: 0.5;
   pointer-events: none;
   margin-bottom: 63px;
+}
+
+/* Guest avatar styling */
+.guest-avatar.pop {
+  animation: avatarPop 0.24s ease-out;
+}
+
+@keyframes avatarPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
 }

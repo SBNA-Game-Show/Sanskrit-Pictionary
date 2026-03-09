@@ -1,6 +1,6 @@
 .chat-container {
   width: 100%;
-  max-width: 500px;
+  max-width: 320px; 
   margin: 0 auto;
   border-radius: 15px;
   background-color: rgba(242, 210, 182);
@@ -19,7 +19,7 @@
   list-style: none;
   padding: 0;
   height: 300px;
-  overflow-y: auto;
+ overflow-y: auto;
   margin-bottom: 15px;
   border: 1px solid #fcd8aa;
   border-radius: 6px;
@@ -33,10 +33,13 @@
   background-color: #ffe0b2;
   border-radius: 6px;
   color: #444;
+  overflow-wrap: break-word;
 }
 
 .input-area {
   display: flex;
+  flex-flow:row wrap;
+  gap:10px;
 }
 
 .input-area input {

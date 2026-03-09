@@ -1,17 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./signin.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { loginUser } from "../utils/authAPI";
 import { toastSuccess, toastError } from "../utils/toast";
 
 function Signin() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false); // Add loading state
+  const [loading, setLoading] = useState(false);
+  const [guestName, setGuestName] = useState("");
+
+  // Extract guest name from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const nameParam = params.get("guestName");
+    if (nameParam) {
+      setGuestName(decodeURIComponent(nameParam));
+    }
+  }, [location]);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -26,11 +38,9 @@ function Signin() {
 
     try {
       const result = await loginUser(formData.email, formData.password);
-
       if (result.success) {
         // Notify navbar to update
         window.dispatchEvent(new Event("displayNameChanged"));
-
         toastSuccess("Login successful! Welcome back! 🎉");
         navigate("/lobby");
       } else {
@@ -48,6 +58,7 @@ function Signin() {
     <div className="signinContainer">
       <form className="signinForm" onSubmit={handleSubmit}>
         <h2>Sign In</h2>
+
         <label htmlFor="email">Email</label>
         <input
           type="email"
@@ -57,6 +68,7 @@ function Signin() {
           onChange={handleChange}
           disabled={loading}
         />
+
         <label htmlFor="password">Password</label>
         <div className="input-wrap">
           <input
@@ -77,12 +89,23 @@ function Signin() {
             {showPw ? "Hide" : "Show"}
           </button>
         </div>
+
         <button type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
+
         <p className="signupRedirect">
           Have not signed up, yet?{" "}
-          <span onClick={() => navigate("/signup")} className="signupLink">
+          <span
+            onClick={() => {
+              // Forward guest name parameter to signup
+              const signupUrl = guestName
+                ? `/signup?guestName=${encodeURIComponent(guestName)}`
+                : "/signup";
+              navigate(signupUrl);
+            }}
+            className="signupLink"
+          >
             Click here to Sign up
           </span>
         </p>

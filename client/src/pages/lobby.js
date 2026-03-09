@@ -1,96 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { socket } from "./socket";
-import { createAvatar } from "@dicebear/core";
-import * as Dice from "@dicebear/collection";
 import Chat from "../reusableComponents/chat";
 import "./lobby.css";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastSuccess, toastInfo, toastError } from "../utils/toast";
-
-/** Inline interactive DiceBear avatar (no extra files) */
-function InteractiveAvatar({
-  avatarStyle = "funEmoji",
-  avatarSeed = "player",
-  size = 44,
-  className = "",
-}) {
-  const wrapRef = useRef(null);
-  const [pop, setPop] = useState(false);
-  const [sparkles, setSparkles] = useState([]);
-  const [tilt, setTilt] = useState({ tx: 0, ty: 0, rot: 0 });
-
-  const dataUrl = useMemo(() => {
-    const style = Dice[avatarStyle] || Dice.funEmoji;
-    const svg = createAvatar(style, { seed: avatarSeed }).toString();
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  }, [avatarStyle, avatarSeed]);
-
-  const onPointerMove = (e) => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    const dx = (x - 0.5) * 2;
-    const dy = (y - 0.5) * 2;
-    const maxShift = 4;
-    const maxRot = 6;
-    setTilt({ tx: dx * maxShift, ty: dy * maxShift, rot: dx * -maxRot });
-  };
-
-  const onPointerLeave = () => setTilt({ tx: 0, ty: 0, rot: 0 });
-  const onClick = () => {
-    setPop(true);
-    setTimeout(() => setPop(false), 240);
-  };
-  const onDoubleClick = () => {
-    const now = Date.now();
-    const burst = Array.from({ length: 7 }).map((_, i) => ({
-      id: `${now}-${i}`,
-      left: 40 + Math.random() * (size - 80),
-      top: 40 + Math.random() * (size - 80),
-      emoji: ["✨", "★", "✦", "✳︎", "❈"][Math.floor(Math.random() * 5)],
-    }));
-    setSparkles((prev) => [...prev, ...burst]);
-    setTimeout(() => {
-      setSparkles((prev) =>
-        prev.filter((s) => !burst.find((b) => b.id === s.id)),
-      );
-    }, 700);
-  };
-
-  return (
-    <div
-      ref={wrapRef}
-      className={`avatar-wrap ${className}`}
-      style={{ width: size, height: size }}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      title="Drag, click, or double-click me ✨"
-    >
-      <img
-        alt=""
-        className={`user-avatar avatar-anim avatar-interactive ${pop ? "pop" : ""}`}
-        src={dataUrl}
-        style={{
-          transform: `translate(${tilt.tx}px, ${tilt.ty}px) rotate(${tilt.rot}deg)`,
-        }}
-      />
-      {sparkles.map((s) => (
-        <span
-          key={s.id}
-          className="sparkle"
-          style={{ left: s.left, top: s.top }}
-        >
-          {s.emoji}
-        </span>
-      ))}
-    </div>
-  );
-}
+import {
+  toastSuccess,
+  toastInfo,
+  toastError,
+  toastWarning,
+} from "../utils/toast";
+import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
 
 const Lobby = () => {
   const { roomId } = useParams();
@@ -101,6 +21,9 @@ const Lobby = () => {
   const myUserId = getUserId();
   const myDisplayName = getDisplayName();
   const navigate = useNavigate();
+
+  // Track recently shown join notifications to prevent duplicates
+  const recentJoinsRef = useRef(new Set());
 
   // game settings
   const [selectedRounds, setSelectedRounds] = useState(1);
@@ -130,7 +53,14 @@ const Lobby = () => {
     isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
   useEffect(() => {
-    if (!myUserId || !roomId) return;
+    // Check if user has valid session (registered OR guest)
+    if (!myUserId) {
+      toastError("Session expired. Please sign in or play as guest.");
+      navigate("/");
+      return;
+    }
+
+    if (!roomId) return;
 
     // unction to rejoin
     const rejoinLobby = () => {
@@ -163,6 +93,17 @@ const Lobby = () => {
       setOnlineUsers((prev) =>
         prev.some((u) => u.userId === user.userId) ? prev : [...prev, user],
       );
+
+      if (
+        user.userId !== myUserId &&
+        !recentJoinsRef.current.has(user.userId)
+      ) {
+        toastInfo(`${user.displayName} joined the lobby`, {
+          autoClose: 2500,
+        });
+        recentJoinsRef.current.add(user.userId);
+        setTimeout(() => recentJoinsRef.current.delete(user.userId), 2000);
+      }
     });
     socket.on("userLeftLobby", ({ userId }) => {
       setOnlineUsers((prev) => prev.filter((u) => u.userId !== userId));
@@ -170,11 +111,11 @@ const Lobby = () => {
 
     socket.on(
       "profileUpdated",
-      ({ userId, displayName, avatarSeed, avatarStyle }) => {
+      ({ userId, displayName, avatarSeed, avatarStyle, avatarData }) => {
         setOnlineUsers((prev) =>
           prev.map((u) =>
             u.userId === userId
-              ? { ...u, displayName, avatarSeed, avatarStyle }
+              ? { ...u, displayName, avatarSeed, avatarStyle, avatarData }
               : u,
           ),
         );
@@ -235,12 +176,29 @@ const Lobby = () => {
       toastError(message || "Unable to start the game.");
     });
 
-    socket.on("hostLeft", ({ message }) => {
-      alert(message || "The host has left the lobby. All players are being kicked.");
+    socket.on("hostLeftOthers", ({ hostName }) => {
+      toastError(`Host ${hostName} ended the game. You have been kicked out.`, {
+        autoClose: 4000,
+      });
       if (socket && socket.connected) {
         socket.emit("leaveLobby", { roomId, userId: myUserId });
       }
-      navigate('/lobby');
+      navigate("/lobby");
+    });
+
+    socket.on("hostDisconnectedOthers", ({ hostName }) => {
+      toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
+        autoClose: 4000,
+      });
+      if (socket && socket.connected) {
+        socket.emit("leaveLobby", { roomId, userId: myUserId });
+      }
+      navigate("/lobby");
+    });
+
+    // Non-host player left
+    socket.on("playerLeftLobby", ({ userId, displayName }) => {
+      toastWarning(`${displayName} left the lobby`, { autoClose: 2500 });
     });
 
     // 2) After listeners are ready, emit registration & state requests
@@ -269,18 +227,46 @@ const Lobby = () => {
       socket.off("gameEnded");
       socket.off("leftTeam");
       socket.off("startGameError");
-      socket.off("hostLeft");
+      socket.off("hostLeftOthers");
+      socket.off("hostDisconnectedOthers");
+      socket.off("playerLeftLobby");
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 
-    const handleBackButton = () => {
+  const handleBackButton = () => {
+    // Show confirmation for host
+    if (isHost) {
+      // If host is alone in the room
+      const isAlone = onlineUsers.length === 1;
+
+      const confirmed = window.confirm(
+        isAlone
+          ? "Are you sure you want to leave the lobby?"
+          : "Are you sure you want to leave? This will end the game and kick all players.",
+      );
+
+      if (!confirmed) {
+        return; // User cancelled, don't leave
+      }
+
+      // Based on whether host is alone
+      if (isAlone) {
+        toastInfo("You have left the lobby.", { autoClose: 2000 });
+      } else {
+        toastInfo("You have left the lobby. All players are being kicked.", {
+          autoClose: 2500,
+        });
+      }
+    }
+
     // Leave the lobby before navigating away
     if (socket && socket.connected) {
       socket.emit("leaveLobby", { roomId, userId: myUserId });
     }
-    navigate('/lobby');
+
+    navigate("/lobby");
   };
-  
+
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId),
@@ -317,6 +303,7 @@ const Lobby = () => {
     const user = byId[userId] || { userId, displayName: userId };
     const isHostUser = userId === hostId;
     const isMe = userId === myUserId;
+    const isGuestUser = userId.startsWith("guest_");
 
     let actions = null;
     if (isMe) {
@@ -375,6 +362,7 @@ const Lobby = () => {
           avatarSeed={user.avatarSeed || user.displayName || user.userId}
           size={44}
           className="avatar-anim"
+          isGuest={isGuestUser}
         />
         <span className={`user-name ${isHostUser ? "host" : ""}`}>
           {user.displayName}
@@ -399,7 +387,9 @@ const Lobby = () => {
           className="copy-button"
           onClick={() => {
             navigator.clipboard.writeText(roomId);
-            toastSuccess("Room ID copied to clipboard! 📋");
+            toastSuccess("Room ID copied to clipboard! 📋", {
+              autoClose: 2000,
+            });
           }}
         >
           Copy ID
@@ -416,12 +406,14 @@ const Lobby = () => {
             unassignedUsers.map((u) => renderUserRow(u.userId))
           )}
 
-          <button 
-              className="copy-button"
-              onClick={handleBackButton}
-              title="Back to main menu"
-            > Back to Main
-            </button>
+          <button
+            className="copy-button"
+            onClick={handleBackButton}
+            title="Back to main menu"
+          >
+            {" "}
+            Back to Main
+          </button>
         </div>
 
         {/* TEAMS */}
@@ -467,6 +459,7 @@ const Lobby = () => {
           <div className="setting-section">
             <h3>Select Timer</h3>
             <div className="option-buttons">
+              {/* Added time to adjust styling. To be removed when completed*/}
               {[30, 45, 60, 75, 90].map((sec) => (
                 <button
                   key={sec}

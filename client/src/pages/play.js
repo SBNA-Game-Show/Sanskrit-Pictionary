@@ -191,6 +191,12 @@ const Play = () => {
     };
     socket.on("lobbyUsers", onLobbyUsers);
 
+    // Navigate to /lobby/code if the game not started
+    socket.once("newGame", (data) => {
+      toastWarning("Game is not started! Navigating to the lobby");
+      navigate(`/lobby/${data.roomId}`, { replace: true })
+    });
+
     const onProfileUpdated = ({
       userId,
       displayName,
@@ -475,6 +481,7 @@ const Play = () => {
       socket.off("playerDisconnected");
       socket.off("playerReconnected");
       socket.off("lobbyUsers", onLobbyUsers);
+      socket.off("newGame");
       socket.off("profileUpdated", onProfileUpdated);
       socket.off("gameState");
       socket.off("updatePlayers");

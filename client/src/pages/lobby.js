@@ -151,10 +151,16 @@ const Lobby = () => {
       }, 1000);
     });
 
-    socket.on("gameEnded", () => {
-      toastSuccess("Game Over!");
-      setCurrentRound(null);
-      setTimeLeft(null);
+    // Keep player in /lobby if game has ended
+    socket.once("gameEnded", () => {
+      toastWarning("Game is over!");
+      navigate("/lobby", { replace: true });
+    });
+
+    // Redirect player to /play/roomId
+    socket.once("gameInProgress", (data) => {
+      toastWarning("Game in progress. Joining as spectator.");
+      navigate(`/play/${data.roomId}`);
     });
 
     socket.on("leftTeam", (res) => {
@@ -217,6 +223,7 @@ const Lobby = () => {
       socket.off("hostLeftOthers");
       socket.off("hostDisconnectedOthers");
       socket.off("playerLeftLobby");
+      socket.off("gameInProgress");
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 

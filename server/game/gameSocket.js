@@ -21,6 +21,16 @@ function createGameSocket(io) {
       // Check if this user is reconnecting to an active game
       const session = gameSessionManager.getSession(roomId);
       if (session) {
+
+          // If the game is ended, send the final scores without rejoining
+          if (session.gameEnded) {
+          socket.emit("gameEnded", { 
+            finalPlayers: gameSessionManager.getPlayersWithScores(roomId)});
+          return; 
+          } else {
+            socket.emit("gameInProgress", { roomId });
+          }
+
         const reconnected = gameSessionManager.markPlayerReconnected(
           roomId,
           userId,
@@ -51,6 +61,7 @@ function createGameSocket(io) {
             scores: session.scores,
             canvasData: canvasData,
             remainingGuesses: myRemainingGuesses,
+            gameEnded: session.gameEnded, // get game status
           });
 
           // Notify others that player reconnected
@@ -59,6 +70,9 @@ function createGameSocket(io) {
             displayName,
           });
         }
+      }
+      else {
+        socket.emit("newGame", { roomId:roomId });
       }
     });
 

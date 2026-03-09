@@ -81,6 +81,7 @@
   text-align: center;
   align-self: center;
   width: 350px;
+  position: relative;
 }
 
 .input-area-wrapper h5 {
@@ -223,11 +224,12 @@
 
 /* round result mini modal (top-left) – already in your file; keep if present */
 .round-result-modal {
-  position: fixed;
-  top: 12px;
-  left: 12px;
+  position: absolute;
+  top: 40px;
+  left: calc(100% + 12px);
   z-index: 30;
 }
+
 .round-result-modal .modal-card {
   background: #fff;
   border-radius: 12px;
@@ -238,15 +240,23 @@
 .round-result-modal .modal-card.wrong-answer {
   background: #ffebee;
   border: 2px solid #c62828;
+  min-width: 150px;
+  padding: 8px 10px;
+  text-align: center;
 }
 
 .round-result-modal .modal-card.wrong-answer h3 {
+  font-size: 20px;
   color: #c62828;
+  white-space: nowrap;
+
 }
 
 .round-result-modal .modal-card.wrong-answer p {
+  font-size: 20px;
   color: #b71c1c;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .drawer-name {

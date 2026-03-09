@@ -420,7 +420,7 @@ function clearActiveTimer(gameId) {
 }
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
-function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
+async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   if (advancingRounds.has(gameId)) return; // Prevent repeated entry into the next round
   advancingRounds.add(gameId);
 

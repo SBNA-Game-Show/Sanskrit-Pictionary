@@ -72,6 +72,11 @@ const Play = () => {
   const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
   const canAnswer = isEligibleGuesser && remainingGuesses > 0;
 
+  // Audio cues
+  const correctAudioRef = useRef(new Audio(correctSound));
+  const wrongAudioRef = useRef(new Audio(wrongSound));
+
+
   // ---------- UI helpers ----------
   const handlePenClick = () => {
     setEraseMode(false);
@@ -87,6 +92,7 @@ const Play = () => {
   const handleEraserWidthChange = (e) => setEraserWidth(Number(e.target.value));
   const handleStrokeColorChange = (e) => setStrokeColor(e.target.value);
 
+  
   // Send answer to server
   const handleSubmitAnswer = () => {
     if (answer.trim() === "" || !canAnswer) return;
@@ -365,6 +371,11 @@ const Play = () => {
     });
 
     socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
+
+      if (userId === getUserId()) {
+          correctAudioRef.current.currentTime = 0;
+          correctAudioRef.current.play();
+        }
       if (userId) {
         setCorrectUserIds((prev) =>
           prev.includes(userId) ? prev : [...prev, userId],
@@ -382,6 +393,12 @@ const Play = () => {
     socket.on(
       "wrongAnswer",
       ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
+
+        if (wrongUserId === getUserId()) {
+          wrongAudioRef.current.currentTime = 0;
+          wrongAudioRef.current.play();
+        }
+
         console.log("[Play] wrongAnswer", {
           wrongUserId,
           displayName,
@@ -418,6 +435,7 @@ const Play = () => {
 
     socket.on("guessesExhausted", () => {
       console.log("[Play] guessesExhausted");
+      
       setRoundResult({
         type: "guessesExhausted",
         displayName: "Out of guesses!",

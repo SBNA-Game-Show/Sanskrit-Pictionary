@@ -113,7 +113,7 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
+      async ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
@@ -137,7 +137,7 @@ function createGameSocket(io) {
           }
         }
 
-        gameSessionManager.createSession(
+        await gameSessionManager.createSession(
           gameId,
           players,
           totalRounds,
@@ -146,7 +146,7 @@ function createGameSocket(io) {
           teams,
           hostData,
         );
-        gameSessionManager.startRound(gameId, io);
+        await gameSessionManager.startRound(gameId, io);
 
         io.to(gameId).emit(
           "updatePlayers",
@@ -440,7 +440,7 @@ function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
 
       // startRound is responsible for: sending a new Flashcard to the questioner, 
       // broadcasting drawerChanged/roundStarted, and updating gameState
-      gameSessionManager.startRound(gameId, io);
+      await gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);

@@ -48,7 +48,7 @@ class GameSessionManager {
     this.sessions = new Map();
   }
 
-  createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
+  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
     // assign players to selected teams
     players.forEach((p) => {
       if (teams.Red.includes(p.userId)) {
@@ -74,9 +74,14 @@ class GameSessionManager {
       scores: {},
       currentFlashcard: null,
       canvasData: null,
+      usedFlashcardIds: [],
+      flashcardDeck: [],    
+      deckIndex: 0,
       // guesses are tracked per-player (p.remainingGuesses)
       gameEnded: false // flag to indicate if game has ended (after final round)
     });
+
+    await this.initializeFlashcardDeck(gameId, difficulty);
 
     // init scores
     players.forEach((p) => {
@@ -92,53 +97,69 @@ class GameSessionManager {
     return this.sessions.get(gameId);
   }
 
+  async initializeFlashcardDeck(gameId, difficulty) {
+    const session = this.getSession(gameId);
+    
+    // Case-insensitive difficulty matching, WE ARE PULLING HERE! + Log
+    const all = await Flashcard.find({
+      difficulty: { $regex: `^${difficulty}$`, $options: "i" }
+    }).lean();
+    console.log(`[initializeFlashcardDeck] Found ${all.length} flashcards for difficulty "${difficulty}"`);
+    
+    // Handle case where no flashcards found
+    if (all.length === 0) { //everything below this is just if there is no cards in the chosen difficulty
+      console.warn(`[initializeFlashcardDeck] No flashcards found for "${difficulty}". Trying any difficulty...`);
+      const anyCards = await Flashcard.find({}).lean();
+      console.log(`[initializeFlashcardDeck] Found ${anyCards.length} total flashcards as fallback`);
+      
+      if (anyCards.length === 0) {
+        console.error("[initializeFlashcardDeck] DATABASE HAS NO FLASHCARDS!");
+        session.flashcardDeck = [];
+        session.deckIndex = 0;
+        return;
+      }
+      
+      // Shuffle fallback cards
+      for (let i = anyCards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [anyCards[i], anyCards[j]] = [anyCards[j], anyCards[i]];
+      }
+      
+      session.flashcardDeck = anyCards;
+      session.deckIndex = 0;
+      return; //everything above this is just if there is no cards in the chosen difficulty
+    }
+    
+    // Shuffle in normal case!
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    
+    session.flashcardDeck = all;
+    session.deckIndex = 0;
+    
+    console.log(`[initializeFlashcardDeck] Deck initialized with ${all.length} cards`);
+  }
+
   /**
    * Try to fetch a random flashcard from MongoDB.
    * - Uses case-insensitive matching for difficulty
    * - Falls back to any random flashcard if none for given difficulty
    */
-  async getRandomFlashcard(difficulty) {
-    try {
-      let query = {};
-      if (difficulty) {
-        query = { difficulty: { $regex: `^${difficulty}$`, $options: "i" } };
-      }
-
-      const countMatching = await Flashcard.countDocuments(query);
-      const totalCount = await Flashcard.countDocuments({});
-      console.log(
-        `[getRandomFlashcard] difficulty=${difficulty} matching=${countMatching} total=${totalCount}`,
-      );
-
-      if (countMatching === 0 && totalCount > 0) {
-        console.warn(
-          `[getRandomFlashcard] No flashcards found for difficulty "${difficulty}". Falling back to any flashcard.`,
-        );
-        const any = await Flashcard.aggregate([{ $sample: { size: 1 } }]);
-        return any && any.length ? any[0] : null;
-      }
-
-      if (totalCount === 0) {
-        console.warn("[getRandomFlashcard] Database has no flashcards at all.");
-        return null;
-      }
-
-      const res = await Flashcard.aggregate([
-        { $match: query },
-        { $sample: { size: 1 } },
-      ]);
-      if (!res || res.length === 0) {
-        console.warn(
-          "[getRandomFlashcard] aggregate returned no results (unexpected).",
-        );
-        return null;
-      }
-      console.log("[getRandomFlashcard] chosen:", res[0]);
-      return res[0];
-    } catch (err) {
-      console.error("[getRandomFlashcard] error:", err);
-      return null;
+  async getRandomFlashcard(gameId, difficulty) {
+    const session = this.getSession(gameId);
+    
+    // If deck empty or used up, reshuffle
+    if (!session.flashcardDeck?.length || session.deckIndex >= session.flashcardDeck.length) {
+      await this.initializeFlashcardDeck(gameId, difficulty);
     }
+    
+    // Get next card from deck
+    const flashcard = session.flashcardDeck[session.deckIndex];
+    session.deckIndex++;
+    
+    return flashcard;
   }
 
   async startRound(gameId, io) {
@@ -152,7 +173,7 @@ class GameSessionManager {
       p.remainingGuesses = 4;
     });
 
-    const flashcard = await this.getRandomFlashcard(session.difficulty);
+    const flashcard = await this.getRandomFlashcard(gameId, session.difficulty);
     if (!flashcard) {
       io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
       return;

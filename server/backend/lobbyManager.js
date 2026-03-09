@@ -482,7 +482,7 @@ function createLobbyManager(io, UserModel) {
     });
   });
 
-  return { findSocketByUserId };
+  return { findSocketByUserId, rooms };
 }
 
 module.exports = createLobbyManager;

@@ -36,6 +36,13 @@ app.use("/api/auth", authRoutes);
 const userRoutes = require("./routes/user.routes");
 app.use("/api/users", userRoutes);
 
+// Room routes
+const {
+  router: roomRoutes,
+  setRoomsReference,
+} = require("./routes/room.routes");
+app.use("/api/room", roomRoutes);
+
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -61,7 +68,10 @@ const io = new Server(server, {
 const User = require("./models/User");
 
 const createLobbyManager = require("./backend/lobbyManager");
-createLobbyManager(io, User);
+const lobbyManager = createLobbyManager(io, User);
+
+// Set rooms reference for API routes
+setRoomsReference(lobbyManager.rooms);
 
 const createGameSocket = require("./game/gameSocket");
 createGameSocket(io);

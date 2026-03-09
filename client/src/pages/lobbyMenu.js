@@ -90,11 +90,11 @@ const LobbyMenu = () => {
           onChange={(e) => setRoomInput(e.target.value)}
           onKeyPress={handleKeyPress}
           disabled={loading}
-          style={{
+            style={{
             padding: "10px",
             borderRadius: "6px",
             border: "1px solid #ccc",
-          }}
+          }}  
         />
         <button
           className="start-game-button"

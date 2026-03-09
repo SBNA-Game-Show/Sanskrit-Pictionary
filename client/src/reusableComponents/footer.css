@@ -13,3 +13,10 @@
   vertical-align: middle;
   margin-right: 5px;
 }
+
+@media (max-width: 450px) {
+  .footer {
+    font-size: 12px;
+    padding: 0.5px 0;
+  }
+}

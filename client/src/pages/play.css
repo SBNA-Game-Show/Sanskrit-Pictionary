@@ -62,12 +62,12 @@
   gap: 10px;
 }
 
-.chat-box {
+/* .chat-box {
   grid-column: 4 / 5;
   grid-row: 5 / 6;
   width: 320px;
   margin: auto;
-}
+} */
 
 .input-area-wrapper {
   grid-column: 4 / 5;
@@ -250,7 +250,6 @@
   font-size: 20px;
   color: #c62828;
   white-space: nowrap;
-
 }
 
 .round-result-modal .modal-card.wrong-answer p {

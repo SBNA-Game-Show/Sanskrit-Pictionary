@@ -597,13 +597,20 @@ const Play = () => {
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 2px",
-          minWidth: "200px",
+          justifyContent: "flex-start",
+          padding: "10px 2px",
+          width: "220px",
         }}
       >
-        {/* Avatar + DisplayName */}
-        <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+        {/* Avatar + Kick button */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+          <InteractiveAvatar
+            avatarSeed={seed}
+            avatarStyle={style}
+            size={30}
+            isGuest={isGuestUser}
+            className="avatar-anim"
+          />
           {isHost && user.userId !== currentUserId && (
             <button
               onClick={() => handleKickClick(user, displayName)}
@@ -623,51 +630,44 @@ const Play = () => {
               Kick
             </button>
           )}
-          <InteractiveAvatar
-            avatarSeed={seed}
-            avatarStyle={style}
-            size={36}
-            isGuest={isGuestUser}
-            className="avatar-anim"
-          />
-          <span
-            className="chip-name"
-            style={{
-              fontWeight: "bold",
-              fontSize: "18px",
-              wordBreak: "break-word",
-              minWidth: "95px",
-            }}
-          >
-            {displayName}
-            {user.userId === drawerId && " ✏️"}
-          </span>
-        </div>
+          </div>
+          
+          {/* DisplayName + Atmps */}
+          <div className="chip-name">
+            {/* DisplayName */}
+            <div style={{ display: "flex", alignItems: "center", width: "120px", gap: "2px" }}>
+              <span style={{ fontWeight: "bold", fontSize: "18px",maxWidth: "110px",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {displayName}
+              </span>
+              <span style={{ fontSize: "15px" }}>
+                  {user.userId === drawerId && " ✏️"}
+              </span>
+            </div>
+            {/* Atmps */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap:"1px", marginTop: "6px", width: "65px",}}>
+              {[...Array(totalGuesses)]
+                .map((_, i) => (
+                  <span key={i} style={{ fontSize: "7px" }}>
+                    {i < (user.remainingGuesses ?? totalGuesses) ? "❤️" : "🤍"}
+                  </span>
+                ))
+                .reverse()}
+            </div>
+          </div>
 
-        {/* Points + Atmps*/}
+        {/* Points */}
         <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            fontSize: "13px",
-            minWidth: "55px",
+          style={{ display: "flex", flexDirection: "column",
+            alignItems: "flex-end", minWidth: "30px"
           }}
         >
-          {/* Points */}
-          <span style={{ color: "#e1bf00", fontWeight: "bold" }}>
-            Pts: {user.points ?? 0}
+          <span style={{ color: "#e1bf00", fontSize: "12px", fontWeight: "bold" }}>
+            Pts:
           </span>
-          {/* Atmps */}
-          <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
-            {[...Array(totalGuesses)]
-              .map((_, i) => (
-                <span key={i} style={{ fontSize: "7px" }}>
-                  {i < (user.remainingGuesses ?? totalGuesses) ? "❤️" : "🤍"}
-                </span>
-              ))
-              .reverse()}
-          </div>
+          <span style={{ color: "#e1bf00", marginTop: "8px", fontSize: "20px",fontWeight: "bold" }}>
+            {user.points ?? 0}
+          </span>
         </div>
       </div>
     );

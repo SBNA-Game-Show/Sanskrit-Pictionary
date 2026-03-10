@@ -458,7 +458,6 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Timer</h3>
-            {console.log("Current timer in Render:", selectedTimer)}
             <div className="option-buttons">
               {/* Added time to adjust styling. To be removed when completed*/}
               {[30, 45, 60, 75, 90].map((sec) => (
@@ -476,7 +475,6 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Difficulty</h3>
-            {console.log("Current diff in Render:", selectedDifficulty)}
             <div className="option-buttons">
               {["Easy", "Medium", "Hard"].map((level) => (
                 <button
@@ -494,7 +492,6 @@ const Lobby = () => {
           {/* Added config for guessess in the lobby */}
           <div className="setting-section">
             <h3>Select Chances</h3>
-            {console.log("Current selectedGuesses in Render:", selectedGuesses)}
             <div className="option-buttons">
               {[3, 5, 8, 12].map((num) => (
                 <button

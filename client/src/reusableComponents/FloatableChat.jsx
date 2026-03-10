@@ -13,12 +13,12 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     y: 100,
   });
   const [size, setSize] = useState({ width: 350, height: 450 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
 
   const chatRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const isDragging = useRef(false);
-  const isResizing = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0 });
+  const dragOffset = useRef({ x: 0, y: 0 });
   const resizeStart = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   // Scroll to bottom when new messages arrive
@@ -61,49 +61,30 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     setMessage("");
   };
 
-  // Dragging logic
-  const handleMouseDown = (e) => {
+  // ✅ UPDATED: Dragging logic - simpler approach
+  const handleDragStart = (e) => {
+    // Don't start drag if clicking on input, button, or resize handle
     if (
-      e.target.closest(".chat-header") &&
-      !e.target.closest(".header-actions")
+      e.target.tagName === "INPUT" ||
+      e.target.tagName === "BUTTON" ||
+      e.target.classList.contains("resize-handle") ||
+      e.target.classList.contains("minimize-btn")
     ) {
-      isDragging.current = true;
-      dragStart.current = {
-        x: e.clientX - position.x,
-        y: e.clientY - position.y,
-      };
-    }
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDragging.current) {
-      setPosition({
-        x: e.clientX - dragStart.current.x,
-        y: e.clientY - dragStart.current.y,
-      });
+      return;
     }
 
-    if (isResizing.current) {
-      const newWidth =
-        resizeStart.current.width + (e.clientX - resizeStart.current.x);
-      const newHeight =
-        resizeStart.current.height + (e.clientY - resizeStart.current.y);
-
-      setSize({
-        width: Math.max(300, Math.min(600, newWidth)),
-        height: Math.max(350, Math.min(700, newHeight)),
-      });
-    }
+    setIsDragging(true);
+    dragOffset.current = {
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    };
   };
 
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    isResizing.current = false;
-  };
-
+  // ✅ UPDATED: Resize start
   const handleResizeStart = (e) => {
     e.stopPropagation();
-    isResizing.current = true;
+    e.preventDefault();
+    setIsResizing(true);
     resizeStart.current = {
       x: e.clientX,
       y: e.clientY,
@@ -112,16 +93,44 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     };
   };
 
+  // ✅ UPDATED: Mouse move handler
   useEffect(() => {
-    if (isDragging.current || isResizing.current) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+    const handleMouseMove = (e) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragOffset.current.x,
+          y: e.clientY - dragOffset.current.y,
+        });
+      }
+
+      if (isResizing) {
+        const newWidth =
+          resizeStart.current.width + (e.clientX - resizeStart.current.x);
+        const newHeight =
+          resizeStart.current.height + (e.clientY - resizeStart.current.y);
+
+        setSize({
+          width: Math.max(300, Math.min(600, newWidth)),
+          height: Math.max(350, Math.min(700, newHeight)),
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setIsResizing(false);
+    };
+
+    if (isDragging || isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+
       return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [position, size]);
+  }, [isDragging, isResizing]);
 
   // Toggle minimize/maximize
   const toggleMinimize = () => {
@@ -140,8 +149,9 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
             top: `${position.y}px`,
             width: `${size.width}px`,
             height: `${size.height}px`,
+            cursor: isDragging ? "grabbing" : "grab",
           }}
-          onMouseDown={handleMouseDown}
+          onMouseDown={handleDragStart}
         >
           {/* Header */}
           <div className="chat-header">
@@ -151,6 +161,7 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
                 className="minimize-btn"
                 onClick={toggleMinimize}
                 title="Minimize"
+                onMouseDown={(e) => e.stopPropagation()}
               >
                 ➖
               </button>
@@ -188,12 +199,22 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onMouseDown={(e) => e.stopPropagation()}
             />
-            <button onClick={handleSend}>Send</button>
+            <button
+              onClick={handleSend}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              Send
+            </button>
           </div>
 
           {/* Resize Handle */}
-          <div className="resize-handle" onMouseDown={handleResizeStart}>
+          <div
+            className="resize-handle"
+            onMouseDown={handleResizeStart}
+            title="Drag to resize"
+          >
             ⋰
           </div>
         </div>

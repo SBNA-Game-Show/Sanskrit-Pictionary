@@ -7,7 +7,7 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
   const { roomId } = useParams();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [position, setPosition] = useState({
     x: window.innerWidth - 370,
     y: 100,
@@ -61,9 +61,18 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     setMessage("");
   };
 
-  // ✅ UPDATED: Dragging logic - simpler approach
+  const constrainPosition = (x, y, width, height) => {
+    const maxX = window.innerWidth - width;
+    const maxY = window.innerHeight - height;
+
+    return {
+      x: Math.max(0, Math.min(x, maxX)),
+      y: Math.max(0, Math.min(y, maxY)),
+    };
+  };
+
+  // Dragging logic
   const handleDragStart = (e) => {
-    // Don't start drag if clicking on input, button, or resize handle
     if (
       e.target.tagName === "INPUT" ||
       e.target.tagName === "BUTTON" ||
@@ -80,7 +89,7 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     };
   };
 
-  // ✅ UPDATED: Resize start
+  // Resize start
   const handleResizeStart = (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -93,14 +102,20 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     };
   };
 
-  // ✅ UPDATED: Mouse move handler
+  // Mouse move handler
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (isDragging) {
-        setPosition({
-          x: e.clientX - dragOffset.current.x,
-          y: e.clientY - dragOffset.current.y,
-        });
+        const newX = e.clientX - dragOffset.current.x;
+        const newY = e.clientY - dragOffset.current.y;
+
+        const constrained = constrainPosition(
+          newX,
+          newY,
+          size.width,
+          size.height,
+        );
+        setPosition(constrained);
       }
 
       if (isResizing) {
@@ -109,10 +124,22 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
         const newHeight =
           resizeStart.current.height + (e.clientY - resizeStart.current.y);
 
+        const constrainedWidth = Math.max(300, Math.min(600, newWidth));
+        const constrainedHeight = Math.max(350, Math.min(700, newHeight));
+
         setSize({
-          width: Math.max(300, Math.min(600, newWidth)),
-          height: Math.max(350, Math.min(700, newHeight)),
+          width: constrainedWidth,
+          height: constrainedHeight,
         });
+
+        // Adjust position if resizing pushes chat out of bounds
+        const constrained = constrainPosition(
+          position.x,
+          position.y,
+          constrainedWidth,
+          constrainedHeight,
+        );
+        setPosition(constrained);
       }
     };
 
@@ -130,7 +157,23 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
         document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [isDragging, isResizing]);
+  }, [isDragging, isResizing, position, size]);
+
+  // Re-constrain position on window resize
+  useEffect(() => {
+    const handleWindowResize = () => {
+      const constrained = constrainPosition(
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+      );
+      setPosition(constrained);
+    };
+
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, [position, size]);
 
   // Toggle minimize/maximize
   const toggleMinimize = () => {

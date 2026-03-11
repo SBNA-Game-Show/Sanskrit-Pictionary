@@ -225,8 +225,9 @@
 /* round result mini modal (top-left) – already in your file; keep if present */
 .round-result-modal {
   position: absolute;
-  top: 40px;
-  left: calc(100% + 12px);
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 30;
 }
 

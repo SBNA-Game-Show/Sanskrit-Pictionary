@@ -369,7 +369,13 @@
     }
    }
 
-
+   @media(max-width: 650px){
+    .chat-container {
+      width: 100%;
+      max-width: 400px;
+    }
+   
+   }
 
 
 
@@ -383,6 +389,7 @@
   }
   .user-list {
     width: 230px;
+    flex-wrap: wrap;
   }
   .team-card {
     min-width: 220px;

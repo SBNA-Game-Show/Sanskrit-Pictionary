@@ -76,3 +76,71 @@
   color: #333;
   align-self: center;
 }
+
+@media (max-width:590px){
+   
+
+.flashcard-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows:auto auto auto;
+    justify-items: center;
+    width:90%;
+  }
+  
+  .vocab-row {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .sanskrit-word {
+  grid-column: span 3;
+  grid-row: 1;
+  text-align: center;
+  font-family: 'Sans-serif';
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.sound-button {
+  grid-column: 2;
+  grid-row: span 3;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  margin: 0 auto;
+  align-self: center;
+}
+
+.numimage {
+  grid-column: 2;
+  grid-row: span 3;
+  width: 90px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.translation-row {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: center;
+  font-size: 16px;
+  color: #333;
+}
+
+.transliteration-row {
+  grid-column: 2;
+  grid-row: 3;
+  text-align: center;
+  font-size: 16px;
+  color: #333;
+  align-self: center;
+}
+
+
+} 

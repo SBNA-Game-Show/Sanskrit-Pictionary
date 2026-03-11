@@ -597,7 +597,8 @@ const Play = () => {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "12px 2px",
-          minWidth: "200px",
+          /* I am changing this for responsiveness */
+          width: "100%",
         }}
       >
         {/* Avatar + DisplayName */}
@@ -795,7 +796,7 @@ const Play = () => {
   return (
     <>
       <RoundPopups />
-      <div className="play-grid">
+      <div className={`play-grid ${isHost ? "host-view" : "player-view"}`}>
         {/* Round result modal */}
         {roundResult && (
           <div className="round-result-modal">

@@ -65,3 +65,66 @@
 .input-area button:hover {
   background-color: #e65100;
 }
+
+@media (max-width: 1150px) {
+  .chat-container {
+    max-width: 80%;
+    padding: 15px;
+    align-items: left;
+    max-width: 250px;
+  }
+}
+
+@media (max-width: 960px) {
+  .chat-container {
+    max-width: 100%; 
+    padding: 10px;
+    align-items: left;
+    /* max-width: 400px; */  
+    
+  }
+
+  .input-area input{
+    width:100%
+  }
+}
+
+/* @media (max-width: 650px) {
+  .chat-container {
+    max-width: 100%;
+    padding: 10px;
+    align-items: left;
+    max-width: 400px;
+    
+  }
+  .input-area input{
+    width:100%
+   
+    
+  }
+} */
+
+ @media (max-width: 500px) {
+  .chat-container {
+    max-width: 100%;
+    padding: 10px;
+    align-items: left;
+    
+    
+  }
+  .input-area input{
+    width:100%
+   
+    
+  }
+} 
+@media (max-width: 400px) {
+  .chat-container {
+    max-width: 100%;
+    padding: 10px;
+    align-items: left;  
+  }
+  .input-area input{
+    width:100%
+  } 
+}

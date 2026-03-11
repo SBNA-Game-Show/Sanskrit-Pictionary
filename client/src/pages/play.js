@@ -743,16 +743,24 @@ const Play = () => {
     // Detect difficulty from the imageSrc path
     let difficulty = "Easy";
     const src = flashcard.imageSrc;
+
     if (src.includes("FlashCardMedium")) difficulty = "Medium";
     if (src.includes("FlashCardHard")) difficulty = "Hard";
 
     const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
 
-    // Filter out correct image from distractors
-    const distractorPool = folderImages.filter((img) => img !== src);
+    // Remove duplicates first, just in case
+    const uniqueFolderImages = [...new Set(folderImages)];
 
-    // Pick 4 random distractors
-    const validDistractors = shuffle(distractorPool).slice(0, 4);
+    // Filter out correct image from distractors
+    const distractorPool = uniqueFolderImages.filter((img) => img !== src);
+
+    // We want 10 total including the correct one
+    const maxChoices = 10;
+    const distractorCount = Math.max(0, maxChoices - 1);
+
+    // Pick up to 9 distractors, or fewer if not available
+    const validDistractors = shuffle(distractorPool).slice(0, distractorCount);
 
     // Mix correct + distractors and shuffle
     const mixed = shuffle([
@@ -761,7 +769,9 @@ const Play = () => {
     ]);
 
     setImageChoices(mixed);
-    setShowChoices(mixed.length === 5);
+
+    // show modal as long as there is at least the correct image
+    setShowChoices(mixed.length > 0);
   }, [canAnswer, flashcard?.imageSrc, roundKey]);
 
   const handlePickChoice = (choice) => {
@@ -989,7 +999,7 @@ const Play = () => {
             </button>
           </div>
 
-          {showChoices && canAnswer && imageChoices.length === 5 && (
+            {showChoices && canAnswer && imageChoices.length > 0 && (
             <div className="choice-modal">
               <div className="choice-card">
                 <h3>Pick the correct image</h3>
@@ -997,11 +1007,11 @@ const Play = () => {
                 <div className="choice-grid">
                   {imageChoices.map((c, index) => (
                     <button
-                      key={index}
+                      key={c.src || index}
                       className="choice-tile"
                       onClick={() => handlePickChoice(c)}
                     >
-                      <img src={c.src} alt="choice" />
+                      <img src={c.src} alt={`choice ${index + 1}`} />
                     </button>
                   ))}
                 </div>

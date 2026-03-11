@@ -29,7 +29,7 @@ const Lobby = () => {
   const [selectedRounds, setSelectedRounds] = useState(1);
   const [selectedTimer, setSelectedTimer] = useState(30);
   const [selectedDifficulty, setSelectedDifficulty] = useState("Easy");
-  const [selectedGuesses, setSelectedGuesses] = useState(5); // Added new config for guesses
+  const [selectedGuesses, setSelectedGuesses] = useState(4); // Added new config for guesses
   const [currentRound, setCurrentRound] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -496,7 +496,7 @@ const Lobby = () => {
             <h3>Select Chances</h3>
             {console.log("Current selectedGuesses in Render:", selectedGuesses)}
             <div className="option-buttons">
-              {[3, 5, 8, 12].map((num) => (
+              {[1, 2, 3, 4].map((num) => (
                 <button
                   key={num}
                   className={selectedGuesses === num ? "active" : ""}

@@ -27,7 +27,7 @@ function createLobbyManager(io, UserModel) {
       if (!rooms[roomId]) {
         rooms[roomId] = {
           hostId: userId,
-          settings: { rounds: 3, timer: 60, difficulty: "Medium", guesses: 5 },
+          settings: { rounds: 3, timer: 60, difficulty: "Medium" },
           teams: { Red: [], Blue: [] },
           chat: [],
         };

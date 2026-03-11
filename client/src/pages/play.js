@@ -180,15 +180,34 @@ const Play = () => {
     if (!roomId) return;
 
     // Function to rejoin and sync state
-    const rejoinAndSync = () => {
-      console.log("[Play] Rejoining room and syncing state");
-      socket.emit("registerLobby", {
-        userId,
-        displayName: getDisplayName() || userId,
-        roomId,
-      });
-      socket.emit("getGameState", { roomId });
-      socket.emit("requestLobbyUsers", { roomId });
+    const rejoinAndSync = async () => {
+
+      // Checking room existence before joining
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
+
+      try {
+        // Call API for room exists status
+        const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
+        const data = await response.json();
+        console.log(" Room Existence:", data);
+
+        if (data.exists) {
+          // Emit registerLobby only when room exists
+          socket.emit("registerLobby", {
+            userId,
+            displayName: getDisplayName() || userId,
+            roomId,
+          });
+          socket.emit("getGameState", { roomId });
+          socket.emit("requestLobbyUsers", { roomId });
+        } else {
+          // Navigate to home if room code is invalid.
+          toastWarning("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
+          navigate(`/lobby`, { replace: true })
+        }
+      } catch (error) {
+        console.error("[Play] Failed to verify room status:", error);
+      }
     };
 
     rejoinAndSync();

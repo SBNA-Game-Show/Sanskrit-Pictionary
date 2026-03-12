@@ -46,7 +46,7 @@ function createGameSocket(io) {
           const canvasData = gameSessionManager.getCanvasData(roomId);
 
           const me = session.players.find((p) => p.userId === userId);
-          const myRemainingGuesses = me?.remainingGuesses ?? 4;
+          const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
 
           // Send current game state to reconnected player
           socket.emit("gameState", {
@@ -57,6 +57,7 @@ function createGameSocket(io) {
             currentRound: session.currentRound,
             totalRounds: session.totalRounds,
             timer: activeTimers[roomId]?.secondsLeft || session.timer,
+            guesses: session.guesses,
             currentFlashcard: session.currentFlashcard,
             scores: session.scores,
             canvasData: canvasData,
@@ -85,6 +86,7 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
+          guesses,
           currentFlashcard,
           scores,
         } = session;
@@ -93,7 +95,7 @@ function createGameSocket(io) {
         const canvasData = gameSessionManager.getCanvasData(roomId);
 
         const me = session.players.find((p) => p.userId === socket.userId);
-        const myRemainingGuesses = me?.remainingGuesses ?? 4;
+        const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
         socket.emit("gameState", {
           players,
           hostData,
@@ -102,6 +104,7 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
+          guesses,
           currentFlashcard,
           scores,
           canvasData: canvasData,
@@ -113,12 +116,13 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      async ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
+      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
           timer,
           difficulty,
+          guesses, // Add guesses in log
           by: socket.id,
           userId: socket.userId,
         });
@@ -145,6 +149,7 @@ function createGameSocket(io) {
           difficulty,
           teams,
           hostData,
+          guesses // Send guesses to manager
         );
         await gameSessionManager.startRound(gameId, io);
 

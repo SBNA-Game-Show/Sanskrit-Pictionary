@@ -29,6 +29,7 @@ const Lobby = () => {
   const [selectedRounds, setSelectedRounds] = useState(1);
   const [selectedTimer, setSelectedTimer] = useState(30);
   const [selectedDifficulty, setSelectedDifficulty] = useState("Easy");
+  const [selectedGuesses, setSelectedGuesses] = useState(4); // Added new config for guesses
   const [currentRound, setCurrentRound] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -129,12 +130,14 @@ const Lobby = () => {
       setSelectedRounds(settings.rounds);
       setSelectedTimer(settings.timer);
       setSelectedDifficulty(settings.difficulty);
+      setSelectedGuesses(settings.guesses);
     });
 
-    socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
+    socket.on("roundStarted", ({ currentRound, currentPlayer, timer, guesses }) => {
       setCurrentRound(currentRound);
       setCurrentPlayer(currentPlayer);
       setTimeLeft(timer);
+      setSelectedGuesses(guesses);
       navigate(`/play/${roomId}`);
     });
 
@@ -279,15 +282,18 @@ const Lobby = () => {
       rounds: selectedRounds,
       timer: selectedTimer,
       difficulty: selectedDifficulty,
+      guesses: selectedGuesses
     };
     if (setting === "rounds") updated.rounds = value;
     if (setting === "timer") updated.timer = value;
     if (setting === "difficulty") updated.difficulty = value;
+    if (setting === "guesses") updated.guesses = value;
 
     // reflect immediately
     setSelectedRounds(updated.rounds);
     setSelectedTimer(updated.timer);
     setSelectedDifficulty(updated.difficulty);
+    setSelectedGuesses(updated.guesses);
 
     // broadcast to room (server validates host)
     socket.emit("updateGameSettings", { roomId, newSettings: updated });
@@ -452,6 +458,7 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Timer</h3>
+            {console.log("Current timer in Render:", selectedTimer)}
             <div className="option-buttons">
               {/* Added time to adjust styling. To be removed when completed*/}
               {[30, 45, 60, 75, 90,1000000].map((sec) => (
@@ -469,6 +476,7 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Difficulty</h3>
+            {console.log("Current diff in Render:", selectedDifficulty)}
             <div className="option-buttons">
               {["Easy", "Medium", "Hard"].map((level) => (
                 <button
@@ -478,6 +486,24 @@ const Lobby = () => {
                   disabled={!isHost}
                 >
                   {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Added config for guessess in the lobby */}
+          <div className="setting-section">
+            <h3>Select Chances</h3>
+            {console.log("Current selectedGuesses in Render:", selectedGuesses)}
+            <div className="option-buttons">
+              {[1, 2, 3, 4].map((num) => (
+                <button
+                  key={num}
+                  className={selectedGuesses === num ? "active" : ""}
+                  onClick={() => handleSettingsChange("guesses", num)}
+                  disabled={!isHost}
+                >
+                  {num}
                 </button>
               ))}
             </div>
@@ -493,6 +519,7 @@ const Lobby = () => {
                     totalRounds: selectedRounds,
                     timer: selectedTimer,
                     difficulty: selectedDifficulty,
+                    guesses: selectedGuesses, // send guesses to server
                     hostData: {
                       hostId,
                       hostDisplayName: myDisplayName,

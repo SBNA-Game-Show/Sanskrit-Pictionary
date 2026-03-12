@@ -53,6 +53,7 @@ const Play = () => {
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
   const [remainingGuesses, setRemainingGuesses] = useState(4);
+  const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
 
   // For multiple-choice image selection (guessers only)
   const [imageChoices, setImageChoices] = useState([]);
@@ -267,6 +268,7 @@ const Play = () => {
       console.log("[Play] received gameState:", state);
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
+      setTotalGuesses(state.guesses); // set total guesses
       setPlayers((prev) => {
         const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
         const merged = (state.players || []).map((p) => {
@@ -274,7 +276,7 @@ const Play = () => {
           return {
             ...p,
             remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
           };
         });
         playersRef.current = merged;
@@ -291,7 +293,7 @@ const Play = () => {
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
       setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
       );
 
       // ✅ Handle canvas data from gameState
@@ -317,7 +319,7 @@ const Play = () => {
           return {
             ...p,
             remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
           };
         });
         playersRef.current = merged;
@@ -327,7 +329,7 @@ const Play = () => {
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
       setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
       );
     });
 
@@ -394,7 +396,7 @@ const Play = () => {
       setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
-      setRemainingGuesses(4);
+      setRemainingGuesses(totalGuesses);
       setCorrectUserIds([]); // Reset the correct answer highlights
 
       // Reset answer and choices when drawer changes
@@ -570,7 +572,7 @@ const Play = () => {
     // Determine states - exhausted only if not correct and not drawer
     const isCorrect = correctUserIds.includes(user.userId);
     const isExhausted =
-      (user.remainingGuesses ?? 4) <= 0 &&
+      (user.remainingGuesses ?? totalGuesses) <= 0 &&
       !isCorrect &&
       user.userId !== drawerId;
 
@@ -600,8 +602,16 @@ const Play = () => {
           minWidth: "200px",
         }}
       >
-        {/* Avatar + DisplayName */}
-        <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+        
+        {/* Avatar + Kick button */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+          <InteractiveAvatar
+            avatarSeed={seed}
+            avatarStyle={style}
+            size={30}
+            isGuest={isGuestUser}
+            className="avatar-anim"
+          />
           {isHost && user.userId !== currentUserId && (
             <button
               onClick={() => handleKickClick(user, displayName)}
@@ -621,23 +631,17 @@ const Play = () => {
               Kick
             </button>
           )}
-          <InteractiveAvatar
-            avatarSeed={seed}
-            avatarStyle={style}
-            size={36}
-            isGuest={isGuestUser}
-            className="avatar-anim"
-          />
-          <span
-            className="chip-name"
-            style={{
-              fontWeight: "bold",
-              fontSize: "18px",
-              wordBreak: "break-word",
-              minWidth: "95px",
-            }}
-          >
+        </div>
+
+        {/* DisplayName */}
+        <div style={{ display: "flex", alignItems: "center", width: "120px", gap: "2px" }}>
+          <span style={{
+            fontWeight: "bold", fontSize: "18px", maxWidth: "110px",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+          }}>
             {displayName}
+          </span>
+          <span style={{ fontSize: "15px" }}>
             {user.userId === drawerId && " ✏️"}
           </span>
         </div>
@@ -658,10 +662,10 @@ const Play = () => {
           </span>
           {/* Atmps */}
           <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
-            {[...Array(4)]
+            {[...Array(totalGuesses)]
               .map((_, i) => (
                 <span key={i} style={{ fontSize: "7px" }}>
-                  {i < (user.remainingGuesses ?? 4) ? "❤️" : "🤍"}
+                  {i < (user.remainingGuesses ?? totalGuesses) ? "❤️" : "🤍"}
                 </span>
               ))
               .reverse()}

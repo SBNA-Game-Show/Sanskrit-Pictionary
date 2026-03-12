@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+/* import React, { useEffect, useMemo, useState } from "react";
 import { socket } from "./socket";
 import { getUserId, saveUserData, getUserData } from "../utils/authStorage";
 import { apiClient } from "../utils/authAPI";
@@ -14,10 +14,10 @@ import {
   bigEars,
 } from "@dicebear/collection";
 import "./profile.css";
-import { toastSuccess, toastError } from "../utils/toast";
+import { toastSuccess, toastError } from "../utils/toast"; */
 
 /* Map of available DiceBear styles */
-const stylesMap = {
+/* const stylesMap = {
   funEmoji,
   bottts,
   croodles,
@@ -37,24 +37,24 @@ export default function ProfileSettings() {
   const [avatarStyle, setAvatarStyle] = useState("funEmoji");
   const [uploadDataUrl, setUploadDataUrl] = useState(null);
   const [saving, setSaving] = useState(false);
-
+ */
   // Load stored profile on mount
-  useEffect(() => {
+  /* useEffect(() => {
     // Get user data from centralized storage
     const userData = getUserData();
 
     if (userData?.displayName) {
       setDisplayName(userData.displayName);
-    }
+    } */
 
     // Load avatar preferences from separate localStorage key (UI-only data)
-    const avatarPrefs = JSON.parse(localStorage.getItem("avatarPrefs") || "{}");
+    /* const avatarPrefs = JSON.parse(localStorage.getItem("avatarPrefs") || "{}");
     if (avatarPrefs.avatarSeed) setAvatarSeed(avatarPrefs.avatarSeed);
     if (avatarPrefs.avatarStyle) setAvatarStyle(avatarPrefs.avatarStyle);
-  }, []);
+  }, []); */
 
   // Live DiceBear SVG
-  const diceSvg = useMemo(() => {
+ /*  const diceSvg = useMemo(() => {
     const style = stylesMap[avatarStyle] || funEmoji;
     return createAvatar(style, { seed: avatarSeed }).toString();
   }, [avatarStyle, avatarSeed]);
@@ -65,40 +65,40 @@ export default function ProfileSettings() {
       const userId = getUserId();
       if (!userId) throw new Error("No userId in localStorage");
 
-      const avatarData = uploadDataUrl || svgToDataUrl(diceSvg);
+      const avatarData = uploadDataUrl || svgToDataUrl(diceSvg); */
 
       // 1) Save display name to centralized auth storage
-      const currentUserData = getUserData();
+      /* const currentUserData = getUserData();
       saveUserData(
         userId,
         displayName,
         currentUserData?.email,
         currentUserData?.token,
-      );
+      ); */
 
       // 2) Save avatar preferences separately (UI-only data)
-      localStorage.setItem(
+      /* localStorage.setItem(
         "avatarPrefs",
         JSON.stringify({
           avatarSeed,
           avatarStyle,
-          avatarData, // local only for quick display
-        }),
-      );
+          avatarData, */ // local only for quick display
+       /*  }),
+      ); */
 
       // Notify navbar and other components
-      window.dispatchEvent(new Event("displayNameChanged"));
+      /* window.dispatchEvent(new Event("displayNameChanged")); */
 
-      // 3) Save on backend (with credentials for cookie)
+    /*   // 3) Save on backend (with credentials for cookie)
       await apiClient.put("/api/users/me/profile", {
         userId,
         displayName,
         avatarSeed,
         avatarStyle,
         avatarData,
-      });
+      }); */
 
-      // 4) Notify lobby via socket
+     /*  // 4) Notify lobby via socket
       socket.emit("updateProfile", {
         userId,
         displayName,
@@ -213,3 +213,4 @@ export default function ProfileSettings() {
     </div>
   );
 }
+ */

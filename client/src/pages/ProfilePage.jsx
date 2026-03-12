@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import ProfileSettings from "./ProfileSettings";
+/* import ProfileSettings from "./ProfileSettings"; */
+import ProfileUI from "./ProfileUI";
 import AccountSettings from "./AccountSettings";
 import "./profile.css";
 
@@ -23,7 +24,7 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {tab === "profile" ? <ProfileSettings /> : <AccountSettings />}
+      {tab === "profile" ? <ProfileUI /> : <AccountSettings />}
     </div>
   );
 }

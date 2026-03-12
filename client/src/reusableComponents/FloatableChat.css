@@ -1,20 +1,20 @@
 /* Floating Chat Container */
 .floatable-chat {
   position: fixed;
-  background: rgba(242, 210, 182, 0.98);
+  background: rgba(255, 250, 240, 0.98);
   border-radius: 15px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   z-index: 1000;
   backdrop-filter: blur(10px);
-  border: 2px solid rgba(238, 115, 7, 0.3);
+  border: 2px solid rgba(238, 115, 7, 0.5);
   user-select: none;
 }
 
 /* Chat Header */
 .chat-header {
-  background: linear-gradient(135deg, rgb(238, 115, 7), rgb(116, 185, 12));
+  background: rgb(238, 115, 7);
   color: white;
   padding: 10px 15px;
   border-radius: 13px 13px 0 0;
@@ -142,10 +142,10 @@
 }
 
 .chat-input-area button:hover {
-  background: rgb(116, 185, 12);
+  background: rgb(200, 95, 5);
 }
 
-/* Resize Handle  */
+/* Resize Handle */
 .resize-handle {
   position: absolute;
   bottom: 0;
@@ -168,7 +168,6 @@
   background: rgba(238, 115, 7, 0.3);
 }
 
-/* Minimized Chat Icon (Bottom Right) */
 .chat-icon-btn {
   position: fixed;
   bottom: 30px;
@@ -176,7 +175,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgb(238, 115, 7), rgb(116, 185, 12));
+  background: rgb(238, 115, 7);
   border: none;
   color: white;
   font-size: 28px;
@@ -194,6 +193,7 @@
 .chat-icon-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 20px rgba(238, 115, 7, 0.7);
+  background: rgb(200, 95, 5);
 }
 
 .chat-icon-btn:active {

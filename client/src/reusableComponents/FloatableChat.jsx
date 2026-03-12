@@ -15,6 +15,7 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
   const [size, setSize] = useState({ width: 350, height: 450 });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const chatRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -35,18 +36,23 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     socket.emit("getChatHistory", { roomId });
     socket.on("chatHistory", (msgs) => {
       setMessages(msgs);
+      setUnreadCount(0);
     });
 
     // Listen for new messages
     socket.on("chat", (msgObj) => {
       setMessages((prev) => [...prev, msgObj]);
+
+      if (isMinimized && msgObj.userId !== myUserId) {
+        setUnreadCount((prev) => prev + 1);
+      }
     });
 
     return () => {
       socket.off("chatHistory");
       socket.off("chat");
     };
-  }, [roomId]);
+  }, [roomId, isMinimized, myUserId]);
 
   const handleSend = () => {
     if (!message.trim()) return;
@@ -61,6 +67,7 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     setMessage("");
   };
 
+  // Constrain position within window boundaries
   const constrainPosition = (x, y, width, height) => {
     const maxX = window.innerWidth - width;
     const maxY = window.innerHeight - height;
@@ -132,7 +139,6 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
           height: constrainedHeight,
         });
 
-        // Adjust position if resizing pushes chat out of bounds
         const constrained = constrainPosition(
           position.x,
           position.y,
@@ -175,8 +181,10 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     return () => window.removeEventListener("resize", handleWindowResize);
   }, [position, size]);
 
-  // Toggle minimize/maximize
   const toggleMinimize = () => {
+    if (isMinimized) {
+      setUnreadCount(0);
+    }
     setIsMinimized(!isMinimized);
   };
 
@@ -271,8 +279,8 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
           title="Open Chat"
         >
           💬
-          {messages.length > 0 && (
-            <span className="unread-badge">{messages.length}</span>
+          {unreadCount > 0 && (
+            <span className="unread-badge">{unreadCount}</span>
           )}
         </button>
       )}

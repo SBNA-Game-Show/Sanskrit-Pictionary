@@ -924,15 +924,12 @@
   }
 
   .choice-grid {
-    grid-template-columns: repeat(3, 1fr);
     gap: 5px;
   }
 
   .choice-tile img {
-    
     height:80%;
     width:80%;
-  
   }
 
   .drawer-name {
@@ -1110,9 +1107,6 @@
   .time-box,
   .guesses-box {
     grid-column: 1;
-    font-size: 0.9em;
-    padding: 5px 6px;
-    min-width: 80px;
   }
 
   .score-box    { grid-row: 1; }
@@ -1128,7 +1122,6 @@
   .drawer-name {
     grid-column: 1;
     grid-row: 2;
-    font-size: 1em;
   }
 
   .canvascontrols {

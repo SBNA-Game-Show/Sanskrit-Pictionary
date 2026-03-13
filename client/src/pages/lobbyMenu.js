@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { nanoid } from "nanoid";
 import { getUserId } from "../utils/authStorage";
-import { toastError, toastSuccess } from "../utils/toast";
+import { toastError } from "../utils/toast";
 
 const LobbyMenu = () => {
   const [roomInput, setRoomInput] = useState("");
@@ -52,10 +52,6 @@ const LobbyMenu = () => {
           return;
         }
 
-        // Room is valid and has space
-        toastSuccess(
-          `Room found! Joining... (${data.playerCount} players online)`,
-        );
         navigate(`/lobby/${roomCode}`);
       } else {
         // Room doesn't exist

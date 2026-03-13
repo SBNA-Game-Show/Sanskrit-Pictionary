@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import "./play.css";
-import Chat from "../reusableComponents/chat";
+import FloatableChat from "../reusableComponents/FloatableChat";
 import Flashcard from "../reusableComponents/flashcard";
 import RoundPopups from "../reusableComponents/RoundPopups";
 import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
@@ -82,7 +82,6 @@ const Play = () => {
   const correctAudioRef = useRef(new Audio(correctSound));
   const wrongAudioRef = useRef(new Audio(wrongSound));
 
-
   // ---------- UI helpers ----------
   const handlePenClick = () => {
     setEraseMode(false);
@@ -98,7 +97,6 @@ const Play = () => {
   const handleEraserWidthChange = (e) => setEraserWidth(Number(e.target.value));
   const handleStrokeColorChange = (e) => setStrokeColor(e.target.value);
 
-  
   // Send answer to server
   const handleSubmitAnswer = () => {
     if (answer.trim() === "" || !canAnswer) return;
@@ -228,12 +226,11 @@ const Play = () => {
       toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
-    socket.on("userKicked", ( kickedPlayer ) => {
+    socket.on("userKicked", (kickedPlayer) => {
       if (kickedPlayer.userId === getUserId()) {
         toastInfo("You were kicked from the game.");
         navigate("/lobby");
-      }
-      else {
+      } else {
         toastInfo(`${kickedPlayer.displayName} was kicked from the game.`);
       }
     });
@@ -256,7 +253,7 @@ const Play = () => {
     // Navigate to /lobby/code if the game not started
     socket.once("newGame", (data) => {
       toastWarning("Game is not started! Navigating to the lobby");
-      navigate(`/lobby/${data.roomId}`, { replace: true })
+      navigate(`/lobby/${data.roomId}`, { replace: true });
     });
 
     const onProfileUpdated = ({
@@ -431,11 +428,10 @@ const Play = () => {
     });
 
     socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
-
       if (userId === getUserId()) {
-          correctAudioRef.current.currentTime = 0;
-          correctAudioRef.current.play();
-        }
+        correctAudioRef.current.currentTime = 0;
+        correctAudioRef.current.play();
+      }
       if (userId) {
         setCorrectUserIds((prev) =>
           prev.includes(userId) ? prev : [...prev, userId],
@@ -453,7 +449,6 @@ const Play = () => {
     socket.on(
       "wrongAnswer",
       ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
-
         if (wrongUserId === getUserId()) {
           wrongAudioRef.current.currentTime = 0;
           wrongAudioRef.current.play();
@@ -495,7 +490,7 @@ const Play = () => {
 
     socket.on("guessesExhausted", () => {
       console.log("[Play] guessesExhausted");
-      
+
       setRoundResult({
         type: "guessesExhausted",
         displayName: "Out of guesses!",
@@ -644,7 +639,7 @@ const Play = () => {
                 cursor: "pointer",
                 fontSize: "10px",
                 fontWeight: "bold",
-                marginRight: "4px"
+                marginRight: "4px",
               }}
               title="Kick Player"
             >
@@ -985,29 +980,27 @@ const Play = () => {
           )}
         </div>
 
-        <div className="chat-box">
-          <Chat
-            myUserId={currentUserId}
-            myDisplayName={
-              isHost
-                ? hostData.hostDisplayName
-                : players.find((p) => p.userId === currentUserId)
-                    ?.displayName || ""
-            }
-            myTeam={myTeam}
-          />
-        </div>
+        {/* FLOATABLE CHAT */}
+        <FloatableChat
+          myUserId={currentUserId}
+          myDisplayName={
+            isHost
+              ? hostData.hostDisplayName
+              : players.find((p) => p.userId === currentUserId)?.displayName ||
+                ""
+          }
+          myTeam={myTeam}
+        />
 
         <div className={`input-area-wrapper ${isHost && "hidden"}`}>
-
           {roundResult?.type === "wrong" && (
-           <div className="round-result-modal">
-            <div className="modal-card wrong-answer">
-             <h3>Wrong Answer</h3>
-             <p>-{roundResult.scoreLost} points 😪</p>
-           </div>
-          </div>
-         )}
+            <div className="round-result-modal">
+              <div className="modal-card wrong-answer">
+                <h3>Wrong Answer</h3>
+                <p>-{roundResult.scoreLost} points 😪</p>
+              </div>
+            </div>
+          )}
 
           <h5>Answer Box</h5>
           <div className="input-area2">
@@ -1052,44 +1045,53 @@ const Play = () => {
       </div>
 
       {/* Kick Confirmation Modal */}
-      {showKickModal && createPortal(
-        <div className="modal-overlay" onClick={handleKickCancel}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Kick Player</h2>
-              <button className="modal-close" onClick={handleKickCancel}>
-                ✕
-              </button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: "16px", color: "#333", marginBottom: "10px" }}>
-                Are you sure you want to kick <strong>{kickTarget?.displayName}</strong> from the game?
-              </p>
-              <div className="modal-note">
-                <span className="note-icon">ⓘ</span>
-                <span>
-                  Kicked players will be removed from the leaderboard and cannot rejoin until a new game starts.
-                </span>
+      {showKickModal &&
+        createPortal(
+          <div className="modal-overlay" onClick={handleKickCancel}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Kick Player</h2>
+                <button className="modal-close" onClick={handleKickCancel}>
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body">
+                <p
+                  style={{
+                    fontSize: "16px",
+                    color: "#333",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Are you sure you want to kick{" "}
+                  <strong>{kickTarget?.displayName}</strong> from the game?
+                </p>
+                <div className="modal-note">
+                  <span className="note-icon">ⓘ</span>
+                  <span>
+                    Kicked players will be removed from the leaderboard and
+                    cannot rejoin until a new game starts.
+                  </span>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="modal-button cancel"
+                  onClick={handleKickCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="modal-button kick"
+                  onClick={handleKickConfirm}
+                >
+                  Kick Player
+                </button>
               </div>
             </div>
-            <div className="modal-footer">
-              <button
-                className="modal-button cancel"
-                onClick={handleKickCancel}
-              >
-                Cancel
-              </button>
-              <button
-                className="modal-button kick"
-                onClick={handleKickConfirm}
-              >
-                Kick Player
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 };

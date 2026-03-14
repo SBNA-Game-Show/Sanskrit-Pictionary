@@ -59,10 +59,6 @@ const LobbyMenu = () => {
           return;
         }
 
-        // Room is valid and has space
-        toastSuccess(
-          `Room found! Joining... (${data.playerCount} players online)`,
-        );
         navigate(`/lobby/${roomCode}`);
       } else {
         // Room doesn't exist

@@ -1,5 +1,7 @@
 // lobbyManager.js
 const mongoose = require("mongoose");
+const gameSessionManager = require("../game/gameSessionManager");
+
 
 // In-memory room state: roomId => { hostId, settings, teams, chat }
 const rooms = {};
@@ -421,6 +423,15 @@ function createLobbyManager(io, UserModel) {
       }
 
       if (room.hostId === userId) {
+        // Check if a game is in progress for this room
+        const session = gameSessionManager.getSession(roomId);
+        if (session) {
+          console.log(
+            `[disconnect] Host ${userId} disconnected, but game ${roomId} is in progress. Skipping mass-kick.`,
+          );
+          return;
+        }
+
         console.log(
           `[disconnect] Host ${userId} disconnected - kicking everyone from ${roomId}`,
         );

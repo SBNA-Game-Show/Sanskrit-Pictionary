@@ -42,10 +42,21 @@ function pushManyDeva(set, raw) {
   }
 }
 // ======================================================
+const EventEmitter = require("events");
 
-class GameSessionManager {
+class GameSessionManager extends EventEmitter {
   constructor() {
+    super();
     this.sessions = new Map();
+  }
+
+  // --- PAUSE/RESUME LOGIC ---
+  pauseTimer(gameId) {
+    this.emit("pauseTimer", gameId);
+  }
+
+  resumeTimer(gameId) {
+    this.emit("resumeTimer", gameId);
   }
 
   async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses) {
@@ -582,6 +593,10 @@ class GameSessionManager {
   getCanvasData(gameId) {
     const session = this.sessions.get(gameId);
     return session?.canvasData || null;
+  }
+
+  deleteSession(gameId) {
+    this.sessions.delete(gameId);
   }
 }
 

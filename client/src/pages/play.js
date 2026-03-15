@@ -11,7 +11,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastInfo, toastSuccess } from "../utils/toast";
+import { toastWarning, toastInfo, toastSuccess, toastError } from "../utils/toast";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
@@ -36,6 +36,9 @@ const Play = () => {
   const profilesRef = useRef({});
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
+
+  // Tracking if game ended naturally
+  const isGameEndedRef = useRef(false);
 
   // UI / game states
   const [players, setPlayers] = useState([]);
@@ -62,6 +65,11 @@ const Play = () => {
 
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
+
+  // Pause state
+  const [isGamePaused, setIsGamePaused] = useState(false);
+  const [pausedByHost, setPausedByHost] = useState("");
+
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
@@ -226,8 +234,28 @@ const Play = () => {
       toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
+    socket.on("hostDisconnectedOthers", ({ hostName }) => {
+      isGameEndedRef.current = true;
+      toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
+        autoClose: 4000,
+      });
+      navigate("/lobby");
+    });
+
+    socket.on("gamePaused", ({ hostName }) => {
+      setIsGamePaused(true);
+      setPausedByHost(hostName);
+    });
+
+    socket.on("gameResumed", ({ hostName }) => {
+      setIsGamePaused(false);
+      setPausedByHost("");
+      toastInfo(`Host ${hostName} returned! Game resumed.`, { autoClose: 3000 });
+    });
+
     socket.on("userKicked", (kickedPlayer) => {
       if (kickedPlayer.userId === getUserId()) {
+        isGameEndedRef.current = true;
         toastInfo("You were kicked from the game.");
         navigate("/lobby");
       } else {
@@ -518,6 +546,7 @@ const Play = () => {
     });
 
     socket.on("gameEnded", (data) => {
+      isGameEndedRef.current = true;
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
@@ -550,6 +579,9 @@ const Play = () => {
       socket.off("connect", handleReconnect);
       socket.off("playerDisconnected");
       socket.off("playerReconnected");
+      socket.off("hostDisconnectedOthers");
+      socket.off("gamePaused");
+      socket.off("gameResumed");
       socket.off("userKicked");
       socket.off("lobbyUsers", onLobbyUsers);
       socket.off("newGame");
@@ -567,6 +599,12 @@ const Play = () => {
       socket.off("clear-canvas");
       socket.off("warnDrawer");
       socket.off("gameEnded");
+
+      // Check for unnatural unmount (e.g. navbar navigation)
+      if (!isGameEndedRef.current) {
+        console.log("[Play] Unmounting mid-game, simulating disconnect...");
+        socket.emit("manualDisconnect");
+      }
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
@@ -1042,6 +1080,16 @@ const Play = () => {
           )}
         </div>
       </div>
+
+      {/* GAME PAUSED OVERLAY */}
+      {isGamePaused && (
+        <div className="pause-overlay">
+          <div className="pause-content">
+            <h2>Game Paused</h2>
+            <p>Waiting 10s for Host {pausedByHost} to reconnect...</p>
+          </div>
+        </div>
+      )}
 
       {/* Kick Confirmation Modal */}
       {showKickModal &&

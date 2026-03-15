@@ -33,6 +33,13 @@ function createLobbyManager(io, UserModel) {
           teams: { Red: [], Blue: [] },
           chat: [],
         };
+      } else if (rooms[roomId].hostId === userId && rooms[roomId].hostDisconnectTimeout) {
+        // Host returned before the 10-second timeout expired
+        clearTimeout(rooms[roomId].hostDisconnectTimeout);
+        rooms[roomId].hostDisconnectTimeout = null;
+        console.log(`[registerLobby] Host ${userId} returned to ${roomId}. Resuming game.`);
+        io.to(roomId).emit("gameResumed", { hostName: displayName || "Host" });
+        gameSessionManager.resumeTimer(roomId);
       }
 
       // broadcast current room state (host, teams, settings)
@@ -408,8 +415,8 @@ function createLobbyManager(io, UserModel) {
     });
 
     // --- DISCONNECT ---
-    socket.on("disconnect", async () => {
-      const { userId, roomId } = socket;
+    const handleDisconnect = async (socketInput) => {
+      const { userId, roomId } = socketInput;
       const room = rooms[roomId];
       if (!roomId || !userId || !room) return;
 
@@ -427,8 +434,41 @@ function createLobbyManager(io, UserModel) {
         const session = gameSessionManager.getSession(roomId);
         if (session) {
           console.log(
-            `[disconnect] Host ${userId} disconnected, but game ${roomId} is in progress. Skipping mass-kick.`,
+            `[disconnect] Host ${userId} disconnected, but game ${roomId} is in progress. Pausing for 10s.`,
           );
+          
+          io.to(roomId).emit("gamePaused", { hostName: userDisplayName });
+          gameSessionManager.pauseTimer(roomId);
+
+          room.hostDisconnectTimeout = setTimeout(async () => {
+            console.log(`[disconnect] Host ${userId} did not return to ${roomId} within 10s. Kicking everyone.`);
+            io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName });
+            gameSessionManager.deleteSession(roomId);
+            delete rooms[roomId];
+
+            const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+            if (socketsInRoom) {
+              for (const sid of socketsInRoom) {
+                const s = io.sockets.sockets.get(sid);
+                if (s && s.id !== socketInput.id) {
+                  s.leave(roomId);
+                  s.roomId = null;
+
+                  // Only mark registered users offline
+                  if (
+                    s.userId &&
+                    !s.userId.startsWith("guest_") &&
+                    mongoose.Types.ObjectId.isValid(s.userId)
+                  ) {
+                    await UserModel.findByIdAndUpdate(s.userId, {
+                      isOnline: false,
+                    });
+                  }
+                }
+              }
+            }
+          }, 10000); // 10 seconds
+
           return;
         }
 
@@ -489,8 +529,11 @@ function createLobbyManager(io, UserModel) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
       }
 
-      console.log("❌ Socket disconnected:", socket.id);
-    });
+      console.log("❌ Socket disconnected:", socketInput.id);
+    };
+
+    socket.on("disconnect", () => handleDisconnect(socket));
+    socket.on("manualDisconnect", () => handleDisconnect(socket));
   });
 
   return { findSocketByUserId, rooms };

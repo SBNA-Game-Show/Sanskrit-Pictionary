@@ -596,7 +596,12 @@ class GameSessionManager extends EventEmitter {
   }
 
   deleteSession(gameId) {
-    this.sessions.delete(gameId);
+    if (this.sessions.has(gameId)) {
+      this.sessions.delete(gameId);
+      console.log(`[Session] Deleted session ${gameId}`);
+      return true;
+    }
+    return false;
   }
 }
 

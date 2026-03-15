@@ -580,6 +580,13 @@ function createLobbyManager(io, UserModel) {
 
     socket.on("disconnect", () => handleDisconnect(socket));
     socket.on("manualDisconnect", () => handleDisconnect(socket));
+
+    socket.on("deleteRoom", ({ roomId }) => {
+      if (rooms[roomId]) {
+        delete rooms[roomId];
+        console.log(`[Lobby] Deleted room ${roomId}`);
+      }
+    });
   });
 
   return { findSocketByUserId, rooms };

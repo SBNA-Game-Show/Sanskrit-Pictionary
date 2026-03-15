@@ -583,6 +583,15 @@ class GameSessionManager {
     const session = this.sessions.get(gameId);
     return session?.canvasData || null;
   }
+
+  deleteSession(gameId) {
+    if (this.sessions.has(gameId)) {
+      this.sessions.delete(gameId);
+      console.log(`[Session] Deleted session ${gameId}`);
+      return true;
+    }
+    return false;
+  }
 }
 
 module.exports = new GameSessionManager();

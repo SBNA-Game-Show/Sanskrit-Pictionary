@@ -297,6 +297,11 @@ function createGameSocket(io) {
         io.to(roomId).emit("roomPlayers", { players: session.players });
     });
 
+    socket.on("deleteRoom", ({ roomId }) => {
+      console.log(`[socket] deleteRoom requested for: ${roomId}`);
+      gameSessionManager.deleteSession(roomId);
+    });
+
     // REPLACE the empty disconnect handler with this:
     socket.on("disconnect", (reason) => {
       console.log(

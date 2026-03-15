@@ -34,6 +34,7 @@ const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // holds freshest players for end screen
   const profilesRef = useRef({});
+  const hostRef = useRef(false);
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
 
@@ -542,6 +543,9 @@ const Play = () => {
 
       setTimeout(() => {
         setRoundResult(null);
+        if (hostRef.current) {
+          socket.emit("deleteRoom", { roomId });
+        }
         navigate("/end", { state: { players: withAvatars } });
       }, 1200);
     });
@@ -572,6 +576,10 @@ const Play = () => {
 
   const isHost = currentUserId === hostData?.hostId;
 
+  useEffect(() => {
+    hostRef.current = isHost;
+  }, [isHost]);
+  
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");

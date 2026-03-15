@@ -1,7 +1,7 @@
 // lobbyManager.js
 const mongoose = require("mongoose");
 const gameSessionManager = require("../game/gameSessionManager");
-
+const { clearActiveTimer, proceedToNextRound } = require("../game/gameSocket");
 
 // In-memory room state: roomId => { hostId, settings, teams, chat }
 const rooms = {};
@@ -39,6 +39,13 @@ function createLobbyManager(io, UserModel) {
         rooms[roomId].hostDisconnectTimeout = null;
         console.log(`[registerLobby] Host ${userId} returned to ${roomId}. Resuming game.`);
         io.to(roomId).emit("gameResumed", { hostName: displayName || "Host" });
+        gameSessionManager.resumeTimer(roomId);
+      } else if (rooms[roomId]?.playerDisconnectTimeouts?.[userId]) {
+        // Player returned before the 10-second timeout expired
+        clearTimeout(rooms[roomId].playerDisconnectTimeouts[userId]);
+        delete rooms[roomId].playerDisconnectTimeouts[userId];
+        console.log(`[registerLobby] Player ${userId} returned to ${roomId} in time.`);
+        io.to(roomId).emit("playerReconnected", { userId, displayName });
         gameSessionManager.resumeTimer(roomId);
       }
 
@@ -504,20 +511,43 @@ function createLobbyManager(io, UserModel) {
           }
         }
       } else {
-        console.log(
-          `[disconnect] Player ${userDisplayName} disconnected from ${roomId}`,
-        );
+        console.log(`[disconnect] Player ${userDisplayName} disconnected from ${roomId}`);
 
-        io.to(roomId).emit("playerLeftLobby", {
-          userId: userId,
-          displayName: userDisplayName,
-        });
+        const session = gameSessionManager.getSession(roomId);
+        if (session) {
+          io.to(roomId).emit("playerDisconnected", { 
+            userId, 
+            displayName: userDisplayName,
+            reconnectWindow: 10 
+          });
 
-        io.to(roomId).emit("userLeftLobby", { userId });
+          room.playerDisconnectTimeouts = room.playerDisconnectTimeouts || {};
+          room.playerDisconnectTimeouts[userId] = setTimeout(async () => {
+            console.log(`[disconnect] Player ${userId} did not return to ${roomId} within 10s. Kicking.`);
 
-        room.teams.Red = room.teams.Red.filter((id) => id !== userId);
-        room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
-        io.to(roomId).emit("teamsUpdate", room.teams);
+            const kickResult = gameSessionManager.kickPlayer(roomId, userId);
+            if (!kickResult) return;
+            const { isCurrentDrawer, kickedPlayer } = kickResult;
+
+            gameSessionManager.resumeTimer(roomId);
+
+            io.to(roomId).emit("playerKicked", { userId, displayName: userDisplayName });
+            io.to(roomId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(roomId));
+
+            if (isCurrentDrawer) {
+              clearActiveTimer(roomId);
+              proceedToNextRound(io, roomId, kickedPlayer);
+            }
+
+            delete room.playerDisconnectTimeouts[userId];
+
+            if (!userId.startsWith("guest_") && mongoose.Types.ObjectId.isValid(userId)) {
+              await UserModel.findByIdAndUpdate(userId, { isOnline: false });
+            }
+          }, 10000);
+
+          return; // don't mark offline yet
+        }
       }
 
       // Only mark registered users offline

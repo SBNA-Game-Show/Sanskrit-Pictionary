@@ -488,4 +488,8 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   }
 }
 
-module.exports = createGameSocket;
+module.exports = {
+  createGameSocket,
+  clearActiveTimer,
+  proceedToNextRound,
+};

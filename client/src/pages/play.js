@@ -234,7 +234,8 @@ const Play = () => {
       toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
-    socket.on("hostDisconnectedOthers", ({ hostName }) => {
+    socket.on("hostDisconnectedOthers", ({ hostName, hostId }) => {
+      if (hostId === getUserId()) return;
       isGameEndedRef.current = true;
       toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
         autoClose: 4000,

@@ -15,6 +15,85 @@ function createLobbyManager(io, UserModel) {
     return null;
   }
 
+  async function forceLeaveRoom(userId, roomId, currentSocket = null) {
+      const room = rooms[roomId];
+      if (!room) return;
+      
+      let userDisplayName = "A player";
+      if (userId.startsWith("guest_")) {
+        userDisplayName = currentSocket?.displayName || "Guest";
+      } else if (mongoose.Types.ObjectId.isValid(userId)) {
+        const user = await UserModel.findById(userId);
+        if (user) userDisplayName = user.displayName;
+      }
+
+      // Clear 10s disconnect timers
+      if (room.hostDisconnectTimeout && room.hostId === userId) {
+         clearTimeout(room.hostDisconnectTimeout);
+         room.hostDisconnectTimeout = null;
+      }
+      if (room.playerDisconnectTimeouts?.[userId]) {
+         clearTimeout(room.playerDisconnectTimeouts[userId]);
+         delete room.playerDisconnectTimeouts[userId];
+      }
+
+      const session = gameSessionManager.getSession(roomId);
+
+      // host force leave
+      // delete the room, and disconnect all other players
+      if (room.hostId === userId) {
+         console.log(`[forceLeaveRoom] Host ${userId} leaving ${roomId}. Kicking everyone.`);
+         io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName, hostId: userId });
+         if (session) {
+             gameSessionManager.deleteSession(roomId);
+         }
+         delete rooms[roomId];
+         
+         const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+         if (socketsInRoom) {
+            for (const sid of socketsInRoom) {
+               const s = io.sockets.sockets.get(sid);
+               if (s) {
+                 s.leave(roomId);
+                 if (s.roomId === roomId) s.roomId = null;
+               }
+            }
+         }
+      } 
+      // player force leave
+      // remove player from game, and update teams and turn order
+      else {
+         console.log(`[forceLeaveRoom] Player ${userId} leaving ${roomId}.`);
+         if (session) {
+            const kickResult = gameSessionManager.kickPlayer(roomId, userId);
+            if (kickResult) {
+                const { isCurrentDrawer, kickedPlayer } = kickResult;
+                io.to(roomId).emit("playerRemoved", { userId, displayName: kickedPlayer.displayName });
+                io.to(roomId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(roomId));
+                if (isCurrentDrawer) {
+                    clearActiveTimer(roomId);
+                    proceedToNextRound(io, roomId, kickedPlayer);
+                }
+            }
+         }
+         room.teams.Red = room.teams.Red.filter((id) => id !== userId);
+         room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
+         io.to(roomId).emit("teamsUpdate", room.teams);
+         io.to(roomId).emit("userLeftLobby", { userId });
+
+         const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+         if (socketsInRoom) {
+            for (const sid of socketsInRoom) {
+               const s = io.sockets.sockets.get(sid);
+               if (s && s.userId === userId) {
+                 s.leave(roomId);
+                 if (s.roomId === roomId) s.roomId = null;
+               }
+            }
+         }
+      }
+  }
+
   io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
@@ -22,6 +101,23 @@ function createLobbyManager(io, UserModel) {
     socket.on("registerLobby", async ({ userId, roomId, displayName }) => {
       socket.userId = userId;
       socket.displayName = displayName; // Store for guests
+
+      // Before joining the new room, leave any other rooms
+      for (const existingRoomId of Object.keys(rooms)) {
+        if (existingRoomId !== roomId) {
+          const r = rooms[existingRoomId];
+          const session = gameSessionManager.getSession(existingRoomId);
+          const inTeam = r.teams.Red.includes(userId) || r.teams.Blue.includes(userId);
+          const isHost = r.hostId === userId;
+          const inSession = session && session.players.some(p => p.userId === userId);
+
+          if (inTeam || isHost || inSession) {
+             console.log(`[registerLobby] User ${userId} is joining ${roomId} but was in ${existingRoomId}. Forcing leave.`);
+             await forceLeaveRoom(userId, existingRoomId, socket);
+          }
+        }
+      }
+
       socket.roomId = roomId;
       socket.join(roomId);
 
@@ -326,98 +422,17 @@ function createLobbyManager(io, UserModel) {
     socket.on("leaveLobby", async ({ roomId, userId }) => {
       const finalUserId = userId || socket.userId;
       const finalRoomId = roomId || socket.roomId;
-      const room = rooms[finalRoomId];
+      
+      if (!finalRoomId || !finalUserId) return;
 
-      if (!roomId || !userId || !room) return;
+      await forceLeaveRoom(finalUserId, finalRoomId, socket);
 
-      // Get user display name for notifications
-      let userDisplayName = "A player";
-      if (finalUserId.startsWith("guest_")) {
-        // Guest user
-        userDisplayName = socket.displayName || "Guest";
-      } else if (mongoose.Types.ObjectId.isValid(finalUserId)) {
-        const user = await UserModel.findById(finalUserId);
-        if (user) userDisplayName = user.displayName;
-      }
-
-      // Check if host is leaving first
-      if (room.hostId === finalUserId) {
-        console.log(
-          `[leaveLobby] Host ${finalUserId} is leaving - kicking everyone from ${finalRoomId}`,
-        );
-
-        // Notify other players (not the host)
-        socket.to(finalRoomId).emit("hostLeftOthers", {
-          hostName: userDisplayName,
-        });
-
-        // Delete the room
-        delete rooms[finalRoomId];
-
-        // Make all sockets leave the room and mark offline
-        const socketsInRoom = io.sockets.adapter.rooms.get(finalRoomId);
-        if (socketsInRoom) {
-          for (const sid of socketsInRoom) {
-            const s = io.sockets.sockets.get(sid);
-            if (s) {
-              s.leave(finalRoomId);
-              s.roomId = null;
-
-              // Only mark registered users offline in DB
-              if (
-                s.userId &&
-                !s.userId.startsWith("guest_") &&
-                mongoose.Types.ObjectId.isValid(s.userId)
-              ) {
-                await UserModel.findByIdAndUpdate(s.userId, {
-                  isOnline: false,
-                });
-              }
-            }
-          }
-        }
-
-        // Leave the host's socket too
-        socket.leave(finalRoomId);
-        socket.roomId = null;
-
-        // Only mark registered host offline in DB
-        if (
-          !finalUserId.startsWith("guest_") &&
-          mongoose.Types.ObjectId.isValid(finalUserId)
-        ) {
-          await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
-        }
-
-        return; // Exit early - no host handoff
-      }
-
-      // Non-host player leaving - notify everyone
-      console.log(
-        `[leaveLobby] Player ${userDisplayName} is leaving ${finalRoomId}`,
-      );
-
-      // Notify everyone else that this player left
-      socket.to(finalRoomId).emit("playerLeftLobby", {
-        userId: finalUserId,
-        displayName: userDisplayName,
-      });
-
-      // remove from teams and broadcast
-      room.teams.Red = room.teams.Red.filter((id) => id !== userId);
-      room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
-      io.to(roomId).emit("teamsUpdate", room.teams);
-      io.to(roomId).emit("userLeftLobby", { userId });
-
-      socket.leave(roomId);
-      socket.roomId = null;
-
-      // Only mark registered users offline in DB
+      // Only mark registered users offline in DB if explicitly leaving
       if (
-        !userId.startsWith("guest_") &&
-        mongoose.Types.ObjectId.isValid(userId)
+        !finalUserId.startsWith("guest_") &&
+        mongoose.Types.ObjectId.isValid(finalUserId)
       ) {
-        await UserModel.findByIdAndUpdate(userId, { isOnline: false });
+        await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
       }
     });
 
@@ -449,7 +464,7 @@ function createLobbyManager(io, UserModel) {
 
           room.hostDisconnectTimeout = setTimeout(async () => {
             console.log(`[disconnect] Host ${userId} did not return to ${roomId} within 10s. Kicking everyone.`);
-            io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName });
+            io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName, hostId: userId });
             gameSessionManager.deleteSession(roomId);
             delete rooms[roomId];
 
@@ -485,6 +500,7 @@ function createLobbyManager(io, UserModel) {
 
         io.to(roomId).emit("hostDisconnectedOthers", {
           hostName: userDisplayName,
+          hostId: userId,
         });
 
         delete rooms[roomId];

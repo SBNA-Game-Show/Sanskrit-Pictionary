@@ -254,7 +254,17 @@ class GameSessionManager extends EventEmitter {
     const session = this.sessions.get(gameId);
     if (!session) return null;
 
-    const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
+  const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
+
+  // send popup after every turn (both red and blue)
+  const fc = session.currentFlashcard || {};
+
+  io.to(gameId).emit("turnEnded", {
+    word: fc.word || "",
+    transliteration: fc.transliteration || "",
+    imageSrc: fc.imageSrc || "",
+    audioSrc: fc.audioSrc || ""
+  });
 
     // No next round if reached total rounds and last drawer was Blue team
     if (lastDrawer && lastDrawer.team === "Blue" 

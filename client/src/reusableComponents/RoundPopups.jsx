@@ -14,6 +14,11 @@ import "./roundPopups.css";
  * Uses a small queue so messages don't overlap.
  * Border/outline color follows the drawer's team (red/blue) when applicable.
  */
+const teamLabel = (team) =>
+  team === "Red" ? "Red Team / लाल दल" :
+  team === "Blue" ? "Blue Team / नील दल" :
+  team ? `${team} Team` : "";
+
 export default function RoundPopups() {
   const [msg, setMsg] = useState(null);    // { title, subtitle, kind, team, duration }
   const queueRef = useRef([]);
@@ -65,7 +70,7 @@ export default function RoundPopups() {
           totalRef.current ? ` / ${totalRef.current}` : ""
         }`,
         // Add turn details in round popup
-        subtitle: `${drawerTeamRef.current} Team Turn — Drawer: ${dname}`,
+        subtitle: `${teamLabel(drawerTeamRef.current)} Turn — Drawer: ${dname}`,
         kind: "start",
         team: drawerTeamRef.current, // use last known team to color outline
         duration: 3000,
@@ -85,8 +90,8 @@ export default function RoundPopups() {
       // announce team switch (only if changed and both sides are known)
       if (prevTeam && nextTeam && prevTeam !== nextTeam) {
         enqueue({
-          title: `${nextTeam} Team Turn`, // Team switched!
-          subtitle: `Drawer is now ${dname} (${nextTeam} team)`,
+          title: `${teamLabel(nextTeam)} Turn`, // Team switched!
+          subtitle: `Drawer is now ${dname} (${teamLabel(nextTeam)})`,
           kind: "switch",
           team: nextTeam,
           duration: 3000,

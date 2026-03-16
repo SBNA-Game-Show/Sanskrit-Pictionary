@@ -74,6 +74,7 @@ const Play = () => {
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
+  const [roundReveal, setRoundReveal] = useState(null);
 
   // Track all users who answered correctly this round to highlight their cards
   const [correctUserIds, setCorrectUserIds] = useState([]);
@@ -527,6 +528,26 @@ const Play = () => {
       setTimeout(() => setRoundResult(null), 1500);
     });
 
+    socket.on("turnEnded", (data) => {
+      console.log("[Play] turnEnded", data);
+
+      setRoundReveal({
+        word: data.word,
+        transliteration: data.transliteration,
+        imageSrc: data.imageSrc,
+      });
+
+      if (data.audioSrc) {
+        const audio = new Audio(data.audioSrc);
+        audio.currentTime = 0;
+        audio.play();
+      }
+
+      setTimeout(() => {
+        setRoundReveal(null);
+      }, 4000);
+    });
+
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
       canvasRef.current?.eraseMode(false);
@@ -593,6 +614,7 @@ const Play = () => {
       socket.off("gameState");
       socket.off("updatePlayers");
       socket.off("drawerChanged");
+      socket.off("turnEnded");
       socket.off("timerUpdate");
       socket.off("drawing-data");
       socket.off("newFlashcard");
@@ -871,6 +893,31 @@ const Play = () => {
       <RoundPopups />
       <div className="play-grid">
         {/* Round result modal */}
+      {roundReveal && (
+        <div className="round-reveal-popup">
+          <div className="round-reveal-card">
+
+            <div className="round-reveal-title">
+              It was:
+            </div>
+
+            <img
+              className="round-reveal-image"
+              src={roundReveal.imageSrc}
+              alt=""
+            />
+
+            <div className="round-reveal-word">
+              {roundReveal.word}
+            </div>
+
+            <div className="round-reveal-translit">
+              {roundReveal.transliteration}
+            </div>
+
+          </div>
+        </div>
+      )}
         {roundResult && (
           <div className="round-result-modal">
             {/* Removed the JSX popups here as we are using toast 

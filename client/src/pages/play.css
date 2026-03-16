@@ -764,12 +764,6 @@
     grid-row:5;
   }
 
- /*  .host-view .user-list{
-    grid-column: 1/2;
-    width: 100%;
-    grid-row:7;
-  } */
-
   .flashcard,
   .flashcard-container {
     grid-row: 1;
@@ -828,16 +822,10 @@
     font-size: 16px;
   }
 
-  
-
    .host-view .guesses-box{
     display:none;
   }
 
-  /* .user-list {
-    grid-row: 9;
-    padding: 10px;
-  } */
 
   .chat-box {
     grid-row: 10;

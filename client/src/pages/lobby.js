@@ -203,8 +203,7 @@ const Lobby = () => {
       navigate("/lobby");
     });
 
-    socket.on("hostDisconnectedOthers", ({ hostName, hostId }) => {
-      if (hostId === myUserId) return;
+    socket.on("hostDisconnectedOthers", ({ hostName }) => {
       toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
         autoClose: 4000,
       });

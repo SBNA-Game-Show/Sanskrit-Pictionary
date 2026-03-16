@@ -73,7 +73,7 @@ const lobbyManager = createLobbyManager(io, User);
 // Set rooms reference for API routes
 setRoomsReference(lobbyManager.rooms);
 
-const createGameSocket = require("./game/gameSocket");
+const { createGameSocket } = require("./game/gameSocket");
 createGameSocket(io);
 
 const PORT = process.env.PORT || 5005;

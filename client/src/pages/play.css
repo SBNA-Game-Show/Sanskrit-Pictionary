@@ -883,4 +883,21 @@
   .user-chip .chip-guesses {
     font-size: 14px;
   }
+
+
+  .round-result-modal .modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.round-result-modal .modal-card.wrong-answer {
+  background: #ffebee;
+  border: 2px solid #c62828;
+  min-width: 100px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
 }

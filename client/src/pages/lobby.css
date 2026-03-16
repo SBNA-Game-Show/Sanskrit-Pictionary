@@ -395,6 +395,11 @@
     min-width: 220px;
   }
   
+  .toastInfo{
+    font-size:12px;
+    background-color: black;
+    color: white;
+  }
 }
 
 /* Ensure selected buttons stay visually selected */

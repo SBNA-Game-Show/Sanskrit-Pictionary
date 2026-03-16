@@ -211,24 +211,36 @@ class GameSessionManager {
   }
 
   nextRound(gameId, io) {
-    const session = this.sessions.get(gameId);
-    if (!session) return null;
+  const session = this.sessions.get(gameId);
+  if (!session) return null;
 
-    const lastDrawer = session.players[session.currentPlayerIndex];
+  const lastDrawer = session.players[session.currentPlayerIndex];
 
-    // No next round if reached total rounds and last drawer was Blue team
-    if (lastDrawer.team === "Blue" 
-        && session.currentRound >= session.totalRounds) return null;
+  // send popup after every turn (both red and blue)
+  const fc = session.currentFlashcard || {};
 
-    // Round number only increments after Blue team's turn, as Red always starts first
-    if (lastDrawer.team === "Blue") {
-      // Trigger roundEnded popup message
-      io.to(gameId).emit("roundEnded", {
-        roundNumber: session.currentRound
-      });
+  io.to(gameId).emit("turnEnded", {
+    word: fc.word || "",
+    transliteration: fc.transliteration || "",
+    imageSrc: fc.imageSrc || "",
+    audioSrc: fc.audioSrc || ""
+  });
 
-      session.currentRound++;
-    }
+  // No next round if reached total rounds and last drawer was Blue team
+  if (
+    lastDrawer.team === "Blue" &&
+    session.currentRound >= session.totalRounds
+  ) return null;
+
+  // Round number only increments after Blue team's turn
+  if (lastDrawer.team === "Blue") {
+
+    io.to(gameId).emit("roundEnded", {
+      roundNumber: session.currentRound
+    });
+
+    session.currentRound++;
+  }
 
     // The turn should cycle through the target team members based on the round count
     session.currentPlayerIndex = this._getNextDrawerIndex(session, lastDrawer);

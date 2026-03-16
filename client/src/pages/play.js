@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import "./play.css";
-import Chat from "../reusableComponents/chat";
+import FloatableChat from "../reusableComponents/FloatableChat";
 import Flashcard from "../reusableComponents/flashcard";
 import RoundPopups from "../reusableComponents/RoundPopups";
 import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
@@ -10,7 +11,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastInfo, toastSuccess } from "../utils/toast";
+import { toastWarning, toastError, toastInfo, toastSuccess } from "../utils/toast";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
@@ -33,8 +34,12 @@ const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // holds freshest players for end screen
   const profilesRef = useRef({});
+  const hostRef = useRef(false);
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
+
+  // Tracking if game ended naturally
+  const isGameEndedRef = useRef(false);
 
   // UI / game states
   const [players, setPlayers] = useState([]);
@@ -52,6 +57,7 @@ const Play = () => {
   const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
   const [remainingGuesses, setRemainingGuesses] = useState(4);
+  const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
 
   // For multiple-choice image selection (guessers only)
   const [imageChoices, setImageChoices] = useState([]);
@@ -61,12 +67,21 @@ const Play = () => {
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
 
+  // Pause state
+  const [isGamePaused, setIsGamePaused] = useState(false);
+  const [pausedByHost, setPausedByHost] = useState("");
+
+
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
   const [roundReveal, setRoundReveal] = useState(null);
 
   // Track all users who answered correctly this round to highlight their cards
   const [correctUserIds, setCorrectUserIds] = useState([]);
+
+  // Modal state for kicking
+  const [showKickModal, setShowKickModal] = useState(false);
+  const [kickTarget, setKickTarget] = useState(null); // { userId, displayName }
 
   // Derived booleans
   const isDrawer = (getUserId() || currentUserId) === drawerId;
@@ -76,7 +91,6 @@ const Play = () => {
   // Audio cues
   const correctAudioRef = useRef(new Audio(correctSound));
   const wrongAudioRef = useRef(new Audio(wrongSound));
-
 
   // ---------- UI helpers ----------
   const handlePenClick = () => {
@@ -93,7 +107,6 @@ const Play = () => {
   const handleEraserWidthChange = (e) => setEraserWidth(Number(e.target.value));
   const handleStrokeColorChange = (e) => setStrokeColor(e.target.value);
 
-  
   // Send answer to server
   const handleSubmitAnswer = () => {
     if (answer.trim() === "" || !canAnswer) return;
@@ -150,6 +163,24 @@ const Play = () => {
     }
   };
 
+  const handleKickClick = (user, displayName) => {
+    setKickTarget({ userId: user.userId, displayName });
+    setShowKickModal(true);
+  };
+
+  const handleKickConfirm = () => {
+    if (kickTarget) {
+      socket.emit("kickUser", { roomId, targetUserId: kickTarget.userId });
+    }
+    setShowKickModal(false);
+    setKickTarget(null);
+  };
+
+  const handleKickCancel = () => {
+    setShowKickModal(false);
+    setKickTarget(null);
+  };
+
   // ---------- Socket setup ----------
   useEffect(() => {
     const userId = getUserId();
@@ -158,15 +189,33 @@ const Play = () => {
     if (!roomId) return;
 
     // Function to rejoin and sync state
-    const rejoinAndSync = () => {
-      console.log("[Play] Rejoining room and syncing state");
-      socket.emit("registerLobby", {
-        userId,
-        displayName: getDisplayName() || userId,
-        roomId,
-      });
-      socket.emit("getGameState", { roomId });
-      socket.emit("requestLobbyUsers", { roomId });
+    const rejoinAndSync = async () => {
+
+      // Checking room existence before joining
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
+
+      try {
+        // Call API for room exists status
+        const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
+        const data = await response.json();
+
+        if (data.exists) {
+          // Emit registerLobby only when room exists
+          socket.emit("registerLobby", {
+            userId,
+            displayName: getDisplayName() || userId,
+            roomId,
+          });
+          socket.emit("getGameState", { roomId });
+          socket.emit("requestLobbyUsers", { roomId });
+        } else {
+          // Navigate to home if room code is invalid.
+          toastError("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
+          navigate(`/lobby`, { replace: true })
+        }
+      } catch (error) {
+        console.error("[Play] Failed to verify room status:", error);
+      }
     };
 
     rejoinAndSync();
@@ -186,6 +235,36 @@ const Play = () => {
       toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
+    socket.on("hostDisconnectedOthers", ({ hostName, hostId }) => {
+      if (hostId === getUserId()) return;
+      isGameEndedRef.current = true;
+      toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
+        autoClose: 4000,
+      });
+      navigate("/lobby");
+    });
+
+    socket.on("gamePaused", ({ hostName }) => {
+      setIsGamePaused(true);
+      setPausedByHost(hostName);
+    });
+
+    socket.on("gameResumed", ({ hostName }) => {
+      setIsGamePaused(false);
+      setPausedByHost("");
+      toastInfo(`Host ${hostName} returned! Game resumed.`, { autoClose: 3000 });
+    });
+
+    socket.on("userKicked", (kickedPlayer) => {
+      if (kickedPlayer.userId === getUserId()) {
+        isGameEndedRef.current = true;
+        toastInfo("You were kicked from the game.");
+        navigate("/lobby");
+      } else {
+        toastInfo(`${kickedPlayer.displayName} was kicked from the game.`);
+      }
+    });
+
     const onLobbyUsers = (users) => {
       const map = {};
       (users || []).forEach((u) => {
@@ -200,6 +279,12 @@ const Play = () => {
       profilesRef.current = map;
     };
     socket.on("lobbyUsers", onLobbyUsers);
+
+    // Navigate to /lobby/code if the game not started
+    socket.once("newGame", (data) => {
+      toastWarning("Game is not started! Navigating to the lobby");
+      navigate(`/lobby/${data.roomId}`, { replace: true });
+    });
 
     const onProfileUpdated = ({
       userId,
@@ -229,6 +314,7 @@ const Play = () => {
       console.log("[Play] received gameState:", state);
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
+      setTotalGuesses(state.guesses); // set total guesses
       setPlayers((prev) => {
         const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
         const merged = (state.players || []).map((p) => {
@@ -236,7 +322,7 @@ const Play = () => {
           return {
             ...p,
             remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
           };
         });
         playersRef.current = merged;
@@ -253,7 +339,7 @@ const Play = () => {
       const me = (state.players || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
       setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
       );
 
       // ✅ Handle canvas data from gameState
@@ -279,7 +365,7 @@ const Play = () => {
           return {
             ...p,
             remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? 4,
+              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
           };
         });
         playersRef.current = merged;
@@ -289,7 +375,7 @@ const Play = () => {
       const me = (list || []).find((p) => p.userId === userId);
       setMyTeam(me?.team || "");
       setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : 4,
+        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
       );
     });
 
@@ -356,7 +442,7 @@ const Play = () => {
       setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
-      setRemainingGuesses(4);
+      setRemainingGuesses(totalGuesses);
       setCorrectUserIds([]); // Reset the correct answer highlights
 
       // Reset answer and choices when drawer changes
@@ -372,11 +458,10 @@ const Play = () => {
     });
 
     socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
-
       if (userId === getUserId()) {
-          correctAudioRef.current.currentTime = 0;
-          correctAudioRef.current.play();
-        }
+        correctAudioRef.current.currentTime = 0;
+        correctAudioRef.current.play();
+      }
       if (userId) {
         setCorrectUserIds((prev) =>
           prev.includes(userId) ? prev : [...prev, userId],
@@ -394,7 +479,6 @@ const Play = () => {
     socket.on(
       "wrongAnswer",
       ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
-
         if (wrongUserId === getUserId()) {
           wrongAudioRef.current.currentTime = 0;
           wrongAudioRef.current.play();
@@ -436,7 +520,7 @@ const Play = () => {
 
     socket.on("guessesExhausted", () => {
       console.log("[Play] guessesExhausted");
-      
+
       setRoundResult({
         type: "guessesExhausted",
         displayName: "Out of guesses!",
@@ -484,6 +568,7 @@ const Play = () => {
     });
 
     socket.on("gameEnded", (data) => {
+      isGameEndedRef.current = true;
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
@@ -508,6 +593,9 @@ const Play = () => {
 
       setTimeout(() => {
         setRoundResult(null);
+        if (hostRef.current) {
+          socket.emit("deleteRoom", { roomId });
+        }
         navigate("/end", { state: { players: withAvatars } });
       }, 1200);
     });
@@ -516,7 +604,12 @@ const Play = () => {
       socket.off("connect", handleReconnect);
       socket.off("playerDisconnected");
       socket.off("playerReconnected");
+      socket.off("hostDisconnectedOthers");
+      socket.off("gamePaused");
+      socket.off("gameResumed");
+      socket.off("userKicked");
       socket.off("lobbyUsers", onLobbyUsers);
+      socket.off("newGame");
       socket.off("profileUpdated", onProfileUpdated);
       socket.off("gameState");
       socket.off("updatePlayers");
@@ -532,11 +625,21 @@ const Play = () => {
       socket.off("clear-canvas");
       socket.off("warnDrawer");
       socket.off("gameEnded");
+
+      // Check for unnatural unmount (e.g. navbar navigation)
+      if (!isGameEndedRef.current) {
+        console.log("[Play] Unmounting mid-game, simulating disconnect...");
+        socket.emit("manualDisconnect");
+      }
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const isHost = currentUserId === hostData?.hostId;
 
+  useEffect(() => {
+    hostRef.current = isHost;
+  }, [isHost]);
+  
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
@@ -551,7 +654,7 @@ const Play = () => {
     // Determine states - exhausted only if not correct and not drawer
     const isCorrect = correctUserIds.includes(user.userId);
     const isExhausted =
-      (user.remainingGuesses ?? 4) <= 0 &&
+      (user.remainingGuesses ?? totalGuesses) <= 0 &&
       !isCorrect &&
       user.userId !== drawerId;
 
@@ -581,25 +684,46 @@ const Play = () => {
           minWidth: "200px",
         }}
       >
-        {/* Avatar + DisplayName */}
-        <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+        
+        {/* Avatar + Kick button */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
           <InteractiveAvatar
             avatarSeed={seed}
             avatarStyle={style}
-            size={36}
+            size={30}
             isGuest={isGuestUser}
             className="avatar-anim"
           />
-          <span
-            className="chip-name"
-            style={{
-              fontWeight: "bold",
-              fontSize: "18px",
-              wordBreak: "break-word",
-              minWidth: "95px",
-            }}
-          >
+          {isHost && user.userId !== currentUserId && (
+            <button
+              onClick={() => handleKickClick(user, displayName)}
+              style={{
+                background: "crimson",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                padding: "2px 6px",
+                cursor: "pointer",
+                fontSize: "10px",
+                fontWeight: "bold",
+                marginRight: "4px",
+              }}
+              title="Kick Player"
+            >
+              Kick
+            </button>
+          )}
+        </div>
+
+        {/* DisplayName */}
+        <div style={{ display: "flex", alignItems: "center", width: "120px", gap: "2px" }}>
+          <span style={{
+            fontWeight: "bold", fontSize: "18px", maxWidth: "110px",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+          }}>
             {displayName}
+          </span>
+          <span style={{ fontSize: "15px" }}>
             {user.userId === drawerId && " ✏️"}
           </span>
         </div>
@@ -620,10 +744,10 @@ const Play = () => {
           </span>
           {/* Atmps */}
           <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
-            {[...Array(4)]
+            {[...Array(totalGuesses)]
               .map((_, i) => (
                 <span key={i} style={{ fontSize: "7px" }}>
-                  {i < (user.remainingGuesses ?? 4) ? "❤️" : "🤍"}
+                  {i < (user.remainingGuesses ?? totalGuesses) ? "❤️" : "🤍"}
                 </span>
               ))
               .reverse()}
@@ -705,16 +829,24 @@ const Play = () => {
     // Detect difficulty from the imageSrc path
     let difficulty = "Easy";
     const src = flashcard.imageSrc;
+
     if (src.includes("FlashCardMedium")) difficulty = "Medium";
     if (src.includes("FlashCardHard")) difficulty = "Hard";
 
     const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
 
-    // Filter out correct image from distractors
-    const distractorPool = folderImages.filter((img) => img !== src);
+    // Remove duplicates first, just in case
+    const uniqueFolderImages = [...new Set(folderImages)];
 
-    // Pick 4 random distractors
-    const validDistractors = shuffle(distractorPool).slice(0, 4);
+    // Filter out correct image from distractors
+    const distractorPool = uniqueFolderImages.filter((img) => img !== src);
+
+    // We want 10 total including the correct one
+    const maxChoices = 10;
+    const distractorCount = Math.max(0, maxChoices - 1);
+
+    // Pick up to 9 distractors, or fewer if not available
+    const validDistractors = shuffle(distractorPool).slice(0, distractorCount);
 
     // Mix correct + distractors and shuffle
     const mixed = shuffle([
@@ -723,7 +855,9 @@ const Play = () => {
     ]);
 
     setImageChoices(mixed);
-    setShowChoices(mixed.length === 5);
+
+    // show modal as long as there is at least the correct image
+    setShowChoices(mixed.length > 0);
   }, [canAnswer, flashcard?.imageSrc, roundKey]);
 
   const handlePickChoice = (choice) => {
@@ -938,20 +1072,28 @@ const Play = () => {
           )}
         </div>
 
-        <div className="chat-box">
-          <Chat
-            myUserId={currentUserId}
-            myDisplayName={
-              isHost
-                ? hostData.hostDisplayName
-                : players.find((p) => p.userId === currentUserId)
-                    ?.displayName || ""
-            }
-            myTeam={myTeam}
-          />
-        </div>
+        {/* FLOATABLE CHAT */}
+        <FloatableChat
+          myUserId={currentUserId}
+          myDisplayName={
+            isHost
+              ? hostData.hostDisplayName
+              : players.find((p) => p.userId === currentUserId)?.displayName ||
+                ""
+          }
+          myTeam={myTeam}
+        />
 
         <div className={`input-area-wrapper ${isHost && "hidden"}`}>
+          {roundResult?.type === "wrong" && (
+            <div className="round-result-modal">
+              <div className="modal-card wrong-answer">
+                <h3>Wrong Answer</h3>
+                <p>-{roundResult.scoreLost} points 😪</p>
+              </div>
+            </div>
+          )}
+
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input
@@ -966,7 +1108,7 @@ const Play = () => {
             </button>
           </div>
 
-          {showChoices && canAnswer && imageChoices.length === 5 && (
+            {showChoices && canAnswer && imageChoices.length > 0 && (
             <div className="choice-modal">
               <div className="choice-card">
                 <h3>Pick the correct image</h3>
@@ -974,11 +1116,11 @@ const Play = () => {
                 <div className="choice-grid">
                   {imageChoices.map((c, index) => (
                     <button
-                      key={index}
+                      key={c.src || index}
                       className="choice-tile"
                       onClick={() => handlePickChoice(c)}
                     >
-                      <img src={c.src} alt="choice" />
+                      <img src={c.src} alt={`choice ${index + 1}`} />
                     </button>
                   ))}
                 </div>
@@ -993,6 +1135,65 @@ const Play = () => {
           )}
         </div>
       </div>
+
+      {/* GAME PAUSED OVERLAY */}
+      {isGamePaused && (
+        <div className="pause-overlay">
+          <div className="pause-content">
+            <h2>Game Paused</h2>
+            <p>Waiting 10s for Host {pausedByHost} to reconnect...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Kick Confirmation Modal */}
+      {showKickModal &&
+        createPortal(
+          <div className="modal-overlay" onClick={handleKickCancel}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Kick Player</h2>
+                <button className="modal-close" onClick={handleKickCancel}>
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body">
+                <p
+                  style={{
+                    fontSize: "16px",
+                    color: "#333",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Are you sure you want to kick{" "}
+                  <strong>{kickTarget?.displayName}</strong> from the game?
+                </p>
+                <div className="modal-note">
+                  <span className="note-icon">ⓘ</span>
+                  <span>
+                    Kicked players will be removed from the leaderboard and
+                    cannot rejoin until a new game starts.
+                  </span>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="modal-button cancel"
+                  onClick={handleKickCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="modal-button kick"
+                  onClick={handleKickConfirm}
+                >
+                  Kick Player
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 };

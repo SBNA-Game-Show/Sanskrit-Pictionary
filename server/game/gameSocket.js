@@ -4,6 +4,15 @@ const activeTimers = {};
 const advancingRounds = new Set(); //Prevent repeated entry into the next round
 
 function createGameSocket(io) {
+  // Listen for pause/resume events from session manager
+  gameSessionManager.on("pauseTimer", (gameId) => {
+    pauseActiveTimer(gameId);
+  });
+
+  gameSessionManager.on("resumeTimer", (gameId) => {
+    resumeActiveTimer(io, gameId);
+  });
+
   io.on("connection", (socket) => {
     // ---- register / state ----
     socket.on("registerLobby", ({ userId, displayName, roomId }) => {
@@ -21,6 +30,16 @@ function createGameSocket(io) {
       // Check if this user is reconnecting to an active game
       const session = gameSessionManager.getSession(roomId);
       if (session) {
+
+          // If the game is ended, send the final scores without rejoining
+          if (session.gameEnded) {
+          socket.emit("gameEnded", { 
+            finalPlayers: gameSessionManager.getPlayersWithScores(roomId)});
+          return; 
+          } else {
+            socket.emit("gameInProgress", { roomId });
+          }
+
         const reconnected = gameSessionManager.markPlayerReconnected(
           roomId,
           userId,
@@ -36,7 +55,7 @@ function createGameSocket(io) {
           const canvasData = gameSessionManager.getCanvasData(roomId);
 
           const me = session.players.find((p) => p.userId === userId);
-          const myRemainingGuesses = me?.remainingGuesses ?? 4;
+          const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
 
           // Send current game state to reconnected player
           socket.emit("gameState", {
@@ -47,10 +66,12 @@ function createGameSocket(io) {
             currentRound: session.currentRound,
             totalRounds: session.totalRounds,
             timer: activeTimers[roomId]?.secondsLeft || session.timer,
+            guesses: session.guesses,
             currentFlashcard: session.currentFlashcard,
             scores: session.scores,
             canvasData: canvasData,
             remainingGuesses: myRemainingGuesses,
+            gameEnded: session.gameEnded, // get game status
           });
 
           // Notify others that player reconnected
@@ -59,6 +80,9 @@ function createGameSocket(io) {
             displayName,
           });
         }
+      }
+      else {
+        socket.emit("newGame", { roomId:roomId });
       }
     });
 
@@ -71,6 +95,7 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
+          guesses,
           currentFlashcard,
           scores,
         } = session;
@@ -79,7 +104,7 @@ function createGameSocket(io) {
         const canvasData = gameSessionManager.getCanvasData(roomId);
 
         const me = session.players.find((p) => p.userId === socket.userId);
-        const myRemainingGuesses = me?.remainingGuesses ?? 4;
+        const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
         socket.emit("gameState", {
           players,
           hostData,
@@ -88,6 +113,7 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
+          guesses,
           currentFlashcard,
           scores,
           canvasData: canvasData,
@@ -99,12 +125,13 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
+      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
           timer,
           difficulty,
+          guesses, // Add guesses in log
           by: socket.id,
           userId: socket.userId,
         });
@@ -123,7 +150,7 @@ function createGameSocket(io) {
           }
         }
 
-        gameSessionManager.createSession(
+        await gameSessionManager.createSession(
           gameId,
           players,
           totalRounds,
@@ -131,8 +158,9 @@ function createGameSocket(io) {
           difficulty,
           teams,
           hostData,
+          guesses // Send guesses to manager
         );
-        gameSessionManager.startRound(gameId, io);
+        await gameSessionManager.startRound(gameId, io);
 
         io.to(gameId).emit(
           "updatePlayers",
@@ -192,6 +220,35 @@ function createGameSocket(io) {
       proceedToNextRound(io, gameId);
     });
 
+    // ---- kick user ----
+    socket.on("kickUser", ({ roomId, targetUserId }) => {
+      const session = gameSessionManager.getSession(roomId);
+      if (!session) return; // If game hasn't started, ignore
+
+      // Verify host
+      if (socket.userId !== session.hostData.hostId) return;
+
+      const kickResult = gameSessionManager.kickPlayer(roomId, targetUserId);
+      if (!kickResult) return;
+
+      const { isCurrentDrawer, kickedPlayer } = kickResult;
+
+      if (kickedPlayer) {
+        io.to(roomId).emit("userKicked", kickedPlayer);
+      }
+
+      // Emit updated players list so leaderboard updates
+      io.to(roomId).emit(
+        "updatePlayers",
+        gameSessionManager.getPlayersWithScores(roomId),
+      );
+
+      if (isCurrentDrawer) {
+        clearActiveTimer(roomId);
+        proceedToNextRound(io, roomId, kickedPlayer);
+      }
+    });
+
     // ---- submit answer ----
     socket.on("submitAnswer", ({ gameId, userId, answer }) => {
       const session = gameSessionManager.getSession(gameId);
@@ -247,6 +304,11 @@ function createGameSocket(io) {
       const session = gameSessionManager.getSession(roomId);
       if (session)
         io.to(roomId).emit("roomPlayers", { players: session.players });
+    });
+
+    socket.on("deleteRoom", ({ roomId }) => {
+      console.log(`[socket] deleteRoom requested for: ${roomId}`);
+      gameSessionManager.deleteSession(roomId);
     });
 
     // REPLACE the empty disconnect handler with this:
@@ -369,6 +431,24 @@ function startSynchronizedTimer(io, gameId, duration) {
   activeTimers[gameId].intervalId = intervalId;
 }
 
+function pauseActiveTimer(gameId) {
+  if (activeTimers[gameId] && activeTimers[gameId].intervalId) {
+    clearInterval(activeTimers[gameId].intervalId);
+    activeTimers[gameId].intervalId = null; // Mark as paused
+  }
+}
+
+function resumeActiveTimer(io, gameId) {
+  if (
+    activeTimers[gameId] &&
+    activeTimers[gameId].intervalId === null &&
+    activeTimers[gameId].secondsLeft > 0
+  ) {
+    // Restart with remaining time
+    startSynchronizedTimer(io, gameId, activeTimers[gameId].secondsLeft);
+  }
+}
+
 function clearActiveTimer(gameId) {
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
@@ -377,7 +457,7 @@ function clearActiveTimer(gameId) {
 }
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
-function proceedToNextRound(io, gameId) {
+async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   if (advancingRounds.has(gameId)) return; // Prevent repeated entry into the next round
   advancingRounds.add(gameId);
 
@@ -386,7 +466,7 @@ function proceedToNextRound(io, gameId) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io, lastDrawerOverride);
 
     // Get latest scores before starting the next round
     const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);
@@ -397,7 +477,7 @@ function proceedToNextRound(io, gameId) {
 
       // startRound is responsible for: sending a new Flashcard to the questioner, 
       // broadcasting drawerChanged/roundStarted, and updating gameState
-      gameSessionManager.startRound(gameId, io);
+      await gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
@@ -413,4 +493,8 @@ function proceedToNextRound(io, gameId) {
   }
 }
 
-module.exports = createGameSocket;
+module.exports = {
+  createGameSocket,
+  clearActiveTimer,
+  proceedToNextRound,
+};

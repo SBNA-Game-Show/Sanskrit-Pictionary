@@ -2,9 +2,9 @@
 // It includes functions to load the profile data from local storage and backend, 
 // and to save the updated profile data back to both local storage and the backend.
 
-import {socket} from './socket';
-import { getUserId, saveUserData, getUserData } from '../utils/authStorage';
-import { apiClient } from '../utils/authAPI';
+import {socket} from '../pages/socket';
+import { getUserId, saveUserData, getUserData } from './authStorage';
+import { apiClient } from './authAPI';
 
 
 

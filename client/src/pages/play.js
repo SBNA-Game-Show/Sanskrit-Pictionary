@@ -971,7 +971,7 @@ const Play = () => {
           <div className="user-panel-title">Players List</div>
 
           <div className="team-block">
-            <h3 className="team-title red">Red Team</h3>
+            <h3 className="team-title red">Red Team / लाल दल</h3>
             {redTeam.length === 0 ? (
               <p className="muted">No players</p>
             ) : (
@@ -980,7 +980,7 @@ const Play = () => {
           </div>
 
           <div className="team-block">
-            <h3 className="team-title blue">Blue Team</h3>
+            <h3 className="team-title blue">Blue Team / नील दल</h3>
             {blueTeam.length === 0 ? (
               <p className="muted">No players</p>
             ) : (

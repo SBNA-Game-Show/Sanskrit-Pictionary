@@ -14,31 +14,40 @@ import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
 
 const Lobby = () => {
   const { roomId } = useParams();
+  const navigate = useNavigate();
+
+  // ── Current user identity ──────────────────────────────────────────────────
+  const myUserId = getUserId();
+  const myDisplayName = getDisplayName();
+
+  // ── Online presence & team state ──────────────────────────────────────────
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [hostId, setHostId] = useState(null);
   const [teams, setTeams] = useState({ Red: [], Blue: [] });
 
-  const myUserId = getUserId();
-  const myDisplayName = getDisplayName();
-  const navigate = useNavigate();
-
-  // Track recently shown join notifications to prevent duplicates
+  // Ref used to debounce duplicate join toast notifications
   const recentJoinsRef = useRef(new Set());
 
-  // game settings
+  // ── Host-configurable game settings ───────────────────────────────────────
   const [selectedRounds, setSelectedRounds] = useState(1);
   const [selectedTimer, setSelectedTimer] = useState(30);
   const [selectedDifficulty, setSelectedDifficulty] = useState("Easy");
-  const [selectedGuesses, setSelectedGuesses] = useState(4); // Added new config for guesses
+  const [selectedGuesses, setSelectedGuesses] = useState(4);
+
+  // ── In-progress game status (displayed when a round is active) ────────────
   const [currentRound, setCurrentRound] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
 
+  // ── Derived / computed values ─────────────────────────────────────────────
+
+  // Fast O(1) lookup map: userId → user object
   const byId = useMemo(
     () => Object.fromEntries(onlineUsers.map((u) => [u.userId, u])),
     [onlineUsers],
   );
 
+  // Which team the current user belongs to ("Red" | "Blue" | null)
   const myTeam = useMemo(() => {
     if (!myUserId) return null;
     if ((teams.Red || []).includes(myUserId)) return "Red";
@@ -46,10 +55,12 @@ const Lobby = () => {
     return null;
   }, [teams, myUserId]);
 
-  const isHost = myUserId === hostId;
-  const redTeamHasPlayers = teams.Red.length > 1;
+  const isHost            = myUserId === hostId;
+  const redTeamHasPlayers  = teams.Red.length > 1;
   const blueTeamHasPlayers = teams.Blue.length > 1;
-  const evenTeams = Math.abs(teams.Red.length - teams.Blue.length) <= 1;
+  const evenTeams          = Math.abs(teams.Red.length - teams.Blue.length) <= 1;
+
+  // Host can only start when both teams have ≥ 2 players and are roughly even
   const canStartGame =
     isHost && redTeamHasPlayers && blueTeamHasPlayers && evenTeams;
 
@@ -63,7 +74,7 @@ const Lobby = () => {
 
     if (!roomId) return;
 
-    // unction to rejoin
+    // Function to re-emit registration and state requests after a reconnect
     const rejoinLobby = () => {
       console.log("[Lobby] Rejoining lobby");
 
@@ -230,6 +241,10 @@ const Lobby = () => {
     };
   }, [roomId, myUserId, myDisplayName, navigate]);
 
+  // ── Event handlers ────────────────────────────────────────────────────────
+
+  // Handles the "Back to Main" button. Prompts the host for confirmation
+  // before kicking all players; guests leave silently.
   const handleBackButton = () => {
     // Show confirmation for host
     if (isHost) {
@@ -264,6 +279,7 @@ const Lobby = () => {
     navigate("/lobby");
   };
 
+  // Users not yet assigned to either team (shown in the "Online Users" column)
   const inAnyTeam = [...(teams.Red || []), ...(teams.Blue || [])];
   const unassignedUsers = onlineUsers.filter(
     (u) => !inAnyTeam.includes(u.userId),
@@ -272,37 +288,47 @@ const Lobby = () => {
   const handleJoinTeam = (teamColor) => {
     socket.emit("joinTeam", { roomId, teamColor, userId: myUserId });
   };
+
   const handleLeaveTeam = () => {
     socket.emit("leaveTeam", { roomId, userId: myUserId });
   };
 
+  // Updates a single game setting locally and broadcasts the full settings
+  // object to the room so all players stay in sync. Only the host may call this.
   const handleSettingsChange = (setting, value) => {
     if (!isHost) return;
-    const updated = {
-      rounds: selectedRounds,
-      timer: selectedTimer,
-      difficulty: selectedDifficulty,
-      guesses: selectedGuesses
-    };
-    if (setting === "rounds") updated.rounds = value;
-    if (setting === "timer") updated.timer = value;
-    if (setting === "difficulty") updated.difficulty = value;
-    if (setting === "guesses") updated.guesses = value;
 
-    // reflect immediately
+    // Build the updated settings object from current state
+    const updated = {
+      rounds:     selectedRounds,
+      timer:      selectedTimer,
+      difficulty: selectedDifficulty,
+      guesses:    selectedGuesses,
+    };
+
+    if (setting === "rounds")     updated.rounds     = value;
+    if (setting === "timer")      updated.timer      = value;
+    if (setting === "difficulty") updated.difficulty = value;
+    if (setting === "guesses")    updated.guesses    = value;
+
+    // Reflect the change immediately in local state
     setSelectedRounds(updated.rounds);
     setSelectedTimer(updated.timer);
     setSelectedDifficulty(updated.difficulty);
     setSelectedGuesses(updated.guesses);
 
-    // broadcast to room (server validates host)
+    // Broadcast the new settings to the room (server validates host)
     socket.emit("updateGameSettings", { roomId, newSettings: updated });
   };
 
+  // ── Render helpers ────────────────────────────────────────────────────────
+
+  // Renders a single user row with avatar, name, crown (if host),
+  // and team-join / team-switch buttons (only for the current user).
   const renderUserRow = (userId) => {
-    const user = byId[userId] || { userId, displayName: userId };
-    const isHostUser = userId === hostId;
-    const isMe = userId === myUserId;
+    const user        = byId[userId] || { userId, displayName: userId };
+    const isHostUser  = userId === hostId;
+    const isMe        = userId === myUserId;
     const isGuestUser = userId.startsWith("guest_");
 
     let actions = null;
@@ -458,9 +484,7 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Timer</h3>
-            {console.log("Current timer in Render:", selectedTimer)}
             <div className="option-buttons">
-              {/* Added time to adjust styling. To be removed when completed*/}
               {[30, 45, 60, 75, 90].map((sec) => (
                 <button
                   key={sec}
@@ -476,7 +500,6 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Difficulty</h3>
-            {console.log("Current diff in Render:", selectedDifficulty)}
             <div className="option-buttons">
               {["Easy", "Medium", "Hard"].map((level) => (
                 <button
@@ -491,10 +514,9 @@ const Lobby = () => {
             </div>
           </div>
 
-          {/* Added config for guessess in the lobby */}
+          {/* Number of guesses each team gets per turn */}
           <div className="setting-section">
             <h3>Select Chances</h3>
-            {console.log("Current selectedGuesses in Render:", selectedGuesses)}
             <div className="option-buttons">
               {[1, 2, 3, 4].map((num) => (
                 <button

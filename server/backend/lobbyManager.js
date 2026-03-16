@@ -1,5 +1,6 @@
 // lobbyManager.js
 const mongoose = require("mongoose");
+const { toastWarning } = require("../../client/src/utils/toast");
 const gameSessionManager = require("../game/gameSessionManager");
 const { clearActiveTimer, proceedToNextRound } = require("../game/gameSocket");
 
@@ -97,6 +98,22 @@ function createLobbyManager(io, UserModel) {
   io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
+    // CREATE ROOM
+    socket.on("createRoom", async ({ userId, roomId, displayName }) => {
+      // create room if not existing
+      if (!rooms[roomId]) {
+        rooms[roomId] = {
+          hostId: userId,
+          settings: { rounds: 1, timer: 30, difficulty: "Easy", guesses: 3 },
+          teams: { Red: [], Blue: [] },
+          chat: [],
+        };
+        console.log(`Room ${roomId} is created by ${displayName}`);
+      } else {
+        toastWarning("Room is already created! Navigating to the lobby");
+      }
+    });
+
     // --- REGISTER LOBBY ---
     socket.on("registerLobby", async ({ userId, roomId, displayName }) => {
       socket.userId = userId;
@@ -122,14 +139,14 @@ function createLobbyManager(io, UserModel) {
       socket.join(roomId);
 
       // create room if missing
-      if (!rooms[roomId]) {
-        rooms[roomId] = {
-          hostId: userId,
-          settings: { rounds: 3, timer: 60, difficulty: "Medium", guesses: 4 },
-          teams: { Red: [], Blue: [] },
-          chat: [],
-        };
-      } else if (rooms[roomId].hostId === userId && rooms[roomId].hostDisconnectTimeout) {
+      // if (!rooms[roomId]) {
+      //   rooms[roomId] = {
+      //     hostId: userId,
+      //     settings: { rounds: 3, timer: 60, difficulty: "Medium", guesses: 4 },
+      //     teams: { Red: [], Blue: [] },
+      //     chat: [],
+      //   };
+      if (rooms[roomId].hostId === userId && rooms[roomId].hostDisconnectTimeout) {
         // Host returned before the 10-second timeout expired
         clearTimeout(rooms[roomId].hostDisconnectTimeout);
         rooms[roomId].hostDisconnectTimeout = null;

@@ -64,17 +64,36 @@ const Lobby = () => {
     if (!roomId) return;
 
     // unction to rejoin
-    const rejoinLobby = () => {
+    const rejoinLobby = async () => {
       console.log("[Lobby] Rejoining lobby");
 
-      socket.emit("registerLobby", {
-        userId: myUserId,
-        displayName: myDisplayName,
-        roomId,
-      });
+      // Checking room existence before joining
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
 
-      socket.emit("requestLobbyUsers", { roomId });
-      socket.emit("getHost", { roomId });
+      try {
+        // Call API for room exists status
+        const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
+        const data = await response.json();
+
+        if (data.exists) {
+          // Emit registerLobby only when room exists
+          socket.emit("registerLobby", {
+            userId: myUserId,
+            displayName: myDisplayName,
+            roomId,
+          });
+
+          socket.emit("requestLobbyUsers", { roomId });
+          socket.emit("getHost", { roomId });
+        } else {
+          // Navigate to home if room code is invalid.
+          toastError("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
+          navigate(`/lobby`, { replace: true })
+          return;
+        }
+      } catch (error) {
+        console.error("[Play] Failed to verify room status:", error);
+      }
     };
 
     // Initial registration
@@ -200,12 +219,7 @@ const Lobby = () => {
       toastWarning(`${displayName} left the lobby`, { autoClose: 2500 });
     });
 
-    // 2) After listeners are ready, emit registration & state requests
-    socket.emit("registerLobby", {
-      userId: myUserId,
-      displayName: myDisplayName,
-      roomId,
-    });
+    // 2) After listeners are ready, emit state requests
     socket.emit("requestLobbyUsers", { roomId });
     socket.emit("getHost", { roomId });
 

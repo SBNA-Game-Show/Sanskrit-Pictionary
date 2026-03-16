@@ -11,7 +11,7 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastInfo, toastSuccess, toastError } from "../utils/toast";
+import { toastWarning, toastError, toastInfo, toastSuccess } from "../utils/toast";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
@@ -197,7 +197,6 @@ const Play = () => {
         // Call API for room exists status
         const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
         const data = await response.json();
-        console.log(" Room Existence:", data);
 
         if (data.exists) {
           // Emit registerLobby only when room exists
@@ -210,7 +209,7 @@ const Play = () => {
           socket.emit("requestLobbyUsers", { roomId });
         } else {
           // Navigate to home if room code is invalid.
-          toastWarning("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
+          toastError("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
           navigate(`/lobby`, { replace: true })
         }
       } catch (error) {

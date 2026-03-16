@@ -1,6 +1,5 @@
 // lobbyManager.js
 const mongoose = require("mongoose");
-const { toastWarning } = require("../../client/src/utils/toast");
 const gameSessionManager = require("../game/gameSessionManager");
 const { clearActiveTimer, proceedToNextRound } = require("../game/gameSocket");
 
@@ -110,7 +109,7 @@ function createLobbyManager(io, UserModel) {
         };
         console.log(`Room ${roomId} is created by ${displayName}`);
       } else {
-        toastWarning("Room is already created! Navigating to the lobby");
+        console.log("Room is already created! Navigating to the lobby");
       }
     });
 

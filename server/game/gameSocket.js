@@ -21,16 +21,6 @@ function createGameSocket(io) {
       // Check if this user is reconnecting to an active game
       const session = gameSessionManager.getSession(roomId);
       if (session) {
-
-          // If the game is ended, send the final scores without rejoining
-          if (session.gameEnded) {
-          socket.emit("gameEnded", { 
-            finalPlayers: gameSessionManager.getPlayersWithScores(roomId)});
-          return; 
-          } else {
-            socket.emit("gameInProgress", { roomId });
-          }
-
         const reconnected = gameSessionManager.markPlayerReconnected(
           roomId,
           userId,
@@ -46,7 +36,7 @@ function createGameSocket(io) {
           const canvasData = gameSessionManager.getCanvasData(roomId);
 
           const me = session.players.find((p) => p.userId === userId);
-          const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
+          const myRemainingGuesses = me?.remainingGuesses ?? 4;
 
           // Send current game state to reconnected player
           socket.emit("gameState", {
@@ -57,12 +47,10 @@ function createGameSocket(io) {
             currentRound: session.currentRound,
             totalRounds: session.totalRounds,
             timer: activeTimers[roomId]?.secondsLeft || session.timer,
-            guesses: session.guesses,
             currentFlashcard: session.currentFlashcard,
             scores: session.scores,
             canvasData: canvasData,
             remainingGuesses: myRemainingGuesses,
-            gameEnded: session.gameEnded, // get game status
           });
 
           // Notify others that player reconnected
@@ -71,9 +59,6 @@ function createGameSocket(io) {
             displayName,
           });
         }
-      }
-      else {
-        socket.emit("newGame", { roomId:roomId });
       }
     });
 
@@ -86,7 +71,6 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
-          guesses,
           currentFlashcard,
           scores,
         } = session;
@@ -95,7 +79,7 @@ function createGameSocket(io) {
         const canvasData = gameSessionManager.getCanvasData(roomId);
 
         const me = session.players.find((p) => p.userId === socket.userId);
-        const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
+        const myRemainingGuesses = me?.remainingGuesses ?? 4;
         socket.emit("gameState", {
           players,
           hostData,
@@ -104,7 +88,6 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
-          guesses,
           currentFlashcard,
           scores,
           canvasData: canvasData,
@@ -116,13 +99,12 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses }) => {
+      ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
           timer,
           difficulty,
-          guesses, // Add guesses in log
           by: socket.id,
           userId: socket.userId,
         });
@@ -141,7 +123,7 @@ function createGameSocket(io) {
           }
         }
 
-        await gameSessionManager.createSession(
+        gameSessionManager.createSession(
           gameId,
           players,
           totalRounds,
@@ -149,9 +131,8 @@ function createGameSocket(io) {
           difficulty,
           teams,
           hostData,
-          guesses // Send guesses to manager
         );
-        await gameSessionManager.startRound(gameId, io);
+        gameSessionManager.startRound(gameId, io);
 
         io.to(gameId).emit(
           "updatePlayers",
@@ -209,35 +190,6 @@ function createGameSocket(io) {
 
       clearActiveTimer(gameId);
       proceedToNextRound(io, gameId);
-    });
-
-    // ---- kick user ----
-    socket.on("kickUser", ({ roomId, targetUserId }) => {
-      const session = gameSessionManager.getSession(roomId);
-      if (!session) return; // If game hasn't started, ignore
-
-      // Verify host
-      if (socket.userId !== session.hostData.hostId) return;
-
-      const kickResult = gameSessionManager.kickPlayer(roomId, targetUserId);
-      if (!kickResult) return;
-
-      const { isCurrentDrawer, kickedPlayer } = kickResult;
-
-      if (kickedPlayer) {
-        io.to(roomId).emit("userKicked", kickedPlayer);
-      }
-
-      // Emit updated players list so leaderboard updates
-      io.to(roomId).emit(
-        "updatePlayers",
-        gameSessionManager.getPlayersWithScores(roomId),
-      );
-
-      if (isCurrentDrawer) {
-        clearActiveTimer(roomId);
-        proceedToNextRound(io, roomId, kickedPlayer);
-      }
     });
 
     // ---- submit answer ----
@@ -425,7 +377,7 @@ function clearActiveTimer(gameId) {
 }
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
-async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
+function proceedToNextRound(io, gameId) {
   if (advancingRounds.has(gameId)) return; // Prevent repeated entry into the next round
   advancingRounds.add(gameId);
 
@@ -434,7 +386,7 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
     gameSessionManager.clearCanvasData(gameId);
     io.to(gameId).emit("clear-canvas");
 
-    const nextRoundInfo = gameSessionManager.nextRound(gameId, io, lastDrawerOverride);
+    const nextRoundInfo = gameSessionManager.nextRound(gameId, io);
 
     // Get latest scores before starting the next round
     const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(gameId);
@@ -445,7 +397,7 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
 
       // startRound is responsible for: sending a new Flashcard to the questioner, 
       // broadcasting drawerChanged/roundStarted, and updating gameState
-      await gameSessionManager.startRound(gameId, io);
+      gameSessionManager.startRound(gameId, io);
 
       io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
       startSynchronizedTimer(io, gameId, nextRoundInfo.timer);

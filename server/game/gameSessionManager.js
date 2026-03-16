@@ -48,7 +48,7 @@ class GameSessionManager {
     this.sessions = new Map();
   }
 
-  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses) {
+  createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
     // assign players to selected teams
     players.forEach((p) => {
       if (teams.Red.includes(p.userId)) {
@@ -70,19 +70,12 @@ class GameSessionManager {
       currentPlayerIndex: firstDrawerIndex,
       timer,
       difficulty,
-      guesses: Number(guesses) || 5, // Guesses config with default value 3
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
       canvasData: null,
-      usedFlashcardIds: [],
-      flashcardDeck: [],    
-      deckIndex: 0,
       // guesses are tracked per-player (p.remainingGuesses)
-      gameEnded: false // flag to indicate if game has ended (after final round)
     });
-
-    await this.initializeFlashcardDeck(gameId, difficulty);
 
     // init scores
     players.forEach((p) => {
@@ -90,8 +83,7 @@ class GameSessionManager {
     });
 
     console.log(
-      `[createSession] gameId=${gameId} players=${players.length} 
-        timer=${timer} difficulty=${difficulty} guesses=${guesses}`
+      `[createSession] gameId=${gameId} players=${players.length} timer=${timer} difficulty=${difficulty}`
     );
   }
 
@@ -99,69 +91,53 @@ class GameSessionManager {
     return this.sessions.get(gameId);
   }
 
-  async initializeFlashcardDeck(gameId, difficulty) {
-    const session = this.getSession(gameId);
-    
-    // Case-insensitive difficulty matching, WE ARE PULLING HERE! + Log
-    const all = await Flashcard.find({
-      difficulty: { $regex: `^${difficulty}$`, $options: "i" }
-    }).lean();
-    console.log(`[initializeFlashcardDeck] Found ${all.length} flashcards for difficulty "${difficulty}"`);
-    
-    // Handle case where no flashcards found
-    if (all.length === 0) { //everything below this is just if there is no cards in the chosen difficulty
-      console.warn(`[initializeFlashcardDeck] No flashcards found for "${difficulty}". Trying any difficulty...`);
-      const anyCards = await Flashcard.find({}).lean();
-      console.log(`[initializeFlashcardDeck] Found ${anyCards.length} total flashcards as fallback`);
-      
-      if (anyCards.length === 0) {
-        console.error("[initializeFlashcardDeck] DATABASE HAS NO FLASHCARDS!");
-        session.flashcardDeck = [];
-        session.deckIndex = 0;
-        return;
-      }
-      
-      // Shuffle fallback cards
-      for (let i = anyCards.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [anyCards[i], anyCards[j]] = [anyCards[j], anyCards[i]];
-      }
-      
-      session.flashcardDeck = anyCards;
-      session.deckIndex = 0;
-      return; //everything above this is just if there is no cards in the chosen difficulty
-    }
-    
-    // Shuffle in normal case!
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [all[i], all[j]] = [all[j], all[i]];
-    }
-    
-    session.flashcardDeck = all;
-    session.deckIndex = 0;
-    
-    console.log(`[initializeFlashcardDeck] Deck initialized with ${all.length} cards`);
-  }
-
   /**
    * Try to fetch a random flashcard from MongoDB.
    * - Uses case-insensitive matching for difficulty
    * - Falls back to any random flashcard if none for given difficulty
    */
-  async getRandomFlashcard(gameId, difficulty) {
-    const session = this.getSession(gameId);
-    
-    // If deck empty or used up, reshuffle
-    if (!session.flashcardDeck?.length || session.deckIndex >= session.flashcardDeck.length) {
-      await this.initializeFlashcardDeck(gameId, difficulty);
+  async getRandomFlashcard(difficulty) {
+    try {
+      let query = {};
+      if (difficulty) {
+        query = { difficulty: { $regex: `^${difficulty}$`, $options: "i" } };
+      }
+
+      const countMatching = await Flashcard.countDocuments(query);
+      const totalCount = await Flashcard.countDocuments({});
+      console.log(
+        `[getRandomFlashcard] difficulty=${difficulty} matching=${countMatching} total=${totalCount}`,
+      );
+
+      if (countMatching === 0 && totalCount > 0) {
+        console.warn(
+          `[getRandomFlashcard] No flashcards found for difficulty "${difficulty}". Falling back to any flashcard.`,
+        );
+        const any = await Flashcard.aggregate([{ $sample: { size: 1 } }]);
+        return any && any.length ? any[0] : null;
+      }
+
+      if (totalCount === 0) {
+        console.warn("[getRandomFlashcard] Database has no flashcards at all.");
+        return null;
+      }
+
+      const res = await Flashcard.aggregate([
+        { $match: query },
+        { $sample: { size: 1 } },
+      ]);
+      if (!res || res.length === 0) {
+        console.warn(
+          "[getRandomFlashcard] aggregate returned no results (unexpected).",
+        );
+        return null;
+      }
+      console.log("[getRandomFlashcard] chosen:", res[0]);
+      return res[0];
+    } catch (err) {
+      console.error("[getRandomFlashcard] error:", err);
+      return null;
     }
-    
-    // Get next card from deck
-    const flashcard = session.flashcardDeck[session.deckIndex];
-    session.deckIndex++;
-    
-    return flashcard;
   }
 
   async startRound(gameId, io) {
@@ -172,11 +148,10 @@ class GameSessionManager {
     // Reset per-player guesses + answered state for new round
     session.players.forEach((p) => {
       p.hasAnswered = false;
-      // reset player's guesses with configed value in session
-      p.remainingGuesses = session.guesses; 
+      p.remainingGuesses = 4;
     });
 
-    const flashcard = await this.getRandomFlashcard(gameId, session.difficulty);
+    const flashcard = await this.getRandomFlashcard(session.difficulty);
     if (!flashcard) {
       io.to(gameId).emit("flashcardError", { message: "No flashcards found." });
       return;
@@ -214,7 +189,6 @@ class GameSessionManager {
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
       timer: session.timer,
-      guesses: session.guesses, // send configed guesses
       // per-player guesses are sent via updatePlayers/gameState
     });
 
@@ -231,7 +205,6 @@ class GameSessionManager {
       currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       timer: session.timer,
-      guesses: session.guesses, // add guesses
       currentFlashcard: null, // drawer-only
       scores: session.scores,
     });
@@ -243,7 +216,7 @@ class GameSessionManager {
 
   const lastDrawer = session.players[session.currentPlayerIndex];
 
-  // send turnEnded with correct answer reveal for guessers before moving to next round
+  // send popup after every turn (both red and blue)
   const fc = session.currentFlashcard || {};
 
   io.to(gameId).emit("turnEnded", {
@@ -269,20 +242,8 @@ class GameSessionManager {
     session.currentRound++;
   }
 
-    // Round number only increments after Blue team's turn, as Red always starts first
-    if (lastDrawer && lastDrawer.team === "Blue") {
-      // Trigger roundEnded popup message
-      io.to(gameId).emit("roundEnded", {
-        roundNumber: session.currentRound
-      });
-
-      session.currentRound++;
-    }
-
     // The turn should cycle through the target team members based on the round count
     session.currentPlayerIndex = this._getNextDrawerIndex(session, lastDrawer);
-    if (session.currentPlayerIndex === -1) return null;
-
     session.roundInProgress = true;
 
     return {
@@ -297,15 +258,13 @@ class GameSessionManager {
   // where n corresponds to the current round number (modulo team size).
   _getNextDrawerIndex(session, lastDrawer) {
     // Next drawer should be from the opposite team of last drawer
-    const targetTeam = (lastDrawer && lastDrawer.team === "Blue") ? "Red" : "Blue";
+    const targetTeam = (lastDrawer.team === "Blue") ? "Red" : "Blue";
 
     // Find all players and their indexes in the target team
     const targetTeamMembers = session.players
         .map((player, index) => ({ player, index }))
         .filter(item => item.player.team === targetTeam)
         .map(item => item.index);
-
-    if (targetTeamMembers.length === 0) return -1;
 
     // Find the next drawer index based on current round number, ensuring it cycles through team members
     const nextDrawerIndex = (session.currentRound - 1) % targetTeamMembers.length;
@@ -341,14 +300,14 @@ class GameSessionManager {
       return { everyoneCorrect, allGuessersDone };
     };
 
-    // Ensure remainingGuesses is always a finite number in the 0..session.guesses range.
+    // Ensure remainingGuesses is always a finite number in the 0..4 range.
     // This prevents accidental extra chances due to falsy/undefined values.
     const rgRaw = player.remainingGuesses;
     const rgNum = Number(rgRaw);
     if (!Number.isFinite(rgNum)) {
-      player.remainingGuesses = session.guesses;
+      player.remainingGuesses = 4;
     } else {
-      player.remainingGuesses = Math.max(0, Math.min(session.guesses, Math.floor(rgNum)));
+      player.remainingGuesses = Math.max(0, Math.min(4, Math.floor(rgNum)));
     }
 
     if (player.remainingGuesses <= 0) {
@@ -441,7 +400,7 @@ class GameSessionManager {
     }
 
     // wrong answer
-    player.remainingGuesses = Math.max(0, (player.remainingGuesses ?? session.guesses) - 1);
+    player.remainingGuesses = Math.max(0, (player.remainingGuesses ?? 4) - 1);
 
     // ----- score penalty for wrong answer -----
     const WRONG_ANSWER_PENALTY = 15;
@@ -467,7 +426,6 @@ class GameSessionManager {
     };
   }
 
-  
   updatePlayerPoints(gameId, userId, scoreChange) {
     const session = this.sessions.get(gameId);
     const currentScore = session.scores[userId] || 0;
@@ -505,7 +463,7 @@ class GameSessionManager {
       userId: p.userId,
       team: p.team,
       points: session.scores[p.userId] || 0,
-      remainingGuesses: p.remainingGuesses ?? session.guesses,
+      remainingGuesses: p.remainingGuesses ?? 4,
       imageSrc: p.imageSrc || "",
     }));
   }
@@ -543,39 +501,6 @@ class GameSessionManager {
       return true;
     }
     return false;
-  }
-
-  // Kick player from session
-  kickPlayer(gameId, userId) {
-    const session = this.sessions.get(gameId);
-    if (!session) return null;
-
-    const playerIndex = session.players.findIndex((p) => p.userId === userId);
-    if (playerIndex === -1) return null;
-
-    const isCurrentDrawer = session.currentPlayerIndex === playerIndex;
-    const kickedPlayer = session.players[playerIndex];
-
-    // Remove player
-    session.players.splice(playerIndex, 1);
-
-    // Clean up score
-    delete session.scores[userId];
-
-    // Adjust currentPlayerIndex if they were before the current drawer
-    // If the kicked player index is less than the current player index, 
-    // then the current player index should be decremented by 1
-    if (playerIndex < session.currentPlayerIndex) {
-      session.currentPlayerIndex--;
-    }
-    // If the kicked player index is outside of the array length,
-    // set current player index back to 0 
-    else if (session.currentPlayerIndex >= session.players.length) {
-      session.currentPlayerIndex = 0;
-    }
-
-    console.log(`[Session] Kicked player ${userId} from ${gameId}`);
-    return { isCurrentDrawer, kickedPlayer };
   }
 
   // ✅ ADD: Update canvas data

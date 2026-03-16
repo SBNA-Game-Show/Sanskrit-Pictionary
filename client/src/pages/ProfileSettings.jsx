@@ -59,6 +59,13 @@ export default function ProfileSettings() {
     return createAvatar(style, { seed: avatarSeed }).toString();
   }, [avatarStyle, avatarSeed]);
 
+  const handleFile = (file) => {
+    if (!file) return setUploadDataUrl(null);
+    const reader = new FileReader();
+    reader.onload = () => setUploadDataUrl(reader.result?.toString() || null);
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -202,6 +209,24 @@ export default function ProfileSettings() {
                 );
               })}
             </div>
+          </div>
+          <div className="control-group">
+            <label className="label">Or Upload</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            />
+            {uploadDataUrl && (
+              <button
+                type="button"
+                className="btn subtle"
+                style={{ marginTop: 8 }}
+                onClick={() => setUploadDataUrl(null)}
+              >
+                Use generated avatar instead
+              </button>
+            )}
           </div>
         </div>
       </div>

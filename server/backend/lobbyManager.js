@@ -27,7 +27,7 @@ function createLobbyManager(io, UserModel) {
       if (!rooms[roomId]) {
         rooms[roomId] = {
           hostId: userId,
-          settings: { rounds: 3, timer: 60, difficulty: "Medium", guesses: 4 },
+          settings: { rounds: 3, timer: 60, difficulty: "Medium" },
           teams: { Red: [], Blue: [] },
           chat: [],
         };
@@ -286,6 +286,24 @@ function createLobbyManager(io, UserModel) {
       }
     });
 
+    socket.on("kickUser", ({ roomId, targetUserId }) => {
+      const room = rooms[roomId];
+      if (!room) return;
+
+      if (socket.userId === room.hostId && targetUserId) {
+        room.teams.Red = room.teams.Red.filter((id) => id !== targetUserId);
+        room.teams.Blue = room.teams.Blue.filter((id) => id !== targetUserId);
+        io.to(roomId).emit("userKicked", { userId: targetUserId });
+
+        const targetSocket = findSocketByUserId(targetUserId);
+        if (targetSocket) {
+          targetSocket.emit("kicked");
+          targetSocket.leave(roomId);
+          targetSocket.roomId = null;
+        }
+      }
+    });
+
     // --- CHAT (kept) ---
     socket.on("chat", ({ roomId, userId, displayName, team, message }) => {
       if (!rooms[roomId]) {
@@ -482,7 +500,7 @@ function createLobbyManager(io, UserModel) {
     });
   });
 
-  return { findSocketByUserId, rooms };
+  return { findSocketByUserId };
 }
 
 module.exports = createLobbyManager;

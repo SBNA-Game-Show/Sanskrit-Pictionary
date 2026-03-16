@@ -33,10 +33,10 @@ const stylesMap={
 const svgToDataUrl = (svg) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
 
-//This function defines the ProfileUI and manages the user profile state, including display name and avatar preferences. 
+//This function defines the ProfileSettings and manages the user profile state, including display name and avatar preferences. 
 // /It loads existing profile data on mount, generates a live preview of the avatar based on user selections, 
 // //and handles saving the profile data when the user clicks the save button.
-export default function ProfileUI() {
+export default function ProfileSettings() {
     const [displayName, setDisplayName] = useState('');
     const [avatarSeed, setAvatarSeed] = useState('player');
     const [avatarStyle, setAvatarStyle] = useState('funEmoji');

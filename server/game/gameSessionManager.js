@@ -42,13 +42,24 @@ function pushManyDeva(set, raw) {
   }
 }
 // ======================================================
+const EventEmitter = require("events");
 
-class GameSessionManager {
+class GameSessionManager extends EventEmitter {
   constructor() {
+    super();
     this.sessions = new Map();
   }
 
-  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData) {
+  // --- PAUSE/RESUME LOGIC ---
+  pauseTimer(gameId) {
+    this.emit("pauseTimer", gameId);
+  }
+
+  resumeTimer(gameId) {
+    this.emit("resumeTimer", gameId);
+  }
+
+  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses) {
     // assign players to selected teams
     players.forEach((p) => {
       if (teams.Red.includes(p.userId)) {
@@ -70,6 +81,7 @@ class GameSessionManager {
       currentPlayerIndex: firstDrawerIndex,
       timer,
       difficulty,
+      guesses: Number(guesses) || 5, // Guesses config with default value 3
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
@@ -89,7 +101,8 @@ class GameSessionManager {
     });
 
     console.log(
-      `[createSession] gameId=${gameId} players=${players.length} timer=${timer} difficulty=${difficulty}`
+      `[createSession] gameId=${gameId} players=${players.length} 
+        timer=${timer} difficulty=${difficulty} guesses=${guesses}`
     );
   }
 
@@ -170,7 +183,8 @@ class GameSessionManager {
     // Reset per-player guesses + answered state for new round
     session.players.forEach((p) => {
       p.hasAnswered = false;
-      p.remainingGuesses = 4;
+      // reset player's guesses with configed value in session
+      p.remainingGuesses = session.guesses; 
     });
 
     const flashcard = await this.getRandomFlashcard(gameId, session.difficulty);
@@ -211,6 +225,7 @@ class GameSessionManager {
       totalRounds: session.totalRounds,
       currentPlayer: currentPlayer.displayName,
       timer: session.timer,
+      guesses: session.guesses, // send configed guesses
       // per-player guesses are sent via updatePlayers/gameState
     });
 
@@ -227,6 +242,7 @@ class GameSessionManager {
       currentRound: session.currentRound,
       totalRounds: session.totalRounds,
       timer: session.timer,
+      guesses: session.guesses, // add guesses
       currentFlashcard: null, // drawer-only
       scores: session.scores,
     });
@@ -317,14 +333,14 @@ class GameSessionManager {
       return { everyoneCorrect, allGuessersDone };
     };
 
-    // Ensure remainingGuesses is always a finite number in the 0..4 range.
+    // Ensure remainingGuesses is always a finite number in the 0..session.guesses range.
     // This prevents accidental extra chances due to falsy/undefined values.
     const rgRaw = player.remainingGuesses;
     const rgNum = Number(rgRaw);
     if (!Number.isFinite(rgNum)) {
-      player.remainingGuesses = 4;
+      player.remainingGuesses = session.guesses;
     } else {
-      player.remainingGuesses = Math.max(0, Math.min(4, Math.floor(rgNum)));
+      player.remainingGuesses = Math.max(0, Math.min(session.guesses, Math.floor(rgNum)));
     }
 
     if (player.remainingGuesses <= 0) {
@@ -417,7 +433,7 @@ class GameSessionManager {
     }
 
     // wrong answer
-    player.remainingGuesses = Math.max(0, (player.remainingGuesses ?? 4) - 1);
+    player.remainingGuesses = Math.max(0, (player.remainingGuesses ?? session.guesses) - 1);
 
     // ----- score penalty for wrong answer -----
     const WRONG_ANSWER_PENALTY = 15;
@@ -480,7 +496,7 @@ class GameSessionManager {
       userId: p.userId,
       team: p.team,
       points: session.scores[p.userId] || 0,
-      remainingGuesses: p.remainingGuesses ?? 4,
+      remainingGuesses: p.remainingGuesses ?? session.guesses,
       imageSrc: p.imageSrc || "",
     }));
   }
@@ -577,6 +593,15 @@ class GameSessionManager {
   getCanvasData(gameId) {
     const session = this.sessions.get(gameId);
     return session?.canvasData || null;
+  }
+
+  deleteSession(gameId) {
+    if (this.sessions.has(gameId)) {
+      this.sessions.delete(gameId);
+      console.log(`[Session] Deleted session ${gameId}`);
+      return true;
+    }
+    return false;
   }
 }
 

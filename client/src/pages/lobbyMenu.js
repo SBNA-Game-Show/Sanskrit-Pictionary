@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { nanoid } from "nanoid";
-import { getUserId } from "../utils/authStorage";
+import { getUserId, getDisplayName } from "../utils/authStorage";
 import { toastError, toastSuccess } from "../utils/toast";
+import { socket } from "./socket"; 
 
 const LobbyMenu = () => {
   const [roomInput, setRoomInput] = useState("");
@@ -25,6 +26,12 @@ const LobbyMenu = () => {
     }
 
     const myRoomId = nanoid(6); // short alpha-numeric room code
+    // emit room creation 
+    socket.emit("createRoom", {
+      userId: userId,
+      displayName: getDisplayName() ,
+      roomId: myRoomId,
+    });
     navigate(`/lobby/${myRoomId}`);
   };
 
@@ -52,10 +59,6 @@ const LobbyMenu = () => {
           return;
         }
 
-        // Room is valid and has space
-        toastSuccess(
-          `Room found! Joining... (${data.playerCount} players online)`,
-        );
         navigate(`/lobby/${roomCode}`);
       } else {
         // Room doesn't exist

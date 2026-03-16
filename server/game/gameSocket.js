@@ -4,6 +4,15 @@ const activeTimers = {};
 const advancingRounds = new Set(); //Prevent repeated entry into the next round
 
 function createGameSocket(io) {
+  // Listen for pause/resume events from session manager
+  gameSessionManager.on("pauseTimer", (gameId) => {
+    pauseActiveTimer(gameId);
+  });
+
+  gameSessionManager.on("resumeTimer", (gameId) => {
+    resumeActiveTimer(io, gameId);
+  });
+
   io.on("connection", (socket) => {
     // ---- register / state ----
     socket.on("registerLobby", ({ userId, displayName, roomId }) => {
@@ -46,7 +55,7 @@ function createGameSocket(io) {
           const canvasData = gameSessionManager.getCanvasData(roomId);
 
           const me = session.players.find((p) => p.userId === userId);
-          const myRemainingGuesses = me?.remainingGuesses ?? 4;
+          const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
 
           // Send current game state to reconnected player
           socket.emit("gameState", {
@@ -57,6 +66,7 @@ function createGameSocket(io) {
             currentRound: session.currentRound,
             totalRounds: session.totalRounds,
             timer: activeTimers[roomId]?.secondsLeft || session.timer,
+            guesses: session.guesses,
             currentFlashcard: session.currentFlashcard,
             scores: session.scores,
             canvasData: canvasData,
@@ -85,6 +95,7 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
+          guesses,
           currentFlashcard,
           scores,
         } = session;
@@ -93,7 +104,7 @@ function createGameSocket(io) {
         const canvasData = gameSessionManager.getCanvasData(roomId);
 
         const me = session.players.find((p) => p.userId === socket.userId);
-        const myRemainingGuesses = me?.remainingGuesses ?? 4;
+        const myRemainingGuesses = me?.remainingGuesses ?? session.guesses;
         socket.emit("gameState", {
           players,
           hostData,
@@ -102,6 +113,7 @@ function createGameSocket(io) {
           currentRound,
           totalRounds,
           timer,
+          guesses,
           currentFlashcard,
           scores,
           canvasData: canvasData,
@@ -113,12 +125,13 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      async ({ gameId, totalRounds, timer, difficulty, hostData, teams }) => {
+      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
           timer,
           difficulty,
+          guesses, // Add guesses in log
           by: socket.id,
           userId: socket.userId,
         });
@@ -145,6 +158,7 @@ function createGameSocket(io) {
           difficulty,
           teams,
           hostData,
+          guesses // Send guesses to manager
         );
         await gameSessionManager.startRound(gameId, io);
 
@@ -292,6 +306,11 @@ function createGameSocket(io) {
         io.to(roomId).emit("roomPlayers", { players: session.players });
     });
 
+    socket.on("deleteRoom", ({ roomId }) => {
+      console.log(`[socket] deleteRoom requested for: ${roomId}`);
+      gameSessionManager.deleteSession(roomId);
+    });
+
     // REPLACE the empty disconnect handler with this:
     socket.on("disconnect", (reason) => {
       console.log(
@@ -412,6 +431,24 @@ function startSynchronizedTimer(io, gameId, duration) {
   activeTimers[gameId].intervalId = intervalId;
 }
 
+function pauseActiveTimer(gameId) {
+  if (activeTimers[gameId] && activeTimers[gameId].intervalId) {
+    clearInterval(activeTimers[gameId].intervalId);
+    activeTimers[gameId].intervalId = null; // Mark as paused
+  }
+}
+
+function resumeActiveTimer(io, gameId) {
+  if (
+    activeTimers[gameId] &&
+    activeTimers[gameId].intervalId === null &&
+    activeTimers[gameId].secondsLeft > 0
+  ) {
+    // Restart with remaining time
+    startSynchronizedTimer(io, gameId, activeTimers[gameId].secondsLeft);
+  }
+}
+
 function clearActiveTimer(gameId) {
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
@@ -456,4 +493,8 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   }
 }
 
-module.exports = createGameSocket;
+module.exports = {
+  createGameSocket,
+  clearActiveTimer,
+  proceedToNextRound,
+};

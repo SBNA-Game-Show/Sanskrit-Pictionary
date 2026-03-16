@@ -62,13 +62,6 @@
   gap: 10px;
 }
 
-.chat-box {
-  grid-column: 4 / 5;
-  grid-row: 5 / 6;
-  width: 320px;
-  margin: auto;
-}
-
 .input-area-wrapper {
   grid-column: 4 / 5;
   grid-row: 3 / 5;
@@ -250,7 +243,6 @@
   font-size: 20px;
   color: #c62828;
   white-space: nowrap;
-
 }
 
 .round-result-modal .modal-card.wrong-answer p {
@@ -577,4 +569,40 @@
 .modal-button.kick:hover {
   background: #d62a2a;
   box-shadow: 0 4px 12px rgba(214, 42, 42, 0.4);
+}
+
+.pause-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.pause-content {
+  background: var(--surface-1, #1e1e2e);
+  padding: 30px;
+  border-radius: 12px;
+  border: 2px solid var(--primary, #6366f1);
+  text-align: center;
+  color: white;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.pause-content h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  color: var(--accent, #f38ba8);
+}
+
+.pause-content p {
+  margin: 0;
+  font-size: 1.1rem;
 }

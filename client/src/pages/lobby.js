@@ -29,6 +29,7 @@ const Lobby = () => {
   const [selectedRounds, setSelectedRounds] = useState(1);
   const [selectedTimer, setSelectedTimer] = useState(30);
   const [selectedDifficulty, setSelectedDifficulty] = useState("Easy");
+  const [selectedGuesses, setSelectedGuesses] = useState(4); // Added new config for guesses
   const [currentRound, setCurrentRound] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -63,17 +64,36 @@ const Lobby = () => {
     if (!roomId) return;
 
     // unction to rejoin
-    const rejoinLobby = () => {
+    const rejoinLobby = async () => {
       console.log("[Lobby] Rejoining lobby");
 
-      socket.emit("registerLobby", {
-        userId: myUserId,
-        displayName: myDisplayName,
-        roomId,
-      });
+      // Checking room existence before joining
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
 
-      socket.emit("requestLobbyUsers", { roomId });
-      socket.emit("getHost", { roomId });
+      try {
+        // Call API for room exists status
+        const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
+        const data = await response.json();
+
+        if (data.exists) {
+          // Emit registerLobby only when room exists
+          socket.emit("registerLobby", {
+            userId: myUserId,
+            displayName: myDisplayName,
+            roomId,
+          });
+
+          socket.emit("requestLobbyUsers", { roomId });
+          socket.emit("getHost", { roomId });
+        } else {
+          // Navigate to home if room code is invalid.
+          toastError("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
+          navigate(`/lobby`, { replace: true })
+          return;
+        }
+      } catch (error) {
+        console.error("[Play] Failed to verify room status:", error);
+      }
     };
 
     // Initial registration
@@ -129,12 +149,14 @@ const Lobby = () => {
       setSelectedRounds(settings.rounds);
       setSelectedTimer(settings.timer);
       setSelectedDifficulty(settings.difficulty);
+      setSelectedGuesses(settings.guesses);
     });
 
-    socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
+    socket.on("roundStarted", ({ currentRound, currentPlayer, timer, guesses }) => {
       setCurrentRound(currentRound);
       setCurrentPlayer(currentPlayer);
       setTimeLeft(timer);
+      setSelectedGuesses(guesses);
       navigate(`/play/${roomId}`);
     });
 
@@ -181,7 +203,8 @@ const Lobby = () => {
       navigate("/lobby");
     });
 
-    socket.on("hostDisconnectedOthers", ({ hostName }) => {
+    socket.on("hostDisconnectedOthers", ({ hostName, hostId }) => {
+      if (hostId === myUserId) return;
       toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
         autoClose: 4000,
       });
@@ -196,12 +219,7 @@ const Lobby = () => {
       toastWarning(`${displayName} left the lobby`, { autoClose: 2500 });
     });
 
-    // 2) After listeners are ready, emit registration & state requests
-    socket.emit("registerLobby", {
-      userId: myUserId,
-      displayName: myDisplayName,
-      roomId,
-    });
+    // 2) After listeners are ready, emit state requests
     socket.emit("requestLobbyUsers", { roomId });
     socket.emit("getHost", { roomId });
 
@@ -279,15 +297,18 @@ const Lobby = () => {
       rounds: selectedRounds,
       timer: selectedTimer,
       difficulty: selectedDifficulty,
+      guesses: selectedGuesses
     };
     if (setting === "rounds") updated.rounds = value;
     if (setting === "timer") updated.timer = value;
     if (setting === "difficulty") updated.difficulty = value;
+    if (setting === "guesses") updated.guesses = value;
 
     // reflect immediately
     setSelectedRounds(updated.rounds);
     setSelectedTimer(updated.timer);
     setSelectedDifficulty(updated.difficulty);
+    setSelectedGuesses(updated.guesses);
 
     // broadcast to room (server validates host)
     socket.emit("updateGameSettings", { roomId, newSettings: updated });
@@ -452,6 +473,7 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Timer</h3>
+            {console.log("Current timer in Render:", selectedTimer)}
             <div className="option-buttons">
               {/* Added time to adjust styling. To be removed when completed*/}
               {[30, 45, 60, 75, 90].map((sec) => (
@@ -469,6 +491,7 @@ const Lobby = () => {
 
           <div className="setting-section">
             <h3>Select Difficulty</h3>
+            {console.log("Current diff in Render:", selectedDifficulty)}
             <div className="option-buttons">
               {["Easy", "Medium", "Hard"].map((level) => (
                 <button
@@ -478,6 +501,24 @@ const Lobby = () => {
                   disabled={!isHost}
                 >
                   {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Added config for guessess in the lobby */}
+          <div className="setting-section">
+            <h3>Select Chances</h3>
+            {console.log("Current selectedGuesses in Render:", selectedGuesses)}
+            <div className="option-buttons">
+              {[1, 2, 3, 4].map((num) => (
+                <button
+                  key={num}
+                  className={selectedGuesses === num ? "active" : ""}
+                  onClick={() => handleSettingsChange("guesses", num)}
+                  disabled={!isHost}
+                >
+                  {num}
                 </button>
               ))}
             </div>
@@ -493,6 +534,7 @@ const Lobby = () => {
                     totalRounds: selectedRounds,
                     timer: selectedTimer,
                     difficulty: selectedDifficulty,
+                    guesses: selectedGuesses, // send guesses to server
                     hostData: {
                       hostId,
                       hostDisplayName: myDisplayName,

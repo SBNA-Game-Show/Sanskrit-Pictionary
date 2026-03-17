@@ -998,7 +998,7 @@ const Play = () => {
         <div className="pause-overlay">
           <div className="pause-content">
             <h2>Game Paused</h2>
-            <p>Waiting 10s for Host {pausedByHost} to reconnect...</p>
+            <p>Waiting 60s for Host {pausedByHost} to reconnect...</p>
           </div>
         </div>
       )}

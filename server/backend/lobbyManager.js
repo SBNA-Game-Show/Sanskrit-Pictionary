@@ -595,7 +595,9 @@ function createLobbyManager(io, UserModel) {
     };
 
     socket.on("disconnect", () => handleDisconnect(socket));
-    socket.on("manualDisconnect", () => handleDisconnect(socket));
+    if (process.env.DISABLE_MANUAL_RECONNECT !== "true") {
+      socket.on("manualDisconnect", () => handleDisconnect(socket));
+    }
 
     socket.on("deleteRoom", ({ roomId }) => {
       if (rooms[roomId]) {

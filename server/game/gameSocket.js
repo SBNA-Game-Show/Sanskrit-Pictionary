@@ -4,6 +4,15 @@ const activeTimers = {};
 const advancingRounds = new Set(); //Prevent repeated entry into the next round
 
 function createGameSocket(io) {
+  // Listen for pause/resume events from session manager
+  gameSessionManager.on("pauseTimer", (gameId) => {
+    pauseActiveTimer(gameId);
+  });
+
+  gameSessionManager.on("resumeTimer", (gameId) => {
+    resumeActiveTimer(io, gameId);
+  });
+
   io.on("connection", (socket) => {
     // ---- register / state ----
     socket.on("registerLobby", ({ userId, displayName, roomId }) => {
@@ -297,6 +306,11 @@ function createGameSocket(io) {
         io.to(roomId).emit("roomPlayers", { players: session.players });
     });
 
+    socket.on("deleteRoom", ({ roomId }) => {
+      console.log(`[socket] deleteRoom requested for: ${roomId}`);
+      gameSessionManager.deleteSession(roomId);
+    });
+
     // REPLACE the empty disconnect handler with this:
     socket.on("disconnect", (reason) => {
       console.log(
@@ -417,6 +431,24 @@ function startSynchronizedTimer(io, gameId, duration) {
   activeTimers[gameId].intervalId = intervalId;
 }
 
+function pauseActiveTimer(gameId) {
+  if (activeTimers[gameId] && activeTimers[gameId].intervalId) {
+    clearInterval(activeTimers[gameId].intervalId);
+    activeTimers[gameId].intervalId = null; // Mark as paused
+  }
+}
+
+function resumeActiveTimer(io, gameId) {
+  if (
+    activeTimers[gameId] &&
+    activeTimers[gameId].intervalId === null &&
+    activeTimers[gameId].secondsLeft > 0
+  ) {
+    // Restart with remaining time
+    startSynchronizedTimer(io, gameId, activeTimers[gameId].secondsLeft);
+  }
+}
+
 function clearActiveTimer(gameId) {
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
@@ -461,4 +493,8 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   }
 }
 
-module.exports = createGameSocket;
+module.exports = {
+  createGameSocket,
+  clearActiveTimer,
+  proceedToNextRound,
+};

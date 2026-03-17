@@ -60,6 +60,10 @@ const Play = () => {
   const [remainingGuesses, setRemainingGuesses] = useState(4);
   const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
 
+  // Audio + timeout refs for round reveal popup sound
+  const roundRevealTimeoutRef = useRef(null);
+  const revealAudioRef = useRef(new Audio());
+
   // For multiple-choice image selection (guessers only)
   const [imageChoices, setImageChoices] = useState([]);
   const [showChoices, setShowChoices] = useState(false);
@@ -529,25 +533,73 @@ const Play = () => {
       setTimeout(() => setRoundResult(null), 1500);
     });
 
+    
+    // Helper: converts flashcard image path → matching audio pronunciation file
+    // Example: /FlashCardEasy/bird.png → /FlashCardEasy/audio/bird.mp3
+        const imageToAudio = (imageSrc) => {
+      if (!imageSrc) return "";
+      const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
+      const parts = src.split("/").filter(Boolean);
+      const folder = parts[0];
+      const file = parts[parts.length - 1];
+      const base = file.split(".")[0].toLowerCase();
+      return `/${folder}/audio/${base}.mp3`;
+    };
+
+    // ADDED: Round reveal audio system
+    // - Plays pronunciation sound when the correct word popup appears
+    // - Uses server audioSrc if available
+    // - Falls back to generating audio path from imageSrc
+    // - Uses refs to prevent multiple overlapping sounds
+    // - Clears previous timeout and audio before starting new one
     socket.on("turnEnded", (data) => {
-      console.log("[Play] turnEnded", data);
+  console.log("[Play] turnEnded", data);
 
-      setRoundReveal({
-        word: data.word,
-        transliteration: data.transliteration,
-        imageSrc: data.imageSrc,
-      });
+  if (roundRevealTimeoutRef.current) {
+    clearTimeout(roundRevealTimeoutRef.current);
+  }
 
-      if (data.audioSrc) {
-        const audio = new Audio(data.audioSrc);
-        audio.currentTime = 0;
-        audio.play();
+  setRoundReveal({
+    word: data.word,
+    transliteration: data.transliteration,
+    imageSrc: data.imageSrc,
+  });
+
+  const resolvedAudioSrc = data.audioSrc || imageToAudio(data.imageSrc);
+  console.log("[Play] resolvedAudioSrc:", resolvedAudioSrc);
+
+  if (resolvedAudioSrc && revealAudioRef.current) {
+    const audioEl = revealAudioRef.current;
+
+    try {
+      audioEl.pause();
+      audioEl.removeAttribute("src");
+      audioEl.load();
+
+      audioEl.src = resolvedAudioSrc;
+      audioEl.currentTime = 0;
+
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("[Play] reveal audio play failed:", err, resolvedAudioSrc);
+        });
       }
+    } catch (err) {
+      console.warn("[Play] audio reset/play error:", err, resolvedAudioSrc);
+    }
+  }
 
-      setTimeout(() => {
-        setRoundReveal(null);
-      }, 4000);
-    });
+  roundRevealTimeoutRef.current = setTimeout(() => {
+    setRoundReveal(null);
+
+    if (revealAudioRef.current) {
+      revealAudioRef.current.pause();
+      revealAudioRef.current.currentTime = 0;
+    }
+  }, 5000);
+});
+    
 
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
@@ -998,7 +1050,7 @@ const Play = () => {
         <div className="pause-overlay">
           <div className="pause-content">
             <h2>Game Paused</h2>
-            <p>Waiting 10s for Host {pausedByHost} to reconnect...</p>
+            <p>Waiting 60s for Host {pausedByHost} to reconnect...</p>
           </div>
         </div>
       )}

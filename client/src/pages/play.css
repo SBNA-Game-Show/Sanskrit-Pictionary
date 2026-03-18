@@ -918,9 +918,6 @@
     grid-row:2/3;
   }
 
-  .guesser-view .user-list{
-    /* height:60%; */
-  }
 
   .player-view .guesses-box{
     grid-column:2;

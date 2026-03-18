@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { socket } from "../pages/socket";
 import "./FloatableChat.css";
+import { toastError } from "../utils/toast";
 
 const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
   const { roomId } = useParams();
@@ -48,9 +49,15 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
       }
     });
 
+    // Listen for chat errors
+    socket.on("chatError", ({ error }) => {
+      toastError(error);
+    });
+
     return () => {
       socket.off("chatHistory");
       socket.off("chat");
+      socket.off("chatError");
     };
   }, [roomId, isMinimized, myUserId]);
 

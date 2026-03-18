@@ -103,7 +103,7 @@ function createLobbyManager(io, UserModel) {
       if (!rooms[roomId]) {
         rooms[roomId] = {
           hostId: userId,
-          settings: { rounds: 1, timer: 30, difficulty: "Easy", guesses: 3 },
+          settings: { rounds: 1, timer: 30, difficulty: "Easy", guesses: 3, isLearningMode: true },
           teams: { Red: [], Blue: [] },
           chat: [],
         };
@@ -337,7 +337,7 @@ function createLobbyManager(io, UserModel) {
     // --- START GAME (added minimal flow to avoid "blank page") ---
     socket.on(
       "startGame",
-      async ({ gameId, totalRounds, timer, difficulty }) => {
+      async ({ gameId, totalRounds, timer, difficulty, isLearningMode }) => {
         const room = rooms[gameId];
         if (
           !room ||
@@ -357,6 +357,7 @@ function createLobbyManager(io, UserModel) {
           rounds: totalRounds ?? room.settings.rounds,
           timer: timer ?? room.settings.timer,
           difficulty: difficulty ?? room.settings.difficulty,
+          isLearningMode: isLearningMode ?? room.settings.isLearningMode
         };
         io.to(gameId).emit("gameSettingsUpdate", room.settings);
 

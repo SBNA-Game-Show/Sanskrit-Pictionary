@@ -7,6 +7,10 @@ const Filter = require("leo-profanity");
 // In-memory room state: roomId => { hostId, settings, teams, chat }
 const rooms = {};
 
+// Track profanity violations per user per room
+// Structure: { roomId: { userId: violationCount } }
+const profanityViolations = {};
+
 function createLobbyManager(io, UserModel) {
   // Helper: find a socket by userId
   function findSocketByUserId(userId) {
@@ -103,6 +107,91 @@ function createLobbyManager(io, UserModel) {
           }
         }
       }
+    }
+  }
+
+  function handleProfanityViolation(socket, roomId, userId, displayName) {
+    // Initialize tracking for this room if needed
+    if (!profanityViolations[roomId]) {
+      profanityViolations[roomId] = {};
+    }
+
+    // Increment violation count for this user
+    profanityViolations[roomId][userId] =
+      (profanityViolations[roomId][userId] || 0) + 1;
+    const violationCount = profanityViolations[roomId][userId];
+
+    if (violationCount === 1) {
+      // First warning
+      socket.emit("chatWarning", {
+        message: "Warning 1/2: Please keep the chat friendly and respectful.",
+        violationCount: 1,
+      });
+      return false;
+    } else if (violationCount === 2) {
+      // Second warning
+      socket.emit("chatWarning", {
+        message:
+          "Warning 2/2: Last warning! Next violation will result in being kicked.",
+        violationCount: 2,
+      });
+      return false;
+    } else {
+      // Third violation - kick the user
+      socket.emit("chatKicked", {
+        message:
+          "You have been removed from the lobby for repeated inappropriate language.",
+      });
+
+      // Notify others in the room
+      socket.to(roomId).emit("userKickedForProfanity", {
+        displayName: displayName,
+        message: `${displayName} has been removed for violating chat policies.`,
+      });
+
+      // Remove from game session if game is in progress
+      const session = gameSessionManager.getSession(roomId);
+      if (session) {
+        const kickResult = gameSessionManager.kickPlayer(roomId, userId);
+        if (kickResult) {
+          const { isCurrentDrawer, kickedPlayer } = kickResult;
+
+          // Notify about player removal during game
+          io.to(roomId).emit("playerRemoved", {
+            userId,
+            displayName: kickedPlayer.displayName,
+          });
+
+          // Update player list
+          io.to(roomId).emit(
+            "updatePlayers",
+            gameSessionManager.getPlayersWithScores(roomId),
+          );
+
+          // If kicked player was drawing, proceed to next round
+          if (isCurrentDrawer) {
+            clearActiveTimer(roomId);
+            proceedToNextRound(io, roomId, kickedPlayer);
+          }
+        }
+      }
+
+      // Remove user from teams (for lobby)
+      const room = rooms[roomId];
+      if (room) {
+        room.teams.Red = room.teams.Red.filter((id) => id !== userId);
+        room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
+        io.to(roomId).emit("teamsUpdate", room.teams);
+      }
+
+      // Remove user from room
+      socket.leave(roomId);
+      socket.roomId = null;
+
+      // Clean up violation tracking for this user
+      delete profanityViolations[roomId][userId];
+
+      return true; // User was kicked
     }
   }
 
@@ -442,11 +531,22 @@ function createLobbyManager(io, UserModel) {
     socket.on("chat", ({ roomId, userId, displayName, team, message }) => {
       // Check for profanity
       if (Filter.check(message)) {
-        socket.emit("chatError", {
-          error: "Please keep the chat friendly and respectful.",
-        });
-        return;
+        const wasKicked = handleProfanityViolation(
+          socket,
+          roomId,
+          userId,
+          displayName,
+        );
+
+        if (!wasKicked) {
+          // User was warned but not kicked
+          return;
+        } else {
+          // User was kicked - already handled in handleProfanityViolation
+          return;
+        }
       }
+
       if (!rooms[roomId]) {
         rooms[roomId] = { chat: [], teams: { Red: [], Blue: [] } };
       }
@@ -480,6 +580,15 @@ function createLobbyManager(io, UserModel) {
         mongoose.Types.ObjectId.isValid(finalUserId)
       ) {
         await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
+      }
+      // Clean up violation tracking
+      if (profanityViolations[roomId]) {
+        delete profanityViolations[roomId][userId];
+
+        // Clean up room violations if empty
+        if (Object.keys(profanityViolations[roomId]).length === 0) {
+          delete profanityViolations[roomId];
+        }
       }
     });
 
@@ -638,6 +747,16 @@ function createLobbyManager(io, UserModel) {
         mongoose.Types.ObjectId.isValid(userId)
       ) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
+      }
+
+      // Clean up profanity violations for this user
+      if (roomId && userId && profanityViolations[roomId]) {
+        delete profanityViolations[roomId][userId];
+
+        // Clean up room violations object if empty
+        if (Object.keys(profanityViolations[roomId]).length === 0) {
+          delete profanityViolations[roomId];
+        }
       }
 
       console.log("❌ Socket disconnected:", socketInput.id);

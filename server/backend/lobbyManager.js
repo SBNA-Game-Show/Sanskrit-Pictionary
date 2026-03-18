@@ -27,7 +27,7 @@ function createLobbyManager(io, UserModel) {
         if (user) userDisplayName = user.displayName;
       }
 
-      // Clear 10s disconnect timers
+      // Clear disconnect timers
       if (room.hostDisconnectTimeout && room.hostId === userId) {
          clearTimeout(room.hostDisconnectTimeout);
          room.hostDisconnectTimeout = null;
@@ -473,14 +473,14 @@ function createLobbyManager(io, UserModel) {
         const session = gameSessionManager.getSession(roomId);
         if (session) {
           console.log(
-            `[disconnect] Host ${userId} disconnected, but game ${roomId} is in progress. Pausing for 10s.`,
+            `[disconnect] Host ${userId} disconnected, but game ${roomId} is in progress. Pausing for 60s.`,
           );
           
           io.to(roomId).emit("gamePaused", { hostName: userDisplayName });
           gameSessionManager.pauseTimer(roomId);
 
           room.hostDisconnectTimeout = setTimeout(async () => {
-            console.log(`[disconnect] Host ${userId} did not return to ${roomId} within 10s. Kicking everyone.`);
+            console.log(`[disconnect] Host ${userId} did not return to ${roomId} within 60s. Kicking everyone.`);
             io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName, hostId: userId });
             gameSessionManager.deleteSession(roomId);
             delete rooms[roomId];
@@ -506,7 +506,7 @@ function createLobbyManager(io, UserModel) {
                 }
               }
             }
-          }, 10000); // 10 seconds
+          }, 60000);
 
           return;
         }
@@ -556,7 +556,7 @@ function createLobbyManager(io, UserModel) {
 
           room.playerDisconnectTimeouts = room.playerDisconnectTimeouts || {};
           room.playerDisconnectTimeouts[userId] = setTimeout(async () => {
-            console.log(`[disconnect] Player ${userId} did not return to ${roomId} within 10s. Kicking.`);
+            console.log(`[disconnect] Player ${userId} did not return to ${roomId} within 30s. Kicking.`);
 
             const kickResult = gameSessionManager.kickPlayer(roomId, userId);
             if (!kickResult) return;
@@ -577,7 +577,7 @@ function createLobbyManager(io, UserModel) {
             if (!userId.startsWith("guest_") && mongoose.Types.ObjectId.isValid(userId)) {
               await UserModel.findByIdAndUpdate(userId, { isOnline: false });
             }
-          }, 10000);
+          }, 30000);
 
           return; // don't mark offline yet
         }
@@ -596,7 +596,9 @@ function createLobbyManager(io, UserModel) {
     };
 
     socket.on("disconnect", () => handleDisconnect(socket));
-    socket.on("manualDisconnect", () => handleDisconnect(socket));
+    if (process.env.DISABLE_MANUAL_RECONNECT !== "true") {
+      socket.on("manualDisconnect", () => handleDisconnect(socket));
+    }
 
     socket.on("deleteRoom", ({ roomId }) => {
       if (rooms[roomId]) {

@@ -38,6 +38,7 @@ const svgToDataUrl = (svg) =>
 // //and handles saving the profile data when the user clicks the save button.
 export default function ProfileSettings() {
   const [displayName, setDisplayName] = useState("");
+  const [originalDisplayName, setOriginalDisplayName] = useState("");
   const [avatarSeed, setAvatarSeed] = useState("player");
   const [avatarStyle, setAvatarStyle] = useState("funEmoji");
   const [uploadDataUrl, setUploadDataUrl] = useState(null);
@@ -47,7 +48,9 @@ export default function ProfileSettings() {
   // This is ran once when the component is first rendered.
   useEffect(() => {
     const data = loadProfileData();
-    setDisplayName(data.displayName || "");
+    const loadedName = data.displayName || "";
+    setDisplayName(loadedName);
+    setOriginalDisplayName(loadedName);
     setAvatarSeed(data.avatarSeed || "player");
     setAvatarStyle(data.avatarStyle || "funEmoji");
     setUploadDataUrl(data.uploadDataUrl || null);
@@ -72,9 +75,11 @@ export default function ProfileSettings() {
         avatarStyle,
         ...avatarData,
       });
+      setOriginalDisplayName(displayName);
       toastSuccess("Profile saved successfully! ✨");
     } catch (error) {
       console.error("Error saving profile:", error);
+      setDisplayName(originalDisplayName);
       const errorMessage =
         error.response?.data?.error || "Failed to update profile";
       toastError(errorMessage);
@@ -101,6 +106,7 @@ export default function ProfileSettings() {
         placeholder="name to display"
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
+        disabled={saving}
       />
 
       <div className="avatar-row">

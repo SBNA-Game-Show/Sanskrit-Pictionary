@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
-const Filter = require("leo-profanity");
+const { containsProfanity } = require("../utils/profanityFilter");
 
 // GET /api/users/online
 router.get("/online", async (req, res) => {
@@ -62,7 +62,8 @@ router.post("/validate-username", (req, res) => {
       });
     }
 
-    if (Filter.check(displayName)) {
+    // Use helper function
+    if (containsProfanity(displayName)) {
       return res.status(400).json({
         valid: false,
         error:
@@ -85,14 +86,13 @@ router.put("/me/profile", async (req, res) => {
     const { userId, displayName, avatarSeed, avatarStyle } = req.body;
     if (!userId) return res.status(400).json({ error: "Missing userId" });
 
-    // Check for profanity in displayName if it's being updated
-    if (displayName && Filter.check(displayName)) {
+    // Use helper function
+    if (displayName && containsProfanity(displayName)) {
       return res.status(400).json({
         error:
           "Username contains inappropriate language. Please choose a different name.",
       });
     }
-
     const user = await User.findByIdAndUpdate(
       userId,
       {

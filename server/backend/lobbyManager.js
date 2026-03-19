@@ -2,7 +2,7 @@
 const mongoose = require("mongoose");
 const gameSessionManager = require("../game/gameSessionManager");
 const { clearActiveTimer, proceedToNextRound } = require("../game/gameSocket");
-const Filter = require("leo-profanity");
+const { containsProfanity } = require("../utils/profanityFilter");
 
 // In-memory room state: roomId => { hostId, settings, teams, chat }
 const rooms = {};
@@ -204,7 +204,13 @@ function createLobbyManager(io, UserModel) {
       if (!rooms[roomId]) {
         rooms[roomId] = {
           hostId: userId,
-          settings: { rounds: 1, timer: 30, difficulty: "Easy", guesses: 3, isLearningMode: true },
+          settings: {
+            rounds: 1,
+            timer: 30,
+            difficulty: "Easy",
+            guesses: 3,
+            isLearningMode: true,
+          },
           teams: { Red: [], Blue: [] },
           chat: [],
         };
@@ -469,7 +475,7 @@ function createLobbyManager(io, UserModel) {
           rounds: totalRounds ?? room.settings.rounds,
           timer: timer ?? room.settings.timer,
           difficulty: difficulty ?? room.settings.difficulty,
-          isLearningMode: isLearningMode ?? room.settings.isLearningMode
+          isLearningMode: isLearningMode ?? room.settings.isLearningMode,
         };
         io.to(gameId).emit("gameSettingsUpdate", room.settings);
 
@@ -529,8 +535,8 @@ function createLobbyManager(io, UserModel) {
 
     // --- CHAT (kept) ---
     socket.on("chat", ({ roomId, userId, displayName, team, message }) => {
-      // Check for profanity
-      if (Filter.check(message)) {
+      // Check for profanity using helper
+      if (containsProfanity(message)) {
         const wasKicked = handleProfanityViolation(
           socket,
           roomId,

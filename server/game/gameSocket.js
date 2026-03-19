@@ -378,6 +378,22 @@ function createGameSocket(io) {
         }
       }
     });
+
+    // End game
+    socket.on("gameEnded", ({ roomId, reason }) => {
+      console.log(`[Socket] Force game end requested for room ${roomId}. Reason: ${reason}`);
+      
+      const session = gameSessionManager.getSession(roomId);
+      if (session) {
+        const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(roomId);
+        clearActiveTimer(roomId);
+        session.gameEnded = true;
+        io.to(roomId).emit("gameEnded", { 
+          finalPlayers: finalPlayersWithScore,
+          reason: "insufficient team member"
+         });
+      }
+    });
   });
 }
 

@@ -76,7 +76,6 @@ const Play = () => {
   const [isGamePaused, setIsGamePaused] = useState(false);
   const [pausedByHost, setPausedByHost] = useState("");
 
-
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
   const [roundReveal, setRoundReveal] = useState(null);
@@ -644,6 +643,11 @@ const Play = () => {
         };
       });
 
+      // Warning popup for force ending by insufficient players
+      if (data.reason === "insufficient team member" ){
+        toastWarning(`Game ended: Minimum player requirement not met.`, { autoClose: 2000 });
+      }
+
       setTimeout(() => {
         setRoundResult(null);
         if (hostRef.current) {
@@ -692,6 +696,22 @@ const Play = () => {
   useEffect(() => {
     hostRef.current = isHost;
   }, [isHost]);
+
+  // Listerner for players changing
+  useEffect(() => {
+    // Only send from host to avoid duplication
+    if (!isHost || players.length === 0 || isGameEndedRef.current) return;
+
+    const redTeamCount = players.filter(p => p.team === "Red").length;
+    const blueTeamCount = players.filter(p => p.team === "Blue").length;
+
+    if (redTeamCount < 2 || blueTeamCount < 2) {
+      socket.emit("gameEnded", {
+        roomId,
+        reason: "Not enough players in one of the teams."
+      });
+    }
+  }, [players, isHost, roomId]);
   
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
@@ -1077,12 +1097,24 @@ const Play = () => {
                   Are you sure you want to kick{" "}
                   <strong>{kickTarget?.displayName}</strong> from the game?
                 </p>
-                <div className="modal-note">
-                  <span className="note-icon">ⓘ</span>
+                <div className="modal-note" style={{ display: 'flex', flexDirection: 'column'}}>
                   <span>
-                    Kicked players will be removed from the leaderboard and
+                    ⚠️ Kicked players will be removed from the leaderboard and
                     cannot rejoin until a new game starts.
                   </span>
+                  {/* Warning of gameEnded in confirm popup  */}
+                  {(() => {
+                    const targetUser = players.find(p => p.userId === kickTarget?.userId);
+                    const teamCount = players.filter(p => p.team === targetUser?.team).length;
+                    if (teamCount <= 2) {
+                      return (
+                      <span>
+                        ⚠️ <strong>Game will be ended</strong> as no enough players in {targetUser?.team} team.
+                      </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
               <div className="modal-footer">

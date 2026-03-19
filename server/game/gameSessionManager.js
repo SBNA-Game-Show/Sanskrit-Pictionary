@@ -118,22 +118,14 @@ class GameSessionManager extends EventEmitter {
     // Change this to fetch from the OFFICIAL github repo once thats setup, for now its using my personal one!
     const manifest = await response.json();
 
-    // Filter by difficulty usageTargets
-    const filtered = manifest.filter(card => 
-      card.difficulty?.toLowerCase() === difficulty.toLowerCase() &&
-      card.usageTargets?.includes('pictionary')
+    // Manifest is now pictionary-only and already uses the game schema.
+    const all = manifest.filter(
+      (card) =>
+        card.difficulty?.toLowerCase() === difficulty.toLowerCase() &&
+        card.word &&
+        card.transliteration &&
+        card.translation,
     );
-
-    // MAP to game format FOR NOW
-    const all = filtered.map(card => ({
-      word: card.sanskrit,           // ← Map field names!
-      transliteration: card.transliteration,
-      translation: card.translation,
-      imageSrc: card.imageUrl,       // ← Map field names!
-      audioSrc: card.audioUrl || "", // ← Map field names!
-      difficulty: card.difficulty,
-      otherNames: card.otherNames || []
-    }));
     
     // Shuffle in normal case!
     for (let i = all.length - 1; i > 0; i--) {

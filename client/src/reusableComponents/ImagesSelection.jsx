@@ -44,7 +44,7 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
           "/FlashCardHard/compassion.png",
           "/FlashCardHard/energy.png",
           "/FlashCardHard/freedom.png",
-          "/FlashCardHard/Happiness.png",
+          "/FlashCardHard/happiness.png",
           "/FlashCardHard/knowledge.png",
           "/FlashCardHard/mind.png",
           "/FlashCardHard/speech.png",

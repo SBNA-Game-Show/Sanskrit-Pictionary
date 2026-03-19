@@ -1,10 +1,20 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Filter = require("leo-profanity");
 
 exports.register = async (req, res) => {
   try {
     const { displayName, email, password } = req.body;
+
+    // Check for profanity in displayName
+    if (Filter.check(displayName)) {
+      return res.status(400).json({
+        error:
+          "Username contains inappropriate language. Please choose a different name.",
+      });
+    }
+
     const existing = await User.findOne({
       $or: [{ email }, { displayName }],
     });

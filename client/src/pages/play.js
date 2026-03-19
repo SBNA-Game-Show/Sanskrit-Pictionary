@@ -11,7 +11,12 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastError, toastInfo, toastSuccess } from "../utils/toast";
+import {
+  toastWarning,
+  toastError,
+  toastInfo,
+  toastSuccess,
+} from "../utils/toast";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
@@ -75,7 +80,6 @@ const Play = () => {
   // Pause state
   const [isGamePaused, setIsGamePaused] = useState(false);
   const [pausedByHost, setPausedByHost] = useState("");
-
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
@@ -195,7 +199,6 @@ const Play = () => {
 
     // Function to rejoin and sync state
     const rejoinAndSync = async () => {
-
       // Checking room existence before joining
       const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
 
@@ -215,8 +218,10 @@ const Play = () => {
           socket.emit("requestLobbyUsers", { roomId });
         } else {
           // Navigate to home if room code is invalid.
-          toastError("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
-          navigate(`/lobby`, { replace: true })
+          toastError("Invalid room code! Navigating to the lobby", {
+            toastId: "invalid-room",
+          });
+          navigate(`/lobby`, { replace: true });
         }
       } catch (error) {
         console.error("[Play] Failed to verify room status:", error);
@@ -257,7 +262,9 @@ const Play = () => {
     socket.on("gameResumed", ({ hostName }) => {
       setIsGamePaused(false);
       setPausedByHost("");
-      toastInfo(`Host ${hostName} returned! Game resumed.`, { autoClose: 3000 });
+      toastInfo(`Host ${hostName} returned! Game resumed.`, {
+        autoClose: 3000,
+      });
     });
 
     socket.on("userKicked", (kickedPlayer) => {
@@ -533,10 +540,9 @@ const Play = () => {
       setTimeout(() => setRoundResult(null), 1500);
     });
 
-    
     // Helper: converts flashcard image path → matching audio pronunciation file
     // Example: /FlashCardEasy/bird.png → /FlashCardEasy/audio/bird.mp3
-        const imageToAudio = (imageSrc) => {
+    const imageToAudio = (imageSrc) => {
       if (!imageSrc) return "";
       const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
       const parts = src.split("/").filter(Boolean);
@@ -553,53 +559,56 @@ const Play = () => {
     // - Uses refs to prevent multiple overlapping sounds
     // - Clears previous timeout and audio before starting new one
     socket.on("turnEnded", (data) => {
-  console.log("[Play] turnEnded", data);
+      console.log("[Play] turnEnded", data);
 
-  if (roundRevealTimeoutRef.current) {
-    clearTimeout(roundRevealTimeoutRef.current);
-  }
-
-  setRoundReveal({
-    word: data.word,
-    transliteration: data.transliteration,
-    imageSrc: data.imageSrc,
-  });
-
-  const resolvedAudioSrc = data.audioSrc || imageToAudio(data.imageSrc);
-  console.log("[Play] resolvedAudioSrc:", resolvedAudioSrc);
-
-  if (resolvedAudioSrc && revealAudioRef.current) {
-    const audioEl = revealAudioRef.current;
-
-    try {
-      audioEl.pause();
-      audioEl.removeAttribute("src");
-      audioEl.load();
-
-      audioEl.src = resolvedAudioSrc;
-      audioEl.currentTime = 0;
-
-      const playPromise = audioEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("[Play] reveal audio play failed:", err, resolvedAudioSrc);
-        });
+      if (roundRevealTimeoutRef.current) {
+        clearTimeout(roundRevealTimeoutRef.current);
       }
-    } catch (err) {
-      console.warn("[Play] audio reset/play error:", err, resolvedAudioSrc);
-    }
-  }
 
-  roundRevealTimeoutRef.current = setTimeout(() => {
-    setRoundReveal(null);
+      setRoundReveal({
+        word: data.word,
+        transliteration: data.transliteration,
+        imageSrc: data.imageSrc,
+      });
 
-    if (revealAudioRef.current) {
-      revealAudioRef.current.pause();
-      revealAudioRef.current.currentTime = 0;
-    }
-  }, 5000);
-});
-    
+      const resolvedAudioSrc = data.audioSrc || imageToAudio(data.imageSrc);
+      console.log("[Play] resolvedAudioSrc:", resolvedAudioSrc);
+
+      if (resolvedAudioSrc && revealAudioRef.current) {
+        const audioEl = revealAudioRef.current;
+
+        try {
+          audioEl.pause();
+          audioEl.removeAttribute("src");
+          audioEl.load();
+
+          audioEl.src = resolvedAudioSrc;
+          audioEl.currentTime = 0;
+
+          const playPromise = audioEl.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn(
+                "[Play] reveal audio play failed:",
+                err,
+                resolvedAudioSrc,
+              );
+            });
+          }
+        } catch (err) {
+          console.warn("[Play] audio reset/play error:", err, resolvedAudioSrc);
+        }
+      }
+
+      roundRevealTimeoutRef.current = setTimeout(() => {
+        setRoundReveal(null);
+
+        if (revealAudioRef.current) {
+          revealAudioRef.current.pause();
+          revealAudioRef.current.currentTime = 0;
+        }
+      }, 5000);
+    });
 
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
@@ -643,6 +652,13 @@ const Play = () => {
           avatarStyle: style,
         };
       });
+
+      // Warning popup for force ending by insufficient players
+      if (data.reason === "insufficient team member") {
+        toastWarning(`Game ended: Minimum player requirement not met.`, {
+          autoClose: 2000,
+        });
+      }
 
       setTimeout(() => {
         setRoundResult(null);
@@ -692,10 +708,29 @@ const Play = () => {
   useEffect(() => {
     hostRef.current = isHost;
   }, [isHost]);
-  
+
+  // Listerner for players changing
+  useEffect(() => {
+    // Only send from host to avoid duplication
+    if (!isHost || players.length === 0 || isGameEndedRef.current) return;
+
+    const redTeamCount = players.filter((p) => p.team === "Red").length;
+    const blueTeamCount = players.filter((p) => p.team === "Blue").length;
+
+    if (redTeamCount < 2 || blueTeamCount < 2) {
+      socket.emit("gameEnded", {
+        roomId,
+        reason: "Not enough players in one of the teams.",
+      });
+    }
+  }, [players, isHost, roomId]);
+
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
+
+  // Check if current user is a spectator (not in players list)
+  const isSpectator = !players.find((p) => p.userId === currentUserId);
 
   const renderUserChip = (user) => {
     const prof = profiles[user.userId] || {};
@@ -738,9 +773,15 @@ const Play = () => {
           width: "100%",
         }}
       >
-        
         {/* Avatar + Kick button */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "3px",
+          }}
+        >
           <InteractiveAvatar
             avatarSeed={seed}
             avatarStyle={style}
@@ -770,11 +811,24 @@ const Play = () => {
         </div>
 
         {/* DisplayName */}
-        <div style={{ display: "flex", alignItems: "center", width: "120px", gap: "2px" }}>
-          <span style={{
-            fontWeight: "bold", fontSize: "18px", maxWidth: "110px",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-          }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            width: "120px",
+            gap: "2px",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: "bold",
+              fontSize: "18px",
+              maxWidth: "110px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {displayName}
           </span>
           <span style={{ fontSize: "15px" }}>
@@ -813,38 +867,30 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-
-
   return (
     <>
       <RoundPopups />
       <div className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}>
         {/* Round result modal */}
-      {roundReveal && (
-        <div className="round-reveal-popup">
-          <div className="round-reveal-card">
+        {roundReveal && (
+          <div className="round-reveal-popup">
+            <div className="round-reveal-card">
+              <div className="round-reveal-title">It was:</div>
 
-            <div className="round-reveal-title">
-              It was:
+              <img
+                className="round-reveal-image"
+                src={roundReveal.imageSrc}
+                alt=""
+              />
+
+              <div className="round-reveal-word">{roundReveal.word}</div>
+
+              <div className="round-reveal-translit">
+                {roundReveal.transliteration}
+              </div>
             </div>
-
-            <img
-              className="round-reveal-image"
-              src={roundReveal.imageSrc}
-              alt=""
-            />
-
-            <div className="round-reveal-word">
-              {roundReveal.word}
-            </div>
-
-            <div className="round-reveal-translit">
-              {roundReveal.transliteration}
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
         {roundResult && (
           <div className="round-result-modal">
             {/* Removed the JSX popups here as we are using toast 
@@ -1006,17 +1052,19 @@ const Play = () => {
           )}
         </div>
 
-        {/* FLOATABLE CHAT */}
-        <FloatableChat
-          myUserId={currentUserId}
-          myDisplayName={
-            isHost
-              ? hostData.hostDisplayName
-              : players.find((p) => p.userId === currentUserId)?.displayName ||
-                ""
-          }
-          myTeam={myTeam}
-        />
+        {/* FLOATABLE CHAT - Hide for spectators */}
+        {!isSpectator && (
+          <FloatableChat
+            myUserId={currentUserId}
+            myDisplayName={
+              isHost
+                ? hostData.hostDisplayName
+                : players.find((p) => p.userId === currentUserId)
+                    ?.displayName || ""
+            }
+            myTeam={myTeam}
+          />
+        )}
 
         <div className={`input-area-wrapper ${isHost && "hidden"}`}>
           {roundResult?.type === "wrong" && (
@@ -1041,9 +1089,20 @@ const Play = () => {
               Send
             </button>
           </div>
-          
-        {/* image selection logic all and i called the necessary usestates */}
-        <ImagesSelection flashcard={flashcard} getUserId={getUserId} canAnswer={canAnswer} roundKey={roundKey} roomId={roomId} socket={socket} setImageChoices={setImageChoices} setShowChoices={setShowChoices} showChoices={showChoices} imageChoices={imageChoices} />
+
+          {/* image selection logic all and i called the necessary usestates */}
+          <ImagesSelection
+            flashcard={flashcard}
+            getUserId={getUserId}
+            canAnswer={canAnswer}
+            roundKey={roundKey}
+            roomId={roomId}
+            socket={socket}
+            setImageChoices={setImageChoices}
+            setShowChoices={setShowChoices}
+            showChoices={showChoices}
+            imageChoices={imageChoices}
+          />
 
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
@@ -1085,12 +1144,32 @@ const Play = () => {
                   Are you sure you want to kick{" "}
                   <strong>{kickTarget?.displayName}</strong> from the game?
                 </p>
-                <div className="modal-note">
-                  <span className="note-icon">ⓘ</span>
+                <div
+                  className="modal-note"
+                  style={{ display: "flex", flexDirection: "column" }}
+                >
                   <span>
-                    Kicked players will be removed from the leaderboard and
+                    ⚠️ Kicked players will be removed from the leaderboard and
                     cannot rejoin until a new game starts.
                   </span>
+                  {/* Warning of gameEnded in confirm popup  */}
+                  {(() => {
+                    const targetUser = players.find(
+                      (p) => p.userId === kickTarget?.userId,
+                    );
+                    const teamCount = players.filter(
+                      (p) => p.team === targetUser?.team,
+                    ).length;
+                    if (teamCount <= 2) {
+                      return (
+                        <span>
+                          ⚠️ <strong>Game will be ended</strong> as no enough
+                          players in {targetUser?.team} team.
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
               <div className="modal-footer">

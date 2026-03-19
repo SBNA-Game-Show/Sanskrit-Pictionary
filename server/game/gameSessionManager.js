@@ -59,7 +59,7 @@ class GameSessionManager extends EventEmitter {
     this.emit("resumeTimer", gameId);
   }
 
-  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses) {
+  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses, isLearningMode) {
     // assign players to selected teams
     players.forEach((p) => {
       if (teams.Red.includes(p.userId)) {
@@ -83,6 +83,7 @@ class GameSessionManager extends EventEmitter {
       blueTeamRound: 1, // Indicater the n-th drawer of blue team
       timer,
       difficulty,
+      isLearningMode, // Added isLearningMode
       guesses: Number(guesses) || 5, // Guesses config with default value 3
       roundInProgress: false,
       scores: {},
@@ -103,7 +104,7 @@ class GameSessionManager extends EventEmitter {
     });
 
     console.log(
-      `[createSession] gameId=${gameId} players=${players.length} 
+      `[createSession] gameId=${gameId} players=${players.length} isLearningMode=${isLearningMode}
         timer=${timer} difficulty=${difficulty} guesses=${guesses}`
     );
   }
@@ -254,17 +255,20 @@ class GameSessionManager extends EventEmitter {
     const session = this.sessions.get(gameId);
     if (!session) return null;
 
-  const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
+    if (session.isLearningMode){
+      // Learning Mode:
+      // send popup after every turn (both red and blue)
+      const fc = session.currentFlashcard || {};
 
-  // send popup after every turn (both red and blue)
-  const fc = session.currentFlashcard || {};
+      io.to(gameId).emit("turnEnded", {
+        word: fc.word || "",
+        transliteration: fc.transliteration || "",
+        imageSrc: fc.imageSrc || "",
+        audioSrc: fc.audioSrc || ""
+      });
+    }
 
-  io.to(gameId).emit("turnEnded", {
-    word: fc.word || "",
-    transliteration: fc.transliteration || "",
-    imageSrc: fc.imageSrc || "",
-    audioSrc: fc.audioSrc || ""
-  });
+    const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
 
     // No next round if reached total rounds and last drawer was Blue team
     if (lastDrawer && lastDrawer.team === "Blue" 

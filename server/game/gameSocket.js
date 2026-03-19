@@ -125,15 +125,16 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses }) => {
+      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses, isLearningMode }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
           timer,
           difficulty,
-          guesses, // Add guesses in log
+          guesses,
           by: socket.id,
           userId: socket.userId,
+          isLearningMode
         });
         const players = [];
         const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
@@ -158,7 +159,8 @@ function createGameSocket(io) {
           difficulty,
           teams,
           hostData,
-          guesses // Send guesses to manager
+          guesses, // Send guesses to manager
+          isLearningMode // Send isLearningMode to manager
         );
         await gameSessionManager.startRound(gameId, io);
 

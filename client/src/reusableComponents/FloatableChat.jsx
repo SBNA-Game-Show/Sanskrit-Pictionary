@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { socket } from "../pages/socket";
 import "./FloatableChat.css";
+import { toastError, toastWarning } from "../utils/toast";
+import { useNavigate } from "react-router-dom";
 
 const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [isMinimized, setIsMinimized] = useState(true);
@@ -48,11 +51,40 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
       }
     });
 
+    // Listen for chat errors
+    socket.on("chatError", ({ error }) => {
+      toastError(error);
+    });
+
+    // Handle profanity warnings
+    socket.on("chatWarning", ({ message, violationCount }) => {
+      if (violationCount === 1) {
+        toastWarning(message, { autoClose: 3500 });
+      } else if (violationCount === 2) {
+        toastError(message, { autoClose: 4500 });
+      }
+    });
+
+    // Handle being kicked for profanity
+    socket.on("chatKicked", ({ message }) => {
+      toastError(message, { autoClose: false });
+      navigate("/lobby");
+    });
+
+    // Notify when someone else is kicked
+    socket.on("userKickedForProfanity", ({ displayName, message }) => {
+      toastWarning(message, { autoClose: 3500 });
+    });
+
     return () => {
       socket.off("chatHistory");
       socket.off("chat");
+      socket.off("chatError");
+      socket.off("chatWarning");
+      socket.off("chatKicked");
+      socket.off("userKickedForProfanity");
     };
-  }, [roomId, isMinimized, myUserId]);
+  }, [roomId, isMinimized, myUserId, navigate]);
 
   const handleSend = () => {
     if (!message.trim()) return;

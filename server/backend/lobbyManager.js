@@ -2,9 +2,14 @@
 const mongoose = require("mongoose");
 const gameSessionManager = require("../game/gameSessionManager");
 const { clearActiveTimer, proceedToNextRound } = require("../game/gameSocket");
+const Filter = require("leo-profanity");
 
 // In-memory room state: roomId => { hostId, settings, teams, chat }
 const rooms = {};
+
+// Track profanity violations per user per room
+// Structure: { roomId: { userId: violationCount } }
+const profanityViolations = {};
 
 function createLobbyManager(io, UserModel) {
   // Helper: find a socket by userId
@@ -16,82 +21,178 @@ function createLobbyManager(io, UserModel) {
   }
 
   async function forceLeaveRoom(userId, roomId, currentSocket = null) {
-      const room = rooms[roomId];
-      if (!room) return;
-      
-      let userDisplayName = "A player";
-      if (userId.startsWith("guest_")) {
-        userDisplayName = currentSocket?.displayName || "Guest";
-      } else if (mongoose.Types.ObjectId.isValid(userId)) {
-        const user = await UserModel.findById(userId);
-        if (user) userDisplayName = user.displayName;
-      }
+    const room = rooms[roomId];
+    if (!room) return;
 
-      // Clear disconnect timers
-      if (room.hostDisconnectTimeout && room.hostId === userId) {
-         clearTimeout(room.hostDisconnectTimeout);
-         room.hostDisconnectTimeout = null;
-      }
-      if (room.playerDisconnectTimeouts?.[userId]) {
-         clearTimeout(room.playerDisconnectTimeouts[userId]);
-         delete room.playerDisconnectTimeouts[userId];
-      }
+    let userDisplayName = "A player";
+    if (userId.startsWith("guest_")) {
+      userDisplayName = currentSocket?.displayName || "Guest";
+    } else if (mongoose.Types.ObjectId.isValid(userId)) {
+      const user = await UserModel.findById(userId);
+      if (user) userDisplayName = user.displayName;
+    }
 
+    // Clear 10s disconnect timers
+    if (room.hostDisconnectTimeout && room.hostId === userId) {
+      clearTimeout(room.hostDisconnectTimeout);
+      room.hostDisconnectTimeout = null;
+    }
+    if (room.playerDisconnectTimeouts?.[userId]) {
+      clearTimeout(room.playerDisconnectTimeouts[userId]);
+      delete room.playerDisconnectTimeouts[userId];
+    }
+
+    const session = gameSessionManager.getSession(roomId);
+
+    // host force leave
+    // delete the room, and disconnect all other players
+    if (room.hostId === userId) {
+      console.log(
+        `[forceLeaveRoom] Host ${userId} leaving ${roomId}. Kicking everyone.`,
+      );
+      io.to(roomId).emit("hostDisconnectedOthers", {
+        hostName: userDisplayName,
+        hostId: userId,
+      });
+      if (session) {
+        gameSessionManager.deleteSession(roomId);
+      }
+      delete rooms[roomId];
+
+      const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+      if (socketsInRoom) {
+        for (const sid of socketsInRoom) {
+          const s = io.sockets.sockets.get(sid);
+          if (s) {
+            s.leave(roomId);
+            if (s.roomId === roomId) s.roomId = null;
+          }
+        }
+      }
+    }
+    // player force leave
+    // remove player from game, and update teams and turn order
+    else {
+      console.log(`[forceLeaveRoom] Player ${userId} leaving ${roomId}.`);
+      if (session) {
+        const kickResult = gameSessionManager.kickPlayer(roomId, userId);
+        if (kickResult) {
+          const { isCurrentDrawer, kickedPlayer } = kickResult;
+          io.to(roomId).emit("playerRemoved", {
+            userId,
+            displayName: kickedPlayer.displayName,
+          });
+          io.to(roomId).emit(
+            "updatePlayers",
+            gameSessionManager.getPlayersWithScores(roomId),
+          );
+          if (isCurrentDrawer) {
+            clearActiveTimer(roomId);
+            proceedToNextRound(io, roomId, kickedPlayer);
+          }
+        }
+      }
+      room.teams.Red = room.teams.Red.filter((id) => id !== userId);
+      room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
+      io.to(roomId).emit("teamsUpdate", room.teams);
+      io.to(roomId).emit("userLeftLobby", { userId });
+
+      const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+      if (socketsInRoom) {
+        for (const sid of socketsInRoom) {
+          const s = io.sockets.sockets.get(sid);
+          if (s && s.userId === userId) {
+            s.leave(roomId);
+            if (s.roomId === roomId) s.roomId = null;
+          }
+        }
+      }
+    }
+  }
+
+  function handleProfanityViolation(socket, roomId, userId, displayName) {
+    // Initialize tracking for this room if needed
+    if (!profanityViolations[roomId]) {
+      profanityViolations[roomId] = {};
+    }
+
+    // Increment violation count for this user
+    profanityViolations[roomId][userId] =
+      (profanityViolations[roomId][userId] || 0) + 1;
+    const violationCount = profanityViolations[roomId][userId];
+
+    if (violationCount === 1) {
+      // First warning
+      socket.emit("chatWarning", {
+        message: "Warning 1/2: Please keep the chat friendly and respectful.",
+        violationCount: 1,
+      });
+      return false;
+    } else if (violationCount === 2) {
+      // Second warning
+      socket.emit("chatWarning", {
+        message:
+          "Warning 2/2: Last warning! Next violation will result in being kicked.",
+        violationCount: 2,
+      });
+      return false;
+    } else {
+      // Third violation - kick the user
+      socket.emit("chatKicked", {
+        message:
+          "You have been removed from the lobby for repeated inappropriate language.",
+      });
+
+      // Notify others in the room
+      socket.to(roomId).emit("userKickedForProfanity", {
+        displayName: displayName,
+        message: `${displayName} has been removed for violating chat policies.`,
+      });
+
+      // Remove from game session if game is in progress
       const session = gameSessionManager.getSession(roomId);
+      if (session) {
+        const kickResult = gameSessionManager.kickPlayer(roomId, userId);
+        if (kickResult) {
+          const { isCurrentDrawer, kickedPlayer } = kickResult;
 
-      // host force leave
-      // delete the room, and disconnect all other players
-      if (room.hostId === userId) {
-         console.log(`[forceLeaveRoom] Host ${userId} leaving ${roomId}. Kicking everyone.`);
-         io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName, hostId: userId });
-         if (session) {
-             gameSessionManager.deleteSession(roomId);
-         }
-         delete rooms[roomId];
-         
-         const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
-         if (socketsInRoom) {
-            for (const sid of socketsInRoom) {
-               const s = io.sockets.sockets.get(sid);
-               if (s) {
-                 s.leave(roomId);
-                 if (s.roomId === roomId) s.roomId = null;
-               }
-            }
-         }
-      } 
-      // player force leave
-      // remove player from game, and update teams and turn order
-      else {
-         console.log(`[forceLeaveRoom] Player ${userId} leaving ${roomId}.`);
-         if (session) {
-            const kickResult = gameSessionManager.kickPlayer(roomId, userId);
-            if (kickResult) {
-                const { isCurrentDrawer, kickedPlayer } = kickResult;
-                io.to(roomId).emit("playerRemoved", { userId, displayName: kickedPlayer.displayName });
-                io.to(roomId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(roomId));
-                if (isCurrentDrawer) {
-                    clearActiveTimer(roomId);
-                    proceedToNextRound(io, roomId, kickedPlayer);
-                }
-            }
-         }
-         room.teams.Red = room.teams.Red.filter((id) => id !== userId);
-         room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
-         io.to(roomId).emit("teamsUpdate", room.teams);
-         io.to(roomId).emit("userLeftLobby", { userId });
+          // Notify about player removal during game
+          io.to(roomId).emit("playerRemoved", {
+            userId,
+            displayName: kickedPlayer.displayName,
+          });
 
-         const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
-         if (socketsInRoom) {
-            for (const sid of socketsInRoom) {
-               const s = io.sockets.sockets.get(sid);
-               if (s && s.userId === userId) {
-                 s.leave(roomId);
-                 if (s.roomId === roomId) s.roomId = null;
-               }
-            }
-         }
+          // Update player list
+          io.to(roomId).emit(
+            "updatePlayers",
+            gameSessionManager.getPlayersWithScores(roomId),
+          );
+
+          // If kicked player was drawing, proceed to next round
+          if (isCurrentDrawer) {
+            clearActiveTimer(roomId);
+            proceedToNextRound(io, roomId, kickedPlayer);
+          }
+        }
       }
+
+      // Remove user from teams (for lobby)
+      const room = rooms[roomId];
+      if (room) {
+        room.teams.Red = room.teams.Red.filter((id) => id !== userId);
+        room.teams.Blue = room.teams.Blue.filter((id) => id !== userId);
+        io.to(roomId).emit("teamsUpdate", room.teams);
+      }
+
+      // Remove user from room
+      socket.leave(roomId);
+      socket.roomId = null;
+
+      // Clean up violation tracking for this user
+      delete profanityViolations[roomId][userId];
+
+      return true; // User was kicked
+    }
   }
 
   io.on("connection", (socket) => {
@@ -123,13 +224,17 @@ function createLobbyManager(io, UserModel) {
         if (existingRoomId !== roomId) {
           const r = rooms[existingRoomId];
           const session = gameSessionManager.getSession(existingRoomId);
-          const inTeam = r.teams.Red.includes(userId) || r.teams.Blue.includes(userId);
+          const inTeam =
+            r.teams.Red.includes(userId) || r.teams.Blue.includes(userId);
           const isHost = r.hostId === userId;
-          const inSession = session && session.players.some(p => p.userId === userId);
+          const inSession =
+            session && session.players.some((p) => p.userId === userId);
 
           if (inTeam || isHost || inSession) {
-             console.log(`[registerLobby] User ${userId} is joining ${roomId} but was in ${existingRoomId}. Forcing leave.`);
-             await forceLeaveRoom(userId, existingRoomId, socket);
+            console.log(
+              `[registerLobby] User ${userId} is joining ${roomId} but was in ${existingRoomId}. Forcing leave.`,
+            );
+            await forceLeaveRoom(userId, existingRoomId, socket);
           }
         }
       }
@@ -145,18 +250,25 @@ function createLobbyManager(io, UserModel) {
       //     teams: { Red: [], Blue: [] },
       //     chat: [],
       //   };
-      if (rooms[roomId].hostId === userId && rooms[roomId].hostDisconnectTimeout) {
+      if (
+        rooms[roomId].hostId === userId &&
+        rooms[roomId].hostDisconnectTimeout
+      ) {
         // Host returned before the 10-second timeout expired
         clearTimeout(rooms[roomId].hostDisconnectTimeout);
         rooms[roomId].hostDisconnectTimeout = null;
-        console.log(`[registerLobby] Host ${userId} returned to ${roomId}. Resuming game.`);
+        console.log(
+          `[registerLobby] Host ${userId} returned to ${roomId}. Resuming game.`,
+        );
         io.to(roomId).emit("gameResumed", { hostName: displayName || "Host" });
         gameSessionManager.resumeTimer(roomId);
       } else if (rooms[roomId]?.playerDisconnectTimeouts?.[userId]) {
         // Player returned before the 10-second timeout expired
         clearTimeout(rooms[roomId].playerDisconnectTimeouts[userId]);
         delete rooms[roomId].playerDisconnectTimeouts[userId];
-        console.log(`[registerLobby] Player ${userId} returned to ${roomId} in time.`);
+        console.log(
+          `[registerLobby] Player ${userId} returned to ${roomId} in time.`,
+        );
         io.to(roomId).emit("playerReconnected", { userId, displayName });
         gameSessionManager.resumeTimer(roomId);
       }
@@ -417,6 +529,24 @@ function createLobbyManager(io, UserModel) {
 
     // --- CHAT (kept) ---
     socket.on("chat", ({ roomId, userId, displayName, team, message }) => {
+      // Check for profanity
+      if (Filter.check(message)) {
+        const wasKicked = handleProfanityViolation(
+          socket,
+          roomId,
+          userId,
+          displayName,
+        );
+
+        if (!wasKicked) {
+          // User was warned but not kicked
+          return;
+        } else {
+          // User was kicked - already handled in handleProfanityViolation
+          return;
+        }
+      }
+
       if (!rooms[roomId]) {
         rooms[roomId] = { chat: [], teams: { Red: [], Blue: [] } };
       }
@@ -439,7 +569,7 @@ function createLobbyManager(io, UserModel) {
     socket.on("leaveLobby", async ({ roomId, userId }) => {
       const finalUserId = userId || socket.userId;
       const finalRoomId = roomId || socket.roomId;
-      
+
       if (!finalRoomId || !finalUserId) return;
 
       await forceLeaveRoom(finalUserId, finalRoomId, socket);
@@ -450,6 +580,15 @@ function createLobbyManager(io, UserModel) {
         mongoose.Types.ObjectId.isValid(finalUserId)
       ) {
         await UserModel.findByIdAndUpdate(finalUserId, { isOnline: false });
+      }
+      // Clean up violation tracking
+      if (profanityViolations[roomId]) {
+        delete profanityViolations[roomId][userId];
+
+        // Clean up room violations if empty
+        if (Object.keys(profanityViolations[roomId]).length === 0) {
+          delete profanityViolations[roomId];
+        }
       }
     });
 
@@ -475,13 +614,18 @@ function createLobbyManager(io, UserModel) {
           console.log(
             `[disconnect] Host ${userId} disconnected, but game ${roomId} is in progress. Pausing for 60s.`,
           );
-          
+
           io.to(roomId).emit("gamePaused", { hostName: userDisplayName });
           gameSessionManager.pauseTimer(roomId);
 
           room.hostDisconnectTimeout = setTimeout(async () => {
-            console.log(`[disconnect] Host ${userId} did not return to ${roomId} within 60s. Kicking everyone.`);
-            io.to(roomId).emit("hostDisconnectedOthers", { hostName: userDisplayName, hostId: userId });
+            console.log(
+              `[disconnect] Host ${userId} did not return to ${roomId} within 10s. Kicking everyone.`,
+            );
+            io.to(roomId).emit("hostDisconnectedOthers", {
+              hostName: userDisplayName,
+              hostId: userId,
+            });
             gameSessionManager.deleteSession(roomId);
             delete rooms[roomId];
 
@@ -544,19 +688,23 @@ function createLobbyManager(io, UserModel) {
           }
         }
       } else {
-        console.log(`[disconnect] Player ${userDisplayName} disconnected from ${roomId}`);
+        console.log(
+          `[disconnect] Player ${userDisplayName} disconnected from ${roomId}`,
+        );
 
         const session = gameSessionManager.getSession(roomId);
         if (session) {
-          io.to(roomId).emit("playerDisconnected", { 
-            userId, 
+          io.to(roomId).emit("playerDisconnected", {
+            userId,
             displayName: userDisplayName,
-            reconnectWindow: 10 
+            reconnectWindow: 10,
           });
 
           room.playerDisconnectTimeouts = room.playerDisconnectTimeouts || {};
           room.playerDisconnectTimeouts[userId] = setTimeout(async () => {
-            console.log(`[disconnect] Player ${userId} did not return to ${roomId} within 30s. Kicking.`);
+            console.log(
+              `[disconnect] Player ${userId} did not return to ${roomId} within 10s. Kicking.`,
+            );
 
             const kickResult = gameSessionManager.kickPlayer(roomId, userId);
             if (!kickResult) return;
@@ -564,8 +712,14 @@ function createLobbyManager(io, UserModel) {
 
             gameSessionManager.resumeTimer(roomId);
 
-            io.to(roomId).emit("playerKicked", { userId, displayName: userDisplayName });
-            io.to(roomId).emit("updatePlayers", gameSessionManager.getPlayersWithScores(roomId));
+            io.to(roomId).emit("playerKicked", {
+              userId,
+              displayName: userDisplayName,
+            });
+            io.to(roomId).emit(
+              "updatePlayers",
+              gameSessionManager.getPlayersWithScores(roomId),
+            );
 
             if (isCurrentDrawer) {
               clearActiveTimer(roomId);
@@ -574,7 +728,10 @@ function createLobbyManager(io, UserModel) {
 
             delete room.playerDisconnectTimeouts[userId];
 
-            if (!userId.startsWith("guest_") && mongoose.Types.ObjectId.isValid(userId)) {
+            if (
+              !userId.startsWith("guest_") &&
+              mongoose.Types.ObjectId.isValid(userId)
+            ) {
               await UserModel.findByIdAndUpdate(userId, { isOnline: false });
             }
           }, 30000);
@@ -590,6 +747,16 @@ function createLobbyManager(io, UserModel) {
         mongoose.Types.ObjectId.isValid(userId)
       ) {
         await UserModel.findByIdAndUpdate(userId, { isOnline: false });
+      }
+
+      // Clean up profanity violations for this user
+      if (roomId && userId && profanityViolations[roomId]) {
+        delete profanityViolations[roomId][userId];
+
+        // Clean up room violations object if empty
+        if (Object.keys(profanityViolations[roomId]).length === 0) {
+          delete profanityViolations[roomId];
+        }
       }
 
       console.log("❌ Socket disconnected:", socketInput.id);

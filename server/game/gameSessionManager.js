@@ -113,35 +113,27 @@ class GameSessionManager extends EventEmitter {
   async initializeFlashcardDeck(gameId, difficulty) {
     const session = this.getSession(gameId);
     
-    // Case-insensitive difficulty matching, WE ARE PULLING HERE! + Log
-    const all = await Flashcard.find({
-      difficulty: { $regex: `^${difficulty}$`, $options: "i" }
-    }).lean();
-    console.log(`[initializeFlashcardDeck] Found ${all.length} flashcards for difficulty "${difficulty}"`);
-    
-    // Handle case where no flashcards found
-    if (all.length === 0) { //everything below this is just if there is no cards in the chosen difficulty
-      console.warn(`[initializeFlashcardDeck] No flashcards found for "${difficulty}". Trying any difficulty...`);
-      const anyCards = await Flashcard.find({}).lean();
-      console.log(`[initializeFlashcardDeck] Found ${anyCards.length} total flashcards as fallback`);
-      
-      if (anyCards.length === 0) {
-        console.error("[initializeFlashcardDeck] DATABASE HAS NO FLASHCARDS!");
-        session.flashcardDeck = [];
-        session.deckIndex = 0;
-        return;
-      }
-      
-      // Shuffle fallback cards
-      for (let i = anyCards.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [anyCards[i], anyCards[j]] = [anyCards[j], anyCards[i]];
-      }
-      
-      session.flashcardDeck = anyCards;
-      session.deckIndex = 0;
-      return; //everything above this is just if there is no cards in the chosen difficulty
-    }
+    // Fetch from github
+    const response = await fetch('https://raw.githubusercontent.com/YouzJa/assets-sand/main/data/images.json'); // <- changed this to RAW cause the cache was being slow (3 hours later and it still didnt update!)
+    // Change this to fetch from the OFFICIAL github repo once thats setup, for now its using my personal one!
+    const manifest = await response.json();
+
+    // Filter by difficulty usageTargets
+    const filtered = manifest.filter(card => 
+      card.difficulty?.toLowerCase() === difficulty.toLowerCase() &&
+      card.usageTargets?.includes('pictionary')
+    );
+
+    // MAP to game format FOR NOW
+    const all = filtered.map(card => ({
+      word: card.sanskrit,           // ← Map field names!
+      transliteration: card.transliteration,
+      translation: card.translation,
+      imageSrc: card.imageUrl,       // ← Map field names!
+      audioSrc: card.audioUrl || "", // ← Map field names!
+      difficulty: card.difficulty,
+      otherNames: card.otherNames || []
+    }));
     
     // Shuffle in normal case!
     for (let i = all.length - 1; i > 0; i--) {

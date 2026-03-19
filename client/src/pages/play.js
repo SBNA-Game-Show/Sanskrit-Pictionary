@@ -979,10 +979,7 @@ const Play = () => {
           </span>
         </div>
 
-         <div className="canvas-wrapper" style={{
-          width:'100%',
-          aspectRatio:'16:9'
-         }}>   
+          
         <ReactSketchCanvas
           className="canvas"
           ref={canvasRef}
@@ -999,7 +996,6 @@ const Play = () => {
             opacity: isDrawer ? 1 : 0.7,
           }}
         />
-        </div>
 
         <div className="canvascontrols">
           {!isHost ? (

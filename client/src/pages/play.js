@@ -729,8 +729,9 @@ const Play = () => {
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
 
-  // Check if current user is a spectator (not in players list)
-  const isSpectator = !players.find((p) => p.userId === currentUserId);
+  // Check if current user is a spectator (not in players list AND not host)
+  const isSpectator =
+    !isHost && !players.find((p) => p.userId === currentUserId);
 
   const renderUserChip = (user) => {
     const prof = profiles[user.userId] || {};

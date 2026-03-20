@@ -75,9 +75,12 @@
   background-color: #b25014;
 }
 
-@media (max-width:650px){
+@media (max-width:800px){
   .navbar{
     padding:2px;
+  }
+  .nav-links{
+    gap: 15px;
   }
   .nav-links a{
     font-size: 16px;
@@ -86,6 +89,10 @@
      font-size: 22px;
   font-weight: bold;
   }
+  .logout-btn2{
+  font-size: 14px;
+  padding: 2px 12px;
+  }
 
 }
 
@@ -93,7 +100,7 @@
  .navbar{
   display: flex;
   flex-direction: column;
-   height: 100px;
+   height: 120px;
   background: rgba(242, 210, 182);
   backdrop-filter: blur(8px);
   display: flex;
@@ -104,4 +111,5 @@
   position: relative;
   z-index: 10;
  }
+
 }

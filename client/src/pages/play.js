@@ -607,7 +607,7 @@ const Play = () => {
           revealAudioRef.current.pause();
           revealAudioRef.current.currentTime = 0;
         }
-      }, 5000);
+      }, 3500);
     });
 
     socket.on("clear-canvas", () => {

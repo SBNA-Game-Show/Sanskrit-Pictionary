@@ -378,7 +378,7 @@ const Lobby = () => {
   };
 
   return (
-    <div className="lobby-container">
+    <div className="lobby-container" data-testid="lobby-page">
       <div className="lobby-url">
         <span>
           <strong>Game Lobby ID:</strong> {roomId}
@@ -398,7 +398,7 @@ const Lobby = () => {
 
       <div className="lobby-content">
         {/* ONLINE USERS */}
-        <div className="user-list">
+        <div className="user-list" data-testid="online-users-panel">
           <h2>Online Users</h2>
           {unassignedUsers.length === 0 ? (
             <p>No users online.</p>
@@ -418,7 +418,7 @@ const Lobby = () => {
 
         {/* TEAMS */}
         <div className="teams-col">
-          <div className="team-card red">
+          <div className="team-card red" data-testid="red-team-panel">
             <h3>Red Team</h3>
             {teams.Red.length === 0 ? (
               <p className="muted">No players</p>
@@ -426,7 +426,7 @@ const Lobby = () => {
               teams.Red.map((uid) => renderUserRow(uid))
             )}
           </div>
-          <div className="team-card blue">
+          <div className="team-card blue" data-testid="blue-team-panel">
             <h3>Blue Team</h3>
             {teams.Blue.length === 0 ? (
               <p className="muted">No players</p>

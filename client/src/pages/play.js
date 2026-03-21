@@ -874,7 +874,7 @@ const Play = () => {
         {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
 
         {/* User List */}
-        <div className="user-list">
+        <div className="user-list" data-testid="online-users-panel">
           <div className="user-panel-title">Players List</div>
 
           <div className="team-block">

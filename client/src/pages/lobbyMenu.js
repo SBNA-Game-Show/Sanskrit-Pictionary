@@ -73,7 +73,7 @@ const LobbyMenu = () => {
   };
 
   return (
-    <div className="lobby-container">
+    <div className="lobby-container" data-testid="lobby-page">
       <h2>Welcome to the Game Lobby</h2>
       <button className="start-game-button" onClick={handleCreateRoom}>
         🆕 Create Room

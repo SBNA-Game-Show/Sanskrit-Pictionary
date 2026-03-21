@@ -11,10 +11,16 @@ import { createAvatar } from "@dicebear/core";
 import * as DiceStyles from "@dicebear/collection";
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastInfo, toastSuccess } from "../utils/toast";
+import {
+  toastWarning,
+  toastError,
+  toastInfo,
+  toastSuccess,
+} from "../utils/toast";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
+import ImagesSelection from "../reusableComponents/ImagesSelection";
 
 const svgToDataUrl = (svg) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -34,8 +40,12 @@ const Play = () => {
   const canvasRef = useRef(null);
   const playersRef = useRef([]); // holds freshest players for end screen
   const profilesRef = useRef({});
+  const hostRef = useRef(false);
   const { roomId } = useParams();
   const navigate = useNavigate(); // for /end navigation
+
+  // Tracking if game ended naturally
+  const isGameEndedRef = useRef(false);
 
   // UI / game states
   const [players, setPlayers] = useState([]);
@@ -55,6 +65,10 @@ const Play = () => {
   const [remainingGuesses, setRemainingGuesses] = useState(4);
   const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
 
+  // Audio + timeout refs for round reveal popup sound
+  const roundRevealTimeoutRef = useRef(null);
+  const revealAudioRef = useRef(new Audio());
+
   // For multiple-choice image selection (guessers only)
   const [imageChoices, setImageChoices] = useState([]);
   const [showChoices, setShowChoices] = useState(false);
@@ -63,8 +77,13 @@ const Play = () => {
   // 🔹 profile map: userId -> { displayName, avatarSeed, avatarStyle }
   const [profiles, setProfiles] = useState({});
 
+  // Pause state
+  const [isGamePaused, setIsGamePaused] = useState(false);
+  const [pausedByHost, setPausedByHost] = useState("");
+
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
+  const [roundReveal, setRoundReveal] = useState(null);
 
   // Track all users who answered correctly this round to highlight their cards
   const [correctUserIds, setCorrectUserIds] = useState([]);
@@ -180,7 +199,6 @@ const Play = () => {
 
     // Function to rejoin and sync state
     const rejoinAndSync = async () => {
-
       // Checking room existence before joining
       const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
 
@@ -188,7 +206,6 @@ const Play = () => {
         // Call API for room exists status
         const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
         const data = await response.json();
-        console.log(" Room Existence:", data);
 
         if (data.exists) {
           // Emit registerLobby only when room exists
@@ -201,8 +218,10 @@ const Play = () => {
           socket.emit("requestLobbyUsers", { roomId });
         } else {
           // Navigate to home if room code is invalid.
-          toastWarning("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
-          navigate(`/lobby`, { replace: true })
+          toastError("Invalid room code! Navigating to the lobby", {
+            toastId: "invalid-room",
+          });
+          navigate(`/lobby`, { replace: true });
         }
       } catch (error) {
         console.error("[Play] Failed to verify room status:", error);
@@ -226,8 +245,31 @@ const Play = () => {
       toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
     });
 
+    socket.on("hostDisconnectedOthers", ({ hostName, hostId }) => {
+      if (hostId === getUserId()) return;
+      isGameEndedRef.current = true;
+      toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
+        autoClose: 4000,
+      });
+      navigate("/lobby");
+    });
+
+    socket.on("gamePaused", ({ hostName }) => {
+      setIsGamePaused(true);
+      setPausedByHost(hostName);
+    });
+
+    socket.on("gameResumed", ({ hostName }) => {
+      setIsGamePaused(false);
+      setPausedByHost("");
+      toastInfo(`Host ${hostName} returned! Game resumed.`, {
+        autoClose: 3000,
+      });
+    });
+
     socket.on("userKicked", (kickedPlayer) => {
       if (kickedPlayer.userId === getUserId()) {
+        isGameEndedRef.current = true;
         toastInfo("You were kicked from the game.");
         navigate("/lobby");
       } else {
@@ -419,7 +461,7 @@ const Play = () => {
       setImageChoices([]);
       setRoundKey((k) => k + 1);
       setFlashcard(null); //  clear old card instantly
-      socket.emit("getGameState", { roomId }); //  fetch new card
+      socket.emit("getGameState", { roomId }); // fetch new card
 
       // Clear canvas when new round starts
       if (canvasRef.current) {
@@ -498,6 +540,76 @@ const Play = () => {
       setTimeout(() => setRoundResult(null), 1500);
     });
 
+    // Helper: converts flashcard image path → matching audio pronunciation file
+    // Example: /FlashCardEasy/bird.png → /FlashCardEasy/audio/bird.mp3
+    const imageToAudio = (imageSrc) => {
+      if (!imageSrc) return "";
+      const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
+      const parts = src.split("/").filter(Boolean);
+      const folder = parts[0];
+      const file = parts[parts.length - 1];
+      const base = file.split(".")[0].toLowerCase();
+      return `/${folder}/audio/${base}.mp3`;
+    };
+
+    // ADDED: Round reveal audio system
+    // - Plays pronunciation sound when the correct word popup appears
+    // - Uses server audioSrc if available
+    // - Falls back to generating audio path from imageSrc
+    // - Uses refs to prevent multiple overlapping sounds
+    // - Clears previous timeout and audio before starting new one
+    socket.on("turnEnded", (data) => {
+      console.log("[Play] turnEnded", data);
+
+      if (roundRevealTimeoutRef.current) {
+        clearTimeout(roundRevealTimeoutRef.current);
+      }
+
+      setRoundReveal({
+        word: data.word,
+        transliteration: data.transliteration,
+        imageSrc: data.imageSrc,
+      });
+
+      const resolvedAudioSrc = data.audioSrc || imageToAudio(data.imageSrc);
+      console.log("[Play] resolvedAudioSrc:", resolvedAudioSrc);
+
+      if (resolvedAudioSrc && revealAudioRef.current) {
+        const audioEl = revealAudioRef.current;
+
+        try {
+          audioEl.pause();
+          audioEl.removeAttribute("src");
+          audioEl.load();
+
+          audioEl.src = resolvedAudioSrc;
+          audioEl.currentTime = 0;
+
+          const playPromise = audioEl.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn(
+                "[Play] reveal audio play failed:",
+                err,
+                resolvedAudioSrc,
+              );
+            });
+          }
+        } catch (err) {
+          console.warn("[Play] audio reset/play error:", err, resolvedAudioSrc);
+        }
+      }
+
+      roundRevealTimeoutRef.current = setTimeout(() => {
+        setRoundReveal(null);
+
+        if (revealAudioRef.current) {
+          revealAudioRef.current.pause();
+          revealAudioRef.current.currentTime = 0;
+        }
+      }, 5000);
+    });
+
     socket.on("clear-canvas", () => {
       canvasRef.current?.clearCanvas();
       canvasRef.current?.eraseMode(false);
@@ -518,6 +630,7 @@ const Play = () => {
     });
 
     socket.on("gameEnded", (data) => {
+      isGameEndedRef.current = true;
       setRoundResult({ type: "gameEnded" });
       const base = Array.isArray(playersRef.current)
         ? playersRef.current
@@ -540,8 +653,18 @@ const Play = () => {
         };
       });
 
+      // Warning popup for force ending by insufficient players
+      if (data.reason === "insufficient team member") {
+        toastWarning(`Game ended: Minimum player requirement not met.`, {
+          autoClose: 2000,
+        });
+      }
+
       setTimeout(() => {
         setRoundResult(null);
+        if (hostRef.current) {
+          socket.emit("deleteRoom", { roomId });
+        }
         navigate("/end", { state: { players: withAvatars } });
       }, 1200);
     });
@@ -550,6 +673,9 @@ const Play = () => {
       socket.off("connect", handleReconnect);
       socket.off("playerDisconnected");
       socket.off("playerReconnected");
+      socket.off("hostDisconnectedOthers");
+      socket.off("gamePaused");
+      socket.off("gameResumed");
       socket.off("userKicked");
       socket.off("lobbyUsers", onLobbyUsers);
       socket.off("newGame");
@@ -557,6 +683,7 @@ const Play = () => {
       socket.off("gameState");
       socket.off("updatePlayers");
       socket.off("drawerChanged");
+      socket.off("turnEnded");
       socket.off("timerUpdate");
       socket.off("drawing-data");
       socket.off("newFlashcard");
@@ -567,14 +694,44 @@ const Play = () => {
       socket.off("clear-canvas");
       socket.off("warnDrawer");
       socket.off("gameEnded");
+
+      // Check for unnatural unmount (e.g. navbar navigation)
+      if (!isGameEndedRef.current) {
+        console.log("[Play] Unmounting mid-game, simulating disconnect...");
+        socket.emit("manualDisconnect");
+      }
     };
   }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const isHost = currentUserId === hostData?.hostId;
 
+  useEffect(() => {
+    hostRef.current = isHost;
+  }, [isHost]);
+
+  // Listerner for players changing
+  useEffect(() => {
+    // Only send from host to avoid duplication
+    if (!isHost || players.length === 0 || isGameEndedRef.current) return;
+
+    const redTeamCount = players.filter((p) => p.team === "Red").length;
+    const blueTeamCount = players.filter((p) => p.team === "Blue").length;
+
+    if (redTeamCount < 2 || blueTeamCount < 2) {
+      socket.emit("gameEnded", {
+        roomId,
+        reason: "Not enough players in one of the teams.",
+      });
+    }
+  }, [players, isHost, roomId]);
+
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
+
+  // Check if current user is a spectator (not in players list AND not host)
+  const isSpectator =
+    !isHost && !players.find((p) => p.userId === currentUserId);
 
   const renderUserChip = (user) => {
     const prof = profiles[user.userId] || {};
@@ -616,9 +773,15 @@ const Play = () => {
           minWidth: "200px",
         }}
       >
-        
         {/* Avatar + Kick button */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "3px",
+          }}
+        >
           <InteractiveAvatar
             avatarSeed={seed}
             avatarStyle={style}
@@ -648,11 +811,24 @@ const Play = () => {
         </div>
 
         {/* DisplayName */}
-        <div style={{ display: "flex", alignItems: "center", width: "120px", gap: "2px" }}>
-          <span style={{
-            fontWeight: "bold", fontSize: "18px", maxWidth: "110px",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-          }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            width: "120px",
+            gap: "2px",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: "bold",
+              fontSize: "18px",
+              maxWidth: "110px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {displayName}
           </span>
           <span style={{ fontSize: "15px" }}>
@@ -691,140 +867,30 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-  //-------------------------------------------------------
-  //------------ cards and audio PLAYBACK LOGIC -----------
-  //-------------------------------------------------------
-
-  const DIFFICULTY_FOLDERS = {
-    Easy: [
-      "/FlashCardEasy/bird.png",
-      "/FlashCardEasy/book.png",
-      "/FlashCardEasy/cow.png",
-      "/FlashCardEasy/elephant.png",
-      "/FlashCardEasy/father.png",
-      "/FlashCardEasy/flower.png",
-      "/FlashCardEasy/friend.png",
-      "/FlashCardEasy/fruit.png",
-      "/FlashCardEasy/house.png",
-      "/FlashCardEasy/king.png",
-      "/FlashCardEasy/moon.png",
-      "/FlashCardEasy/mother.png",
-      "/FlashCardEasy/river.png",
-      "/FlashCardEasy/sun.png",
-      "/FlashCardEasy/tree.png",
-      "/FlashCardEasy/water.png",
-    ],
-
-    Medium: [
-      "/FlashCardMedium/child.png",
-      "/FlashCardMedium/earth.png",
-      "/FlashCardMedium/fire.png",
-      "/FlashCardMedium/king.png",
-      "/FlashCardMedium/mountain.png",
-      "/FlashCardMedium/ocean.png",
-      "/FlashCardMedium/queen.png",
-      "/FlashCardMedium/sky.png",
-      "/FlashCardMedium/teacher.png",
-      "/FlashCardMedium/time.png",
-    ],
-
-    Hard: [
-      "/FlashCardHard/compassion.png",
-      "/FlashCardHard/energy.png",
-      "/FlashCardHard/freedom.png",
-      "/FlashCardHard/Happiness.png",
-      "/FlashCardHard/knowledge.png",
-      "/FlashCardHard/mind.png",
-      "/FlashCardHard/speech.png",
-      "/FlashCardHard/student.png",
-      "/FlashCardHard/truth.png",
-      "/FlashCardHard/universe.png",
-    ],
-  };
-
-  function shuffle(arr) {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
-  useEffect(() => {
-    if (!canAnswer || !flashcard?.imageSrc) {
-      setShowChoices(false);
-      setImageChoices([]);
-      return;
-    }
-
-    // Detect difficulty from the imageSrc path
-    let difficulty = "Easy";
-    const src = flashcard.imageSrc;
-
-    if (src.includes("FlashCardMedium")) difficulty = "Medium";
-    if (src.includes("FlashCardHard")) difficulty = "Hard";
-
-    const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
-
-    // Remove duplicates first, just in case
-    const uniqueFolderImages = [...new Set(folderImages)];
-
-    // Filter out correct image from distractors
-    const distractorPool = uniqueFolderImages.filter((img) => img !== src);
-
-    // We want 10 total including the correct one
-    const maxChoices = 10;
-    const distractorCount = Math.max(0, maxChoices - 1);
-
-    // Pick up to 9 distractors, or fewer if not available
-    const validDistractors = shuffle(distractorPool).slice(0, distractorCount);
-
-    // Mix correct + distractors and shuffle
-    const mixed = shuffle([
-      { src, isCorrect: true },
-      ...validDistractors.map((s) => ({ src: s, isCorrect: false })),
-    ]);
-
-    setImageChoices(mixed);
-
-    // show modal as long as there is at least the correct image
-    setShowChoices(mixed.length > 0);
-  }, [canAnswer, flashcard?.imageSrc, roundKey]);
-
-  const handlePickChoice = (choice) => {
-    if (!canAnswer) return;
-
-    if (choice.isCorrect) {
-      // Correct click → send real answer
-      socket.emit("submitAnswer", {
-        gameId: roomId,
-        userId: getUserId(),
-        answer: flashcard?.word || "",
-      });
-
-      setShowChoices(false);
-      setImageChoices([]);
-    } else {
-      // ❌ Wrong click → send intentionally wrong answer
-      socket.emit("submitAnswer", {
-        gameId: roomId,
-        userId: getUserId(),
-        answer: "__wrong_choice__", // something that will never match
-      });
-
-      setShowChoices(false);
-      setTimeout(() => {
-        setShowChoices(true);
-      }, 400);
-    }
-  };
-
   return (
     <>
       <RoundPopups />
       <div className="play-grid">
         {/* Round result modal */}
+        {roundReveal && (
+          <div className="round-reveal-popup">
+            <div className="round-reveal-card">
+              <div className="round-reveal-title">It was:</div>
+
+              <img
+                className="round-reveal-image"
+                src={roundReveal.imageSrc}
+                alt=""
+              />
+
+              <div className="round-reveal-word">{roundReveal.word}</div>
+
+              <div className="round-reveal-translit">
+                {roundReveal.transliteration}
+              </div>
+            </div>
+          </div>
+        )}
         {roundResult && (
           <div className="round-result-modal">
             {/* Removed the JSX popups here as we are using toast 
@@ -878,7 +944,7 @@ const Play = () => {
           <div className="user-panel-title">Players List</div>
 
           <div className="team-block">
-            <h3 className="team-title red">Red Team</h3>
+            <h3 className="team-title red">Red Team / लाल दल</h3>
             {redTeam.length === 0 ? (
               <p className="muted">No players</p>
             ) : (
@@ -887,7 +953,7 @@ const Play = () => {
           </div>
 
           <div className="team-block">
-            <h3 className="team-title blue">Blue Team</h3>
+            <h3 className="team-title blue">Blue Team / नील दल</h3>
             {blueTeam.length === 0 ? (
               <p className="muted">No players</p>
             ) : (
@@ -979,17 +1045,19 @@ const Play = () => {
           )}
         </div>
 
-        {/* FLOATABLE CHAT */}
-        <FloatableChat
-          myUserId={currentUserId}
-          myDisplayName={
-            isHost
-              ? hostData.hostDisplayName
-              : players.find((p) => p.userId === currentUserId)?.displayName ||
-                ""
-          }
-          myTeam={myTeam}
-        />
+        {/* FLOATABLE CHAT - Hide for spectators */}
+        {!isSpectator && (
+          <FloatableChat
+            myUserId={currentUserId}
+            myDisplayName={
+              isHost
+                ? hostData.hostDisplayName
+                : players.find((p) => p.userId === currentUserId)
+                    ?.displayName || ""
+            }
+            myTeam={myTeam}
+          />
+        )}
 
         <div className={`input-area-wrapper ${isHost && "hidden"}`}>
           {roundResult?.type === "wrong" && (
@@ -1015,25 +1083,19 @@ const Play = () => {
             </button>
           </div>
 
-            {showChoices && canAnswer && imageChoices.length > 0 && (
-            <div className="choice-modal">
-              <div className="choice-card">
-                <h3>Pick the correct image</h3>
-
-                <div className="choice-grid">
-                  {imageChoices.map((c, index) => (
-                    <button
-                      key={c.src || index}
-                      className="choice-tile"
-                      onClick={() => handlePickChoice(c)}
-                    >
-                      <img src={c.src} alt={`choice ${index + 1}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* image selection logic all and i called the necessary usestates */}
+          <ImagesSelection
+            flashcard={flashcard}
+            getUserId={getUserId}
+            canAnswer={canAnswer}
+            roundKey={roundKey}
+            roomId={roomId}
+            socket={socket}
+            setImageChoices={setImageChoices}
+            setShowChoices={setShowChoices}
+            showChoices={showChoices}
+            imageChoices={imageChoices}
+          />
 
           {!canAnswer && (
             <small style={{ color: "#c00" }}>
@@ -1042,6 +1104,16 @@ const Play = () => {
           )}
         </div>
       </div>
+
+      {/* GAME PAUSED OVERLAY */}
+      {isGamePaused && (
+        <div className="pause-overlay">
+          <div className="pause-content">
+            <h2>Game Paused</h2>
+            <p>Waiting 60s for Host {pausedByHost} to reconnect...</p>
+          </div>
+        </div>
+      )}
 
       {/* Kick Confirmation Modal */}
       {showKickModal &&
@@ -1065,12 +1137,32 @@ const Play = () => {
                   Are you sure you want to kick{" "}
                   <strong>{kickTarget?.displayName}</strong> from the game?
                 </p>
-                <div className="modal-note">
-                  <span className="note-icon">ⓘ</span>
+                <div
+                  className="modal-note"
+                  style={{ display: "flex", flexDirection: "column" }}
+                >
                   <span>
-                    Kicked players will be removed from the leaderboard and
+                    ⚠️ Kicked players will be removed from the leaderboard and
                     cannot rejoin until a new game starts.
                   </span>
+                  {/* Warning of gameEnded in confirm popup  */}
+                  {(() => {
+                    const targetUser = players.find(
+                      (p) => p.userId === kickTarget?.userId,
+                    );
+                    const teamCount = players.filter(
+                      (p) => p.team === targetUser?.team,
+                    ).length;
+                    if (teamCount <= 2) {
+                      return (
+                        <span>
+                          ⚠️ <strong>Game will be ended</strong> as no enough
+                          players in {targetUser?.team} team.
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
               <div className="modal-footer">

@@ -1,0 +1,86 @@
+/* ============================= */
+/*         IMAGE CHOICES         */
+/* ============================= */
+
+.choice-modal {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* responsive grid */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/* square tiles */
+.choice-tile {
+  border: none;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+
+  aspect-ratio: 1 / 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  position: relative;
+  transform-origin: center;
+  will-change: transform;
+
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+/* image fills tile */
+.choice-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+
+  transition: transform 0.25s ease;
+  will-change: transform;
+}
+
+/* hover effect */
+.choice-tile:hover {
+  transform: scale(1.12);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+.choice-tile:hover img {
+  transform: scale(1.18);
+}
+
+/* click feedback */
+.choice-tile:active {
+  transform: scale(1.04);
+}
+
+/* mobile adjustments */
+@media (max-width: 700px) {
+
+  .choice-grid {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 16px;
+  }
+
+  .choice-tile:hover {
+    transform: scale(1.06);
+  }
+
+  .choice-tile:hover img {
+    transform: scale(1.1);
+  }
+}

@@ -4,6 +4,15 @@ const activeTimers = {};
 const advancingRounds = new Set(); //Prevent repeated entry into the next round
 
 function createGameSocket(io) {
+  // Listen for pause/resume events from session manager
+  gameSessionManager.on("pauseTimer", (gameId) => {
+    pauseActiveTimer(gameId);
+  });
+
+  gameSessionManager.on("resumeTimer", (gameId) => {
+    resumeActiveTimer(io, gameId);
+  });
+
   io.on("connection", (socket) => {
     // ---- register / state ----
     socket.on("registerLobby", ({ userId, displayName, roomId }) => {
@@ -116,15 +125,16 @@ function createGameSocket(io) {
     // ---- start game ----
     socket.on(
       "startGame",
-      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses }) => {
+      async ({ gameId, totalRounds, timer, difficulty, hostData, teams, guesses, isLearningMode }) => {
         console.log("[socket] startGame:", {
           gameId,
           totalRounds,
           timer,
           difficulty,
-          guesses, // Add guesses in log
+          guesses,
           by: socket.id,
           userId: socket.userId,
+          isLearningMode
         });
         const players = [];
         const socketsInRoom = io.sockets.adapter.rooms.get(gameId);
@@ -149,7 +159,8 @@ function createGameSocket(io) {
           difficulty,
           teams,
           hostData,
-          guesses // Send guesses to manager
+          guesses, // Send guesses to manager
+          isLearningMode // Send isLearningMode to manager
         );
         await gameSessionManager.startRound(gameId, io);
 
@@ -297,6 +308,11 @@ function createGameSocket(io) {
         io.to(roomId).emit("roomPlayers", { players: session.players });
     });
 
+    socket.on("deleteRoom", ({ roomId }) => {
+      console.log(`[socket] deleteRoom requested for: ${roomId}`);
+      gameSessionManager.deleteSession(roomId);
+    });
+
     // REPLACE the empty disconnect handler with this:
     socket.on("disconnect", (reason) => {
       console.log(
@@ -364,6 +380,22 @@ function createGameSocket(io) {
         }
       }
     });
+
+    // End game
+    socket.on("gameEnded", ({ roomId, reason }) => {
+      console.log(`[Socket] Force game end requested for room ${roomId}. Reason: ${reason}`);
+      
+      const session = gameSessionManager.getSession(roomId);
+      if (session) {
+        const finalPlayersWithScore = gameSessionManager.getPlayersWithScores(roomId);
+        clearActiveTimer(roomId);
+        session.gameEnded = true;
+        io.to(roomId).emit("gameEnded", { 
+          finalPlayers: finalPlayersWithScore,
+          reason: "insufficient team member"
+         });
+      }
+    });
   });
 }
 
@@ -417,6 +449,24 @@ function startSynchronizedTimer(io, gameId, duration) {
   activeTimers[gameId].intervalId = intervalId;
 }
 
+function pauseActiveTimer(gameId) {
+  if (activeTimers[gameId] && activeTimers[gameId].intervalId) {
+    clearInterval(activeTimers[gameId].intervalId);
+    activeTimers[gameId].intervalId = null; // Mark as paused
+  }
+}
+
+function resumeActiveTimer(io, gameId) {
+  if (
+    activeTimers[gameId] &&
+    activeTimers[gameId].intervalId === null &&
+    activeTimers[gameId].secondsLeft > 0
+  ) {
+    // Restart with remaining time
+    startSynchronizedTimer(io, gameId, activeTimers[gameId].secondsLeft);
+  }
+}
+
 function clearActiveTimer(gameId) {
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
@@ -461,4 +511,8 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
   }
 }
 
-module.exports = createGameSocket;
+module.exports = {
+  createGameSocket,
+  clearActiveTimer,
+  proceedToNextRound,
+};

@@ -449,26 +449,16 @@ const Lobby = () => {
 
         {/* TEAMS */}
         <div className="teams-col">
-<<<<<<< HEAD
-          <div className="team-card red" data-testid="red-team-panel">
-            <h3>Red Team</h3>
-=======
           <div className="team-card red">
             <h3>Red Team / लाल दल</h3>
->>>>>>> origin/main
             {teams.Red.length === 0 ? (
               <p className="muted">No players</p>
             ) : (
               teams.Red.map((uid) => renderUserRow(uid))
             )}
           </div>
-<<<<<<< HEAD
-          <div className="team-card blue" data-testid="blue-team-panel">
-            <h3>Blue Team</h3>
-=======
           <div className="team-card blue">
             <h3>Blue Team / नील दल</h3>
->>>>>>> origin/main
             {teams.Blue.length === 0 ? (
               <p className="muted">No players</p>
             ) : (

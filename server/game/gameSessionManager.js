@@ -2,6 +2,10 @@
 // GameSessionManager - manages in-memory game sessions and fetches flashcards from MongoDB
 const Flashcard = require("../models/Flashcard");
 
+const FLASHCARD_MANIFEST_URL =
+  process.env.FLASHCARD_MANIFEST_URL ||
+  "https://raw.githubusercontent.com/SBNA-Game-Show/sanskrit-asset/main/data/images.json";
+
 // ========== helpers: normalization & synonyms ==========
 function normDeva(s) {
   return (s || "")
@@ -112,10 +116,8 @@ class GameSessionManager extends EventEmitter {
 
   async initializeFlashcardDeck(gameId, difficulty) {
     const session = this.getSession(gameId);
-    
-    // Fetch from github
-    const response = await fetch('https://raw.githubusercontent.com/YouzJa/assets-sand/main/data/images.json'); // <- changed this to RAW cause the cache was being slow (3 hours later and it still didnt update!)
-    // Change this to fetch from the OFFICIAL github repo once thats setup, for now its using my personal one!
+
+    const response = await fetch(FLASHCARD_MANIFEST_URL);
     const manifest = await response.json();
 
     // Manifest is now pictionary-only and already uses the game schema.

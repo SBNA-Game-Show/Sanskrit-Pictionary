@@ -3,23 +3,8 @@ import React, { useRef } from "react";
 function Flashcard({ items = [] }) {
   const audioRef = useRef(null);
 
-  const imageToAudio = (imageSrc) => {
-    if (!imageSrc) return "";
-
-    const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
-
-    const parts = src.split("/").filter(Boolean); 
-    // ["FlashCardEasy", "bird.png"]
-
-    const folder = parts[0]; 
-    const file = parts[parts.length - 1]; 
-    const base = file.split(".")[0].toLowerCase();
-
-    return `/${folder}/audio/${base}.mp3`;
-  };
-
-  const playAudio = async (imageSrc) => {
-    const audioPath = imageToAudio(imageSrc);
+  const playAudio = async (item) => {
+    const audioPath = item?.audioSrc || "";
     if (!audioPath) return;
 
     const el = audioRef.current;
@@ -44,7 +29,7 @@ function Flashcard({ items = [] }) {
         <div
           key={item?.id ?? `${item?.word}-${index}`}
           className="vocab-row"
-          onClick={() => playAudio(item?.imageSrc)}
+          onClick={() => playAudio(item)}
           style={{ cursor: "pointer" }}
         >
           <span className="sanskrit-word">{item?.word}</span>
@@ -54,7 +39,7 @@ function Flashcard({ items = [] }) {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              playAudio(item?.imageSrc);
+              playAudio(item);
             }}
           >
             🔊

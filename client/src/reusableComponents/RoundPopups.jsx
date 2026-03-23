@@ -15,8 +15,8 @@ import "./roundPopups.css";
  * Border/outline color follows the drawer's team (red/blue) when applicable.
  */
 const teamLabel = (team) =>
-  team === "Red" ? "Red Team / लाल दल" :
-  team === "Blue" ? "Blue Team / नील दल" :
+  team === "Red" ? "Red Team / रक्तदल (Raktadala)" :
+  team === "Blue" ? "Blue Team / नीलदल (Neeladala)" :
   team ? `${team} Team` : "";
 
 export default function RoundPopups() {

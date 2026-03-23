@@ -103,13 +103,13 @@ const End = () => {
       <p className="winning-team" style={winningStyle(winningTeam)}>
         {winningTeam === "tie"
           ? "It's a Tie!"
-          : `${winningTeam === "red" ? "Red Team / लाल दल" : "Blue Team / नील दल"} Wins!`}{" "}
+          : `${winningTeam === "red" ? "Red Team / रक्तदल (Raktadala)" : "Blue Team / नीलदल (Neeladala)"} Wins!`}{" "}
       </p>
       <div className="leaderboard-list">
         {/* RED TEAM */}
         <div className={`teamRed ${winningTeam === "red" ? "winner" : ""}`}>
           <p className="team-title" id="red">
-            Red Team / लाल दल{" "}
+            Red Team / रक्तदल (Raktadala){" "}
           </p>
           <div className="team-score">Total: {redPoints}</div>
           {redTeam.map((player, index) => {
@@ -159,7 +159,7 @@ const End = () => {
         {/* BLUE TEAM */}
         <div className={`teamBlue ${winningTeam === "blue" ? "winner" : ""}`}>
           <p className="team-title" id="blue">
-            Blue Team / नील दल
+            Blue Team / नीलदल (Neeladala)
           </p>
           <div className="team-score">Total: {bluePoints}</div>
           {blueTeam.map((player, index) => {

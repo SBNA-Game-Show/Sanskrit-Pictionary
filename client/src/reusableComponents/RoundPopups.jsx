@@ -4,16 +4,17 @@ import { createPortal } from "react-dom";
 import { socket } from "../pages/socket"; 
 import "./roundPopups.css";
 
-/**
+/*
  * Center overlay popups for:
- *  - roundStarted        -> "Round X / Y — Drawer: Name"
- *  - correctAnswer       -> "Round X ended — Guesser: Name"
  *  - drawerChanged(team) -> "Team switched — Drawer is now Name (Team)"
+ *  - roundEnded          -> "Round X ended"
+ *  - warnDrawer          -> "Warning Drawer"
  *  - gameEnded           -> "Game Over"
  *
  * Uses a small queue so messages don't overlap.
  * Border/outline color follows the drawer's team (red/blue) when applicable.
  */
+
 const teamLabel = (team) =>
   team === "Red" ? "Red Team / लाल दल" :
   team === "Blue" ? "Blue Team / नील दल" :
@@ -53,30 +54,6 @@ export default function RoundPopups() {
   }
 
   useEffect(() => {
-    // ---- Round started ----
-    const onRoundStarted = ({ currentRound, totalRounds, currentPlayer }) => {
-      roundRef.current = currentRound;
-      if (typeof totalRounds === "number") totalRef.current = totalRounds;
-
-      // currentPlayer can be string or object
-      const dname =
-        typeof currentPlayer === "string"
-          ? currentPlayer
-          : currentPlayer?.displayName || currentPlayer?.userId || "Player";
-      if (dname) drawerNameRef.current = dname;
-
-      enqueue({
-        title: `Round ${currentRound}${
-          totalRef.current ? ` / ${totalRef.current}` : ""
-        }`,
-        // Add turn details in round popup
-        subtitle: `${teamLabel(drawerTeamRef.current)} Turn — Drawer: ${dname}`,
-        kind: "start",
-        team: drawerTeamRef.current, // use last known team to color outline
-        duration: 3000,
-      });
-    };
-
     // ---- Drawer / team changed ----
     const onDrawerChanged = ({ displayName, team }) => {
       const dname =
@@ -122,17 +99,6 @@ export default function RoundPopups() {
       });
     };
 
-    // ---- Guesses exhausted ----
-    const onGuessesExhausted = () => {
-      enqueue({
-        title: `Ran Out of Guesses!`,
-        subtitle: "Out of guesses!",
-        kind: "exhausted",
-        team: drawerTeamRef.current,
-        duration: 2000,
-      });
-    };
-
     // ---- Warn player ----
     const onWarnPlayer = () => {
       enqueue({
@@ -144,22 +110,16 @@ export default function RoundPopups() {
       });
     };
 
-    socket.on("roundStarted", onRoundStarted);
     socket.on("drawerChanged", onDrawerChanged);
     socket.on("roundEnded", onRoundEnded);
-    // socket.on("correctAnswer", onCorrectAnswer);
     socket.on("warnDrawer", onWarnPlayer);
     socket.on("gameEnded", onGameEnded);
-    socket.on("guessesExhausted", onGuessesExhausted);
 
     return () => {
-      socket.off("roundStarted", onRoundStarted);
       socket.off("drawerChanged", onDrawerChanged);
       socket.off("roundEnded", onRoundEnded);
-      // socket.off("correctAnswer", onCorrectAnswer);
       socket.off("warnDrawer", onWarnPlayer);
       socket.off("gameEnded", onGameEnded);
-      socket.off("guessesExhausted", onGuessesExhausted);
     };
   }, []);
 

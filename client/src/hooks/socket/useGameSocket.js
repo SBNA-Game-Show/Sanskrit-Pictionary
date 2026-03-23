@@ -11,8 +11,6 @@ export const useGameSocket = (
   setHostData,
   drawerId,
   setDrawerId,
-  setDrawerTeam,
-  setCurrentPlayerName,
   setTimeLeft,
   setFlashcard,
   setTotalGuesses,
@@ -175,8 +173,6 @@ export const useGameSocket = (
       setPlayers(state.players);
       setHostData(state.hostData || null);
       setDrawerId(state.drawer?.userId || null);
-      setDrawerTeam(state.drawer?.team || "");
-      setCurrentPlayerName(state.drawer?.displayName || "");
       setTimeLeft(state.timer || 0);
 
       if (serverFlash) setFlashcard(serverFlash);
@@ -210,13 +206,6 @@ export const useGameSocket = (
       });
 
       setDrawerId(newDrawerId);
-      setDrawerTeam(team || "");
-
-      const name =
-        typeof displayName === "string"
-          ? displayName
-          : displayName?.displayName || displayName?.userId || "";
-      setCurrentPlayerName(name);
 
       // Clear canvas when drawer changes
       if (canvasRef.current) {
@@ -255,12 +244,6 @@ export const useGameSocket = (
         timer,
       });
 
-      let cpName = "";
-      if (typeof currentPlayer === "string") cpName = currentPlayer;
-      else if (currentPlayer && typeof currentPlayer === "object")
-        cpName = currentPlayer.displayName || currentPlayer.userId || "";
-
-      setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
       setCorrectUserIds([]); // Reset the correct answer highlights

@@ -36,8 +36,6 @@ const Play = () => {
   const [flashcard, setFlashcard] = useState(null);
   const [currentUserId, setCurrentUserId] = useState("");
   const [drawerId, setDrawerId] = useState(null);
-  const [drawerTeam, setDrawerTeam] = useState("");
-  const [currentPlayerName, setCurrentPlayerName] = useState("");
   const [answer, setAnswer] = useState("");
   const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
 
@@ -68,6 +66,8 @@ const Play = () => {
   const [kickTarget, setKickTarget] = useState(null); // { userId, displayName }
 
   // Derived booleans
+  const drawerDisplayName = players.find((p) => p.userId === drawerId)?.displayName;
+  const drawerTeam = players.find((p) => p.userId === drawerId)?.team;
   const remainingGuesses = players.find((p) => p.userId === (getUserId() || currentUserId))?.remainingGuesses;
   const myTeam = players.find((p) => p.userId === (getUserId() || currentUserId))?.team;
   const isDrawer = (getUserId() || currentUserId) === drawerId;
@@ -177,8 +177,6 @@ const Play = () => {
     setHostData,
     drawerId,
     setDrawerId,
-    setDrawerTeam,
-    setCurrentPlayerName,
     setTimeLeft,
     setFlashcard,
     setTotalGuesses,
@@ -474,7 +472,7 @@ const Play = () => {
               fontWeight: "bold",
             }}
           >
-            {currentPlayerName}
+            {drawerDisplayName}
           </span>
         </div>
 

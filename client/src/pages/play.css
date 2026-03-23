@@ -1101,7 +1101,9 @@
     grid-row: 10;
     width: 100%;
     max-width: 100%;
+    /**/
   }
+
 
   .input-area2 {
     flex-direction: column;

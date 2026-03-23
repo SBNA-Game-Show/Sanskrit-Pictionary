@@ -35,15 +35,17 @@ function registerDrawingHandlers(socket, io) {
 
     // Clear stored canvas data
     gameSessionManager.clearCanvasData(gameId);
-
-    // Deduct 50 points
-    const newScore = gameSessionManager.updatePlayerPoints(
-      gameId,
-      drawerId,
-      -50,
+    // deduct 50 points from drawer
+    gameSessionManager.updateScore(gameId, drawerId, -50);
+    // update canvas
+    io.to(gameId).emit("clear-canvas");
+    // display RoundPopup warning
+    io.to(gameId).emit("warnDrawer");
+    // update player points
+    io.to(gameId).emit(
+      "updatePlayers",
+      gameSessionManager.getPlayersWithScores(gameId),
     );
-
-    io.to(gameId).emit("warnDrawer", drawerId, newScore);
   });
 }
 

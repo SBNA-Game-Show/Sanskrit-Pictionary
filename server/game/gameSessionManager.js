@@ -84,7 +84,7 @@ class GameSessionManager extends EventEmitter {
       timer,
       difficulty,
       isLearningMode, // Added isLearningMode
-      guesses: Number(guesses) || 5, // Guesses config with default value 3
+      guesses: Number(guesses) || 3, // Guesses config with default value 3
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
@@ -463,6 +463,7 @@ class GameSessionManager extends EventEmitter {
     const newScore = Math.max(0, currentScore - WRONG_ANSWER_PENALTY);
     session.scores[userId] = newScore;
 
+    // emit to play incorrect sound and trigger point deduction popup
     io.to(gameId).emit("wrongAnswer", {
       userId,
       displayName: player.displayName,

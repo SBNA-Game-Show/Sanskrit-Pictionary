@@ -18,7 +18,6 @@ import { useGameSocket } from "../hooks/socket/useGameSocket";
 
 const Play = () => {
   const canvasRef = useRef(null);
-  const playersRef = useRef([]); // holds freshest players for end screen
   const profilesRef = useRef({});
   const hostRef = useRef(false);
   const { roomId } = useParams();
@@ -39,9 +38,7 @@ const Play = () => {
   const [drawerId, setDrawerId] = useState(null);
   const [drawerTeam, setDrawerTeam] = useState("");
   const [currentPlayerName, setCurrentPlayerName] = useState("");
-  const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
-  const [remainingGuesses, setRemainingGuesses] = useState(4);
   const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
 
   // Audio + timeout refs for round reveal popup sound
@@ -58,7 +55,6 @@ const Play = () => {
 
   // Pause state
   const [isGamePaused, setIsGamePaused] = useState(false);
-  const [pausedByHost, setPausedByHost] = useState("");
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
@@ -72,6 +68,8 @@ const Play = () => {
   const [kickTarget, setKickTarget] = useState(null); // { userId, displayName }
 
   // Derived booleans
+  const remainingGuesses = players.find((p) => p.userId === (getUserId() || currentUserId))?.remainingGuesses;
+  const myTeam = players.find((p) => p.userId === (getUserId() || currentUserId))?.team;
   const isDrawer = (getUserId() || currentUserId) === drawerId;
   const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
   const canAnswer = isEligibleGuesser && remainingGuesses > 0;
@@ -79,6 +77,9 @@ const Play = () => {
   // Audio cues
   const correctAudioRef = useRef(new Audio(correctSound));
   const wrongAudioRef = useRef(new Audio(wrongSound));
+
+  //LOG PLAYERS
+  console.log(players)
 
   // ---------- UI helpers ----------
   const handlePenClick = () => {
@@ -172,7 +173,6 @@ const Play = () => {
   // Socket setup
   useGameSocket(
     setCurrentUserId,
-    players,
     setPlayers,
     setHostData,
     drawerId,
@@ -181,13 +181,9 @@ const Play = () => {
     setCurrentPlayerName,
     setTimeLeft,
     setFlashcard,
-    setMyTeam,
-    setRemainingGuesses,
-    totalGuesses,
     setTotalGuesses,
     setProfiles,
     setIsGamePaused,
-    setPausedByHost,
     setRoundResult,
     setRoundReveal,
     setCorrectUserIds,
@@ -202,7 +198,6 @@ const Play = () => {
     revealAudioRef,
     roundRevealTimeoutRef,
     profilesRef,
-    playersRef,
     hostRef,
   )
 
@@ -617,7 +612,7 @@ const Play = () => {
         <div className="pause-overlay">
           <div className="pause-content">
             <h2>Game Paused</h2>
-            <p>Waiting 60s for Host {pausedByHost} to reconnect...</p>
+            <p>Waiting 60s for Host to reconnect...</p>
           </div>
         </div>
       )}

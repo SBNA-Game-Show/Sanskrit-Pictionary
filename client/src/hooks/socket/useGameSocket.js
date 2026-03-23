@@ -7,7 +7,6 @@ import { makeAvatarDataUrl } from "../../utils/game/avatarUtils";
 
 export const useGameSocket = (
   setCurrentUserId,
-  players,
   setPlayers,
   setHostData,
   drawerId,
@@ -16,13 +15,9 @@ export const useGameSocket = (
   setCurrentPlayerName,
   setTimeLeft,
   setFlashcard,
-  setMyTeam,
-  setRemainingGuesses,
-  totalGuesses,
   setTotalGuesses,
   setProfiles,
   setIsGamePaused,
-  setPausedByHost,
   setRoundResult,
   setRoundReveal,
   setCorrectUserIds,
@@ -37,7 +32,6 @@ export const useGameSocket = (
   revealAudioRef,
   roundRevealTimeoutRef,
   profilesRef,
-  playersRef,
   hostRef,
 ) => {
   const { roomId } = useParams();
@@ -109,12 +103,10 @@ export const useGameSocket = (
 
     socket.on("gamePaused", ({ hostName }) => {
       setIsGamePaused(true);
-      setPausedByHost(hostName);
     });
 
     socket.on("gameResumed", ({ hostName }) => {
       setIsGamePaused(false);
-      setPausedByHost("");
       toastInfo(`Host ${hostName} returned! Game resumed.`, {
         autoClose: 3000,
       });
@@ -180,19 +172,7 @@ export const useGameSocket = (
       const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
 
       setTotalGuesses(state.guesses); // set total guesses
-      setPlayers((prev) => {
-        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
-        const merged = (state.players || []).map((p) => {
-          const prevP = prevMap.get(p.userId);
-          return {
-            ...p,
-            remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
-          };
-        });
-        playersRef.current = merged;
-        return merged;
-      });
+      setPlayers(state.players);
       setHostData(state.hostData || null);
       setDrawerId(state.drawer?.userId || null);
       setDrawerTeam(state.drawer?.team || "");
@@ -200,12 +180,6 @@ export const useGameSocket = (
       setTimeLeft(state.timer || 0);
 
       if (serverFlash) setFlashcard(serverFlash);
-
-      const me = (state.players || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
-      setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
-      );
 
       // ✅ Handle canvas data from gameState
       if (canvasRef.current) {
@@ -222,26 +196,8 @@ export const useGameSocket = (
       }
     });
 
-    socket.on("updatePlayers", (list) => {
-      setPlayers((prev) => {
-        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
-        const merged = (list || []).map((p) => {
-          const prevP = prevMap.get(p.userId);
-          return {
-            ...p,
-            remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
-          };
-        });
-        playersRef.current = merged;
-        return merged;
-      });
-
-      const me = (list || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
-      setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
-      );
+    socket.on("updatePlayers", (players) => {
+      setPlayers(players);
     });
 
     // drawerChanged clears canvas
@@ -307,7 +263,6 @@ export const useGameSocket = (
       setCurrentPlayerName(cpName);
       setAnswer("");
       setTimeLeft(timer || 0);
-      setRemainingGuesses(totalGuesses);
       setCorrectUserIds([]); // Reset the correct answer highlights
 
       // Reset answer and choices when drawer changes
@@ -355,21 +310,6 @@ export const useGameSocket = (
           remainingGuesses,
           scoreLost,
         });
-        if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
-          setRemainingGuesses(remainingGuesses);
-        }
-
-        // Update the user list for everyone immediately (server also emits updatePlayers,
-        // but this makes the UI responsive even if packets arrive out-of-order)
-        if (wrongUserId && remainingGuesses !== undefined) {
-          setPlayers((prev) => {
-            const next = (prev || []).map((p) =>
-              p.userId === wrongUserId ? { ...p, remainingGuesses } : p,
-            );
-            playersRef.current = next;
-            return next;
-          });
-        }
 
         // Show penalty notification if this is the current user
         if (scoreLost && wrongUserId === getUserId()) {
@@ -469,25 +409,9 @@ export const useGameSocket = (
       setEraseMode(false);
     });
 
-    socket.on("warnDrawer", (drawerId, newScore) => {
-      canvasRef.current?.clearCanvas();
-
-      setPlayers((prev) => {
-        const next = (prev || []).map((p) =>
-          p.userId === drawerId ? { ...p, points: newScore } : p,
-        );
-
-        playersRef.current = next;
-        return next;
-      });
-    });
-
     socket.on("gameEnded", (data) => {
       isGameEndedRef.current = true;
       setRoundResult({ type: "gameEnded" });
-      const base = Array.isArray(playersRef.current)
-        ? playersRef.current
-        : players;
 
       const currentProfiles = profilesRef.current;
 
@@ -545,7 +469,6 @@ export const useGameSocket = (
       socket.off("wrongAnswer");
       socket.off("guessesExhausted");
       socket.off("clear-canvas");
-      socket.off("warnDrawer");
       socket.off("gameEnded");
 
       // Check for unnatural unmount (e.g. navbar navigation)

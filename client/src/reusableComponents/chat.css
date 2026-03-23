@@ -65,3 +65,15 @@
 .input-area button:hover {
   background-color: #e65100;
 }
+
+
+@media (max-width: 400px) {
+  .chat-container {
+    max-width: 100%;
+    padding: 10px;
+    align-items: left;  
+  }
+  .input-area input{
+    width:100%
+  } 
+} 

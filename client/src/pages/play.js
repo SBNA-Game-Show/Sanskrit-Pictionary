@@ -770,7 +770,8 @@ const Play = () => {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "12px 2px",
-          minWidth: "200px",
+          /* I am changing this for responsiveness */
+          width: "100%",
         }}
       >
         {/* Avatar + Kick button */}
@@ -870,7 +871,7 @@ const Play = () => {
   return (
     <>
       <RoundPopups />
-      <div className="play-grid">
+      <div className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}>
         {/* Round result modal */}
         {roundReveal && (
           <div className="round-reveal-popup">
@@ -942,7 +943,7 @@ const Play = () => {
         {/* User List */}
         <div className="user-list">
           <div className="user-panel-title">Players List</div>
-
+          <div className="team-container">
           <div className="team-block">
             <h3 className="team-title red">Red Team / लाल दल</h3>
             {redTeam.length === 0 ? (
@@ -962,6 +963,8 @@ const Play = () => {
           </div>
         </div>
 
+        </div>
+
         <div
           className="drawer-name"
           style={{ textAlign: "center", marginBottom: "5px" }}
@@ -977,6 +980,7 @@ const Play = () => {
           </span>
         </div>
 
+          
         <ReactSketchCanvas
           className="canvas"
           ref={canvasRef}

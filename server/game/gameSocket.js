@@ -1,6 +1,7 @@
 const gameSessionManager = require("../game/gameSessionManager");
 
 const activeTimers = {};
+const pendingTimerStarts = {};
 const advancingRounds = new Set(); //Prevent repeated entry into the next round
 
 function createGameSocket(io) {
@@ -164,12 +165,34 @@ function createGameSocket(io) {
         );
         await gameSessionManager.startRound(gameId, io);
 
+        // Give clients a moment to navigate from /lobby to /play and mount listeners.
+        await new Promise((resolve) => setTimeout(resolve, 900));
+
+        // Emit drawer countdown after navigation so users can actually see it.
+        const session = gameSessionManager.getSession(gameId);
+        const currentDrawer = session.players[session.currentPlayerIndex];
+        const startingTeam = currentDrawer?.team || "Red";
+        
+        console.log("🎮 [Backend] Emitting drawerCountdown event:", { 
+          drawer: currentDrawer?.displayName, 
+          team: startingTeam,
+          gameId 
+        });
+        
+        io.to(gameId).emit("drawerCountdown", {
+          displayName: currentDrawer?.displayName || "Drawer",
+          team: startingTeam,
+          message: `${startingTeam === "Red" ? "Red Team / रक्तदल" : "Blue Team / नीलदल"} is Starting!`,
+          gameId,
+          syncId: scheduleTimerStart(io, gameId, timer, "startGame"),
+        });
+
         io.to(gameId).emit(
           "updatePlayers",
           gameSessionManager.getPlayersWithScores(gameId),
         );
-        io.to(gameId).emit("startTimer", { duration: timer });
-        startSynchronizedTimer(io, gameId, timer);
+
+        // Timer now starts when clients report drawer countdown completion.
       },
     );
 
@@ -298,6 +321,13 @@ function createGameSocket(io) {
       proceedToNextRound(io, gameId);
     });
 
+    socket.on("drawerCountdownComplete", ({ gameId, syncId }) => {
+      const pending = pendingTimerStarts[gameId];
+      if (!pending) return;
+      if (pending.syncId !== syncId) return;
+      startPendingTimer(io, gameId, `clientAck:${socket.id}`);
+    });
+
     socket.on("startRound", async ({ roomId }) => {
       await gameSessionManager.startRound(roomId, io);
     });
@@ -310,6 +340,7 @@ function createGameSocket(io) {
 
     socket.on("deleteRoom", ({ roomId }) => {
       console.log(`[socket] deleteRoom requested for: ${roomId}`);
+      clearPendingTimerStart(roomId);
       gameSessionManager.deleteSession(roomId);
     });
 
@@ -468,10 +499,56 @@ function resumeActiveTimer(io, gameId) {
 }
 
 function clearActiveTimer(gameId) {
+  clearPendingTimerStart(gameId);
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
     delete activeTimers[gameId];
   }
+}
+
+function createTimerSyncId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function clearPendingTimerStart(gameId) {
+  if (!pendingTimerStarts[gameId]) return;
+  clearTimeout(pendingTimerStarts[gameId].timeoutId);
+  delete pendingTimerStarts[gameId];
+}
+
+function scheduleTimerStart(io, gameId, duration, source) {
+  clearPendingTimerStart(gameId);
+
+  const syncId = createTimerSyncId();
+  const safeDuration = Number.isFinite(duration)
+    ? Math.max(0, Math.floor(duration))
+    : 0;
+
+  pendingTimerStarts[gameId] = {
+    syncId,
+    duration: safeDuration,
+    source,
+    timeoutId: setTimeout(() => {
+      startPendingTimer(io, gameId, "fallbackTimeout");
+    }, 15000),
+  };
+
+  return syncId;
+}
+
+function startPendingTimer(io, gameId, startReason) {
+  const pending = pendingTimerStarts[gameId];
+  if (!pending) return false;
+
+  clearTimeout(pending.timeoutId);
+  delete pendingTimerStarts[gameId];
+
+  console.log(
+    `[timerSync] Starting timer for ${gameId} (${pending.duration}s) source=${pending.source} reason=${startReason}`,
+  );
+  io.to(gameId).emit("startTimer", { duration: pending.duration });
+  startSynchronizedTimer(io, gameId, pending.duration);
+  return true;
 }
 
 /** Proceed to the next round: switch drawer, draw new card, start new timer */
@@ -493,12 +570,60 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
       // Sync scores before starting the next round
       io.to(gameId).emit("updatePlayers", finalPlayersWithScore);
 
+      // Get current and previous team info for team switch countdown
+      const session = gameSessionManager.getSession(gameId);
+      const lastDrawer = lastDrawerOverride || session.players.find((p) => 
+        p === session.players[session.currentPlayerIndex]
+      );
+      const currentTeam = lastDrawer?.team || "Red";
+      const nextTeam = nextRoundInfo.currentPlayer?.team || "Blue";
+
+      // Emit team switch countdown only if teams are different
+      if (currentTeam !== nextTeam) {
+        const currentTeamLabel = currentTeam === "Red" ? "Red Team / रक्तदल" : "Blue Team / नीलदल";
+        const nextTeamLabel = nextTeam === "Red" ? "Red Team / रक्तदल" : "Blue Team / नीलदल";
+        const nextDrawerName = nextRoundInfo.currentPlayer?.displayName || "Drawer";
+
+        console.log("🎮 [Backend] Emitting teamSwitchCountdown event:", { 
+          currentTeam, 
+          nextTeam, 
+          nextDrawerName,
+          gameId 
+        });
+
+        io.to(gameId).emit("teamSwitchCountdown", {
+          currentTeam: currentTeam,
+          nextTeam: nextTeam,
+          currentTeamLabel: currentTeamLabel,
+          nextTeamLabel: nextTeamLabel,
+          nextDrawerName: nextDrawerName,
+        });
+
+        // Wait for team switch countdown to complete (~6.2 seconds)
+        // Use 7000ms to be safe
+        await new Promise((resolve) => setTimeout(resolve, 7000));
+      }
+
       // startRound is responsible for: sending a new Flashcard to the questioner, 
       // broadcasting drawerChanged/roundStarted, and updating gameState
       await gameSessionManager.startRound(gameId, io);
 
-      io.to(gameId).emit("startTimer", { duration: nextRoundInfo.timer });
-      startSynchronizedTimer(io, gameId, nextRoundInfo.timer);
+      // Emit drawer countdown for new drawer
+      const newDrawer = session.players[session.currentPlayerIndex];
+      const newTeamLabel = newDrawer?.team === "Red" ? "Red Team / रक्तदल" : "Blue Team / नीलदल";
+      
+      io.to(gameId).emit("drawerCountdown", {
+        displayName: newDrawer?.displayName || "Drawer",
+        team: newDrawer?.team || "Red",
+        message: `${newTeamLabel} Turn - ${newDrawer?.displayName || "Drawer"} is Drawing!`,
+        gameId,
+        syncId: scheduleTimerStart(
+          io,
+          gameId,
+          nextRoundInfo.timer,
+          "proceedToNextRound",
+        ),
+      });
     } else {
       // Sync scores before emitting gameEnded
       io.to(gameId).emit("updatePlayers", finalPlayersWithScore);

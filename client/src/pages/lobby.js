@@ -450,7 +450,7 @@ const Lobby = () => {
         {/* TEAMS */}
         <div className="teams-col">
           <div className="team-card red">
-            <h3>Red Team / रक्तदल (Raktadala)</h3>
+            <h3>Red Team / रक्तदल</h3>
             {teams.Red.length === 0 ? (
               <p className="muted">No players</p>
             ) : (
@@ -458,7 +458,7 @@ const Lobby = () => {
             )}
           </div>
           <div className="team-card blue">
-            <h3>Blue Team / नीलदल (Neeladala)</h3>
+            <h3>Blue Team / नीलदल</h3>
             {teams.Blue.length === 0 ? (
               <p className="muted">No players</p>
             ) : (

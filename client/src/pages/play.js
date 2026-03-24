@@ -560,15 +560,6 @@ const Play = () => {
         )}
 
         <div className={`input-area-wrapper ${isHost && "hidden"}`}>
-          {roundResult?.type === "wrong" && (
-            <div className="round-result-modal">
-              <div className="modal-card wrong-answer">
-                <h3>Wrong Answer</h3>
-                <p>-{roundResult.scoreLost} points 😪</p>
-              </div>
-            </div>
-          )}
-
           <h5>Answer Box</h5>
           <div className="input-area2">
             <input

@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import "./ImagesSelection.css";
  // For multiple-choice image selection (guessers only)
 
 
 export default function ImagesSelection( { flashcard, getUserId, canAnswer, roundKey, roomId, socket, setImageChoices, setShowChoices, imageChoices, showChoices }) {
+    const [isShaking, setIsShaking] = useState(false);
+    const [showPointsLoss, setShowPointsLoss] = useState(false);
+    const [pointsGained, setPointsGained] = useState(null);
 
 
     
@@ -104,8 +107,26 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
         setShowChoices(mixed.length > 0);
       }, [canAnswer, flashcard?.imageSrc, roundKey]);
     
+      useEffect(() => {
+        const handleCorrect = ({ userId, scoreGained }) => {
+          if (userId === getUserId()) {
+            setPointsGained(scoreGained);
+            
+            // Duration to show the popup before closing everything
+            setTimeout(() => {
+              setPointsGained(null);
+              setShowChoices(false);
+              setImageChoices([]);
+            }, 1200);
+          }
+        };
+    
+        socket.on("correctAnswer", handleCorrect);
+        return () => socket.off("correctAnswer", handleCorrect);
+      }, [socket, getUserId, setShowChoices, setImageChoices]);
+    
       const handlePickChoice = (choice) => {
-        if (!canAnswer) return;
+        if (!canAnswer || isShaking || showPointsLoss || pointsGained !== null) return;
     
         if (choice.isCorrect) {
           // Correct click → send real answer
@@ -114,30 +135,39 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
             userId: getUserId(),
             answer: flashcard?.word || "",
           });
-    
-          setShowChoices(false);
-          setImageChoices([]);
+          
+          // Note: Visibility and cleanup are now handled by the correctAnswer socket listener
         } else {
-          // ❌ Wrong click → send intentionally wrong answer
+          // ❌ Wrong click → shake + points loss
+          setIsShaking(true);
+          setShowPointsLoss(true);
+
           socket.emit("submitAnswer", {
             gameId: roomId,
             userId: getUserId(),
             answer: "__wrong_choice__", // something that will never match
           });
     
-          setShowChoices(false);
+          // Stop shaking
           setTimeout(() => {
-            setShowChoices(true);
-          }, 400);
+            setIsShaking(false);
+          }, 350);
+
+          // Hide points loss element after animation
+          setTimeout(() => {
+            setShowPointsLoss(false);
+          }, 1000);
         }
       };
 
 
   return (
-    <div>
-       {showChoices && canAnswer && imageChoices.length > 0 && (
+    <div style={{ position: 'relative', width: '100%' }}>
+        {showPointsLoss && <div className="points-loss">-15 points</div>}
+        {pointsGained !== null && <div className="points-gain">+{pointsGained} points</div>}
+        {showChoices && canAnswer && imageChoices.length > 0 && (
                   <div className="choice-modal">
-                    <div className="choice-card">
+                    <div className={`choice-card ${isShaking ? "shake" : ""}`}>
                       <h3>Pick the correct image</h3>
       
                       <div className="choice-grid">

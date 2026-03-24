@@ -2,10 +2,6 @@
 // GameSessionManager - manages in-memory game sessions and fetches flashcards from MongoDB
 const Flashcard = require("../models/Flashcard");
 
-const FLASHCARD_MANIFEST_URL =
-  process.env.FLASHCARD_MANIFEST_URL ||
-  "https://raw.githubusercontent.com/SBNA-Game-Show/sanskrit-asset/main/data/images.json";
-
 // ========== helpers: normalization & synonyms ==========
 function normDeva(s) {
   return (s || "")
@@ -116,29 +112,27 @@ class GameSessionManager extends EventEmitter {
 
   async initializeFlashcardDeck(gameId, difficulty) {
     const session = this.getSession(gameId);
-
-    const response = await fetch(FLASHCARD_MANIFEST_URL);
+    
+    // Fetch from github
+    const response = await fetch('https://raw.githubusercontent.com/YouzJa/assets-sand2/main/data/images.json'); // <- changed this to RAW cause the cache was being slow (3 hours later and it still didnt update!)
+    // Change this to fetch from the OFFICIAL github repo once thats setup, for now its using my personal one!
     const manifest = await response.json();
 
-    // Manifest is now pictionary-only and already uses the game schema.
-    const all = manifest.filter(
-      (card) =>
-        card.difficulty?.toLowerCase() === difficulty.toLowerCase() &&
-        card.word &&
-        card.transliteration &&
-        card.translation,
+    // Filter by difficulty usageTargets
+    const filtered = manifest.filter(card => 
+      card.difficulty?.toLowerCase() === difficulty.toLowerCase()
     );
     
     // Shuffle in normal case!
-    for (let i = all.length - 1; i > 0; i--) {
+    for (let i = filtered.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [all[i], all[j]] = [all[j], all[i]];
+      [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
     }
     
-    session.flashcardDeck = all;
+    session.flashcardDeck = filtered;
     session.deckIndex = 0;
     
-    console.log(`[initializeFlashcardDeck] Deck initialized with ${all.length} cards`);
+    console.log(`[initializeFlashcardDeck] Deck initialized with ${filtered.length} cards`);
   }
 
   /**

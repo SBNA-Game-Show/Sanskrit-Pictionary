@@ -114,7 +114,7 @@ class GameSessionManager extends EventEmitter {
     const session = this.getSession(gameId);
     
     // Fetch from github
-    const response = await fetch('https://raw.githubusercontent.com/YouzJa/assets-sand2/main/data/images.json'); // <- changed this to RAW cause the cache was being slow (3 hours later and it still didnt update!)
+    const response = await fetch('https://raw.githubusercontent.com/SBNA-Game-Show/sanskrit-asset/main/data/images.json'); // <- changed this to RAW cause the cache was being slow (3 hours later and it still didnt update!)
     // Change this to fetch from the OFFICIAL github repo once thats setup, for now its using my personal one!
     const manifest = await response.json();
 

@@ -235,22 +235,6 @@ const Play = () => {
     }
   }, [players, isHost, roomId]);
 
-  // // Listerner for react
-  // useEffect(() => {
-  //   socket.on("receive-reaction", (data) => {
-  //     const { type, id, left } = data;
-  //     setReactions((prev) => [...prev, { id, type, left }]);
-
-  //     setTimeout(() => {
-  //       setReactions((prev) => prev.filter((r) => r.id !== id));
-  //     }, 3000);
-  //   });
-
-  //   return () => {
-  //     socket.off("receive-reaction");
-  //   };
-  // }, []);
-
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");

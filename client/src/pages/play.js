@@ -15,6 +15,7 @@ import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
 import ImagesSelection from "../reusableComponents/ImagesSelection";
 import { useGameSocket } from "../hooks/socket/useGameSocket";
+import ReactionOverlay from "../reusableComponents/ReactionOverlay";
 
 const Play = () => {
   const canvasRef = useRef(null);
@@ -80,6 +81,9 @@ const Play = () => {
 
   //LOG PLAYERS
   console.log(players)
+
+  //React buttons
+  const [reactions, setReactions] = useState([]);
 
   // ---------- UI helpers ----------
   const handlePenClick = () => {
@@ -201,6 +205,15 @@ const Play = () => {
 
   const isHost = currentUserId === hostData?.hostId;
 
+  // Send reactions
+  const sendReaction = (emoji) => {
+    socket.emit("send-reaction", {
+      roomId,
+      type: emoji,
+      left: Math.random() * 40 + 30,
+    });
+  };
+
   useEffect(() => {
     hostRef.current = isHost;
   }, [isHost]);
@@ -220,6 +233,22 @@ const Play = () => {
       });
     }
   }, [players, isHost, roomId]);
+
+  // Listerner for react
+  useEffect(() => {
+    socket.on("receive-reaction", (data) => {
+      const { type, id, left } = data;
+      setReactions((prev) => [...prev, { id, type, left }]);
+
+      setTimeout(() => {
+        setReactions((prev) => prev.filter((r) => r.id !== id));
+      }, 3000);
+    });
+
+    return () => {
+      socket.off("receive-reaction");
+    };
+  }, []);
 
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
@@ -366,6 +395,7 @@ const Play = () => {
 
   return (
     <>
+      <ReactionOverlay reactions={reactions} />
       <RoundPopups />
       <div className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}>
         {/* Round result modal */}
@@ -432,9 +462,6 @@ const Play = () => {
             </label>
           </a>
         </div>
-
-        {/* Drawer and host see the full flashcard */}
-        {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
 
         {/* User List */}
         <div className="user-list">
@@ -558,42 +585,44 @@ const Play = () => {
             myTeam={myTeam}
           />
         )}
-
-        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
-          <h5>Answer Box</h5>
-          <div className="input-area2">
-            <input
-              type="text"
-              placeholder="Type answer"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              disabled={!canAnswer}
-            />
-            <button onClick={handleSubmitAnswer} disabled={!canAnswer}>
-              Send
-            </button>
+        
+        {/* Team not in turn can react to the drawing */}
+        {!isEligibleGuesser && !isDrawer && !isHost && !isSpectator && (
+          <div className="like-panel"> 
+            <h2>How do you like the drawing ?</h2>
+            <div className="reaction-buttons">
+              <button onClick={() => sendReaction('👍')}>👍</button>
+              <button onClick={() => sendReaction('💐')}>💐</button>
+              <button onClick={() => sendReaction('💯')}>💯</button>
+              <button onClick={() => sendReaction('👎')}>👎</button>
+            </div>
           </div>
+        )}
 
-          {/* image selection logic all and i called the necessary usestates */}
-          <ImagesSelection
-            flashcard={flashcard}
-            getUserId={getUserId}
-            canAnswer={canAnswer}
-            roundKey={roundKey}
-            roomId={roomId}
-            socket={socket}
-            setImageChoices={setImageChoices}
-            setShowChoices={setShowChoices}
-            showChoices={showChoices}
-            imageChoices={imageChoices}
-          />
+        {/* Drawer and host see the full flashcard */}
+        {flashcard && (isDrawer || isHost) && (
+          <div className="flashcard">
+            <Flashcard items={[flashcard]} />
+          </div>
+        )}
 
-          {!canAnswer && (
-            <small style={{ color: "#c00" }}>
-              Only the {drawerTeam} team can answer, and not the drawer.
-            </small>
-          )}
-        </div>
+        {/* image selection logic all and i called the necessary usestates */}
+        {isEligibleGuesser && !isHost && (
+          <div className="input-area-wrapper">
+            <ImagesSelection
+              flashcard={flashcard}
+              getUserId={getUserId}
+              canAnswer={canAnswer}
+              roundKey={roundKey}
+              roomId={roomId}
+              socket={socket}
+              setImageChoices={setImageChoices}
+              setShowChoices={setShowChoices}
+              showChoices={showChoices}
+              imageChoices={imageChoices}
+            /> 
+          </div>
+        )}
       </div>
 
       {/* GAME PAUSED OVERLAY */}

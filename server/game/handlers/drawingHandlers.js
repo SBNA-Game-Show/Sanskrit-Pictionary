@@ -47,6 +47,19 @@ function registerDrawingHandlers(socket, io) {
       gameSessionManager.getPlayersWithScores(gameId),
     );
   });
+
+  // ---- React from non-gueesing players ----
+  socket.on("send-reaction", (data) => {
+    const { roomId, type, id, left } = data;
+    if (!roomId) return;
+
+    // send the reaction to everyone in the room
+    io.to(roomId).emit("receive-reaction", {
+      type,
+      id,
+      left
+    });
+  });
 }
 
 module.exports = { registerDrawingHandlers };

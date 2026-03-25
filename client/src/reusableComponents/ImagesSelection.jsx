@@ -167,9 +167,8 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
         {pointsGained !== null && <div className="points-gain">+{pointsGained} points</div>}
         {showChoices && canAnswer && imageChoices.length > 0 && (
                   <div className="choice-modal">
+                    <h3>Pick the correct image</h3>
                     <div className={`choice-card ${isShaking ? "shake" : ""}`}>
-                      <h3>Pick the correct image</h3>
-      
                       <div className="choice-grid">
                         {imageChoices.map((c, index) => (
                           <button

@@ -215,6 +215,10 @@
   }
 }
 
+.drawer-view .guesses-box{
+  display:none;
+}
+
 /* round result mini modal (top-left) – already in your file; keep if present */
 .round-result-modal {
   position: absolute;
@@ -867,3 +871,292 @@
     opacity: 1;
   }
 }
+
+/* .guesser-view .guesses-box{
+  display:none;
+} */
+
+
+
+
+
+/* ===========================
+   RESPONSIVE BREAKPOINTS
+   =========================== */
+
+
+
+@media (max-width: 1120px) {
+  .play-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto 1fr auto auto;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .flashcard,
+  .flashcard-container {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .drawer-name {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 1.3em;
+  }
+
+  .score-box,
+  .time-box,
+  .guesses-box {
+    font-size: 18px;
+    padding: 8px;
+  }
+
+  .host-view .guesses-box{
+    grid-column:1/2;
+    grid-row:2/3;
+  }
+
+
+
+  .player-view .guesses-box{
+    grid-column:2;
+    grid-row:5;
+  }
+
+  .host-view .time-box{
+    grid-column:2/3;
+    grid-row:2/3;
+  }
+
+
+  .canvascontrols {
+    grid-column: 1 / 3;
+    grid-row: 3;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 1.2em;
+  }
+
+  .canvas {
+    grid-column: 1 / 3;
+    grid-row: 4;
+    margin: 0;
+    min-height: 300px;
+  }
+
+  .input-area-wrapper {
+    grid-column: 2;
+    grid-row: 6;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .host-view .user-list {
+    grid-column: 1/3;
+    grid-row: 5;
+    height: 100%;
+    max-width:600px;
+  }
+
+
+   .host-view .team-container{
+    display:flex;
+    gap:20px;
+  }
+  
+  .player-view .user-list{
+    grid-column:1/2;
+    grid-row:6;
+  }
+
+  .choice-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .guesser-view .guesses-box{
+  grid-column: 2;
+  grid-row: 2;
+}
+
+}
+
+/* Small screens */
+@media (max-width: 600px) {
+  .play-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto auto auto auto; 
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .flashcard,
+  .flashcard-container,
+  .drawer-name,
+  .score-box,
+  .time-box,
+  .guesses-box,
+  .canvascontrols,
+  .canvas,
+  .input-area-wrapper,
+  .user-list,
+  .chat-box {
+    grid-column: 1;
+  }
+
+  .host-view .time-box{
+    grid-column:1;
+    grid-row:3;
+  }
+
+   .host-view .guesses-box{
+    display:none;
+  }
+  .player-view .guesses-box{
+    grid-column: 1;
+    grid-row:5;
+  }
+
+  .flashcard,
+  .flashcard-container {
+    grid-row: 1;
+  }
+
+  .drawer-name {
+    grid-row: 2;
+    font-size: 1.1em;
+  }
+
+  .score-box {
+    grid-row: 3;
+  }
+
+  .time-box {
+    grid-row: 4;
+  }
+
+  .guesses-box {
+    grid-row: 8;
+  }
+
+  .canvascontrols {
+    grid-row: 4;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .player-view .canvascontrols {
+    grid-row: 6;
+  }
+
+   .host-view .user-list {
+    grid-row: 6;
+    height: 100%;
+  }
+
+   .host-view .user-list {
+    grid-column: 1/3;
+    grid-row: 6;
+    height: 100%;
+  }
+
+
+   .host-view .team-container{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+
+   .player-view .user-list{
+    grid-row:9;
+    height: 100%;
+  }
+
+  .canvas {
+    grid-column: 1/2;
+    grid-row: 5;
+    min-height: 350px;
+    height: 320px;
+  }
+
+  .player-view .canvas {
+    grid-row: 7;
+  }
+  .input-area-wrapper {
+    grid-row: 8;
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+  }
+
+   .host-view .guesses-box{
+    display:none;
+  }
+
+
+  .chat-box {
+    grid-row: 10;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .input-area2 {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .input-area2 input,
+  .input-area2 button {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .choice-grid {
+    grid-template-columns: repeat(4, 1fr);
+    /* gap: 5px; */
+    
+  }
+  .choice-tile{
+    align-items:center;
+  }
+  .choice-tile img {
+    width:80%;
+    height: 90%;
+  }
+
+  .user-chip {
+    padding: 6px 8px;
+    gap: 8px;
+  }
+
+  .user-chip .avatar-wrap {
+    width: 30px;
+    height: 30px;
+  }
+
+  .user-chip .chip-name,
+  .user-chip .chip-guesses {
+    font-size: 14px;
+  }
+
+
+  .round-result-modal .modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.round-result-modal .modal-card.wrong-answer {
+  background: #ffebee;
+  border: 2px solid #c62828;
+  min-width: 100px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+}
+

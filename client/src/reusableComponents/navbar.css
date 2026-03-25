@@ -74,3 +74,42 @@
 .logout-btn2:hover {
   background-color: #b25014;
 }
+
+@media (max-width:800px){
+  .navbar{
+    padding:2px;
+  }
+  .nav-links{
+    gap: 15px;
+  }
+  .nav-links a{
+    font-size: 16px;
+  }
+  .nav-logo{
+     font-size: 22px;
+  font-weight: bold;
+  }
+  .logout-btn2{
+  font-size: 14px;
+  padding: 2px 12px;
+  }
+
+}
+
+@media (max-width: 450px) {
+ .navbar{
+  display: flex;
+  flex-direction: column;
+   height: 120px;
+  background: rgba(242, 210, 182);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 10;
+ }
+
+}

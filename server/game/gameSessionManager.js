@@ -63,7 +63,7 @@ class GameSessionManager extends EventEmitter {
     this.emit("resumeTimer", gameId);
   }
 
-  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses) {
+  async createSession(gameId, players, totalRounds, timer, difficulty, teams, hostData, guesses, isLearningMode) {
     // assign players to selected teams
     players.forEach((p) => {
       if (teams.Red.includes(p.userId)) {
@@ -83,9 +83,12 @@ class GameSessionManager extends EventEmitter {
       currentRound: 1, // Round number should be starts from 1 
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
+      redTeamRound: 1, // Indicater the n-th drawer of red team
+      blueTeamRound: 1, // Indicater the n-th drawer of blue team
       timer,
       difficulty,
-      guesses: Number(guesses) || 5, // Guesses config with default value 3
+      isLearningMode, // Added isLearningMode
+      guesses: Number(guesses) || 3, // Guesses config with default value 3
       roundInProgress: false,
       scores: {},
       currentFlashcard: null,
@@ -105,7 +108,7 @@ class GameSessionManager extends EventEmitter {
     });
 
     console.log(
-      `[createSession] gameId=${gameId} players=${players.length} 
+      `[createSession] gameId=${gameId} players=${players.length} isLearningMode=${isLearningMode}
         timer=${timer} difficulty=${difficulty} guesses=${guesses}`
     );
   }
@@ -238,17 +241,20 @@ class GameSessionManager extends EventEmitter {
     const session = this.sessions.get(gameId);
     if (!session) return null;
 
-  const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
+    if (session.isLearningMode){
+      // Learning Mode:
+      // send popup after every turn (both red and blue)
+      const fc = session.currentFlashcard || {};
 
-  // send popup after every turn (both red and blue)
-  const fc = session.currentFlashcard || {};
+      io.to(gameId).emit("turnEnded", {
+        word: fc.word || "",
+        transliteration: fc.transliteration || "",
+        imageSrc: fc.imageSrc || "",
+        audioSrc: fc.audioSrc || ""
+      });
+    }
 
-  io.to(gameId).emit("turnEnded", {
-    word: fc.word || "",
-    transliteration: fc.transliteration || "",
-    imageSrc: fc.imageSrc || "",
-    audioSrc: fc.audioSrc || ""
-  });
+    const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
 
     // No next round if reached total rounds and last drawer was Blue team
     if (lastDrawer && lastDrawer.team === "Blue" 
@@ -264,8 +270,10 @@ class GameSessionManager extends EventEmitter {
         roundNumber: session.currentRound
       });
 
-    session.currentRound++;
-  }
+      session.redTeamRound++;
+      session.blueTeamRound++;
+      session.currentRound++;
+    }
 
     // The turn should cycle through the target team members based on the round count
     session.currentPlayerIndex = this._getNextDrawerIndex(session, lastDrawer);
@@ -276,6 +284,8 @@ class GameSessionManager extends EventEmitter {
     return {
       currentRound: session.currentRound,
       currentPlayer: session.players[session.currentPlayerIndex],
+      redTeamRound: session.redTeamRound,
+      blueTeamRound: session.blueTeamRound,
       timer: session.timer,
       difficulty: session.difficulty,
     };
@@ -286,6 +296,8 @@ class GameSessionManager extends EventEmitter {
   _getNextDrawerIndex(session, lastDrawer) {
     // Next drawer should be from the opposite team of last drawer
     const targetTeam = (lastDrawer && lastDrawer.team === "Blue") ? "Red" : "Blue";
+    // Get the teamRound to be updated
+    const targetTeamRound = targetTeam === "Red" ? "redTeamRound" : "blueTeamRound";
 
     // Find all players and their indexes in the target team
     const targetTeamMembers = session.players
@@ -295,8 +307,8 @@ class GameSessionManager extends EventEmitter {
 
     if (targetTeamMembers.length === 0) return -1;
 
-    // Find the next drawer index based on current round number, ensuring it cycles through team members
-    const nextDrawerIndex = (session.currentRound - 1) % targetTeamMembers.length;
+    // Find the next drawer index based on teamRound number, ensuring it cycles through team members
+    const nextDrawerIndex = (session[targetTeamRound] - 1) % targetTeamMembers.length;
 
     return targetTeamMembers[nextDrawerIndex];
   }
@@ -437,6 +449,7 @@ class GameSessionManager extends EventEmitter {
     const newScore = Math.max(0, currentScore - WRONG_ANSWER_PENALTY);
     session.scores[userId] = newScore;
 
+    // emit to play incorrect sound and trigger point deduction popup
     io.to(gameId).emit("wrongAnswer", {
       userId,
       displayName: player.displayName,
@@ -542,6 +555,11 @@ class GameSessionManager extends EventEmitter {
 
     const isCurrentDrawer = session.currentPlayerIndex === playerIndex;
     const kickedPlayer = session.players[playerIndex];
+    // Get the teamRound to be updated
+    const kickedTeamRound = kickedPlayer.team === "Red" ? "redTeamRound" : "blueTeamRound";
+    // Get kickedPlayer's index in team
+    const kickedPlayerTeamIndex = session.players.filter(p => p.team === kickedPlayer.team).findIndex(p => p === kickedPlayer);
+    const teamSizeBefore = session.players.filter(p => p.team === kickedPlayer.team).length;
 
     // Remove player
     session.players.splice(playerIndex, 1);
@@ -554,6 +572,12 @@ class GameSessionManager extends EventEmitter {
     // then the current player index should be decremented by 1
     if (playerIndex < session.currentPlayerIndex) {
       session.currentPlayerIndex--;
+    }
+
+    // If the kicked player's index is less equal than the current team player in team, 
+    // then the current teamRound should be decremented by 1
+    if (kickedPlayerTeamIndex <= session[kickedTeamRound] % teamSizeBefore ) {
+      session[kickedTeamRound]--;
     }
     // If the kicked player index is outside of the array length,
     // set current player index back to 0 

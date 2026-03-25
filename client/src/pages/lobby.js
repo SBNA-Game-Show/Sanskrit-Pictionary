@@ -17,6 +17,7 @@ const DEFAULT_GAME_SETTINGS = {
   timer: 30,
   difficulty: "Easy",
   guesses: 4,
+  isLearningMode: true
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
@@ -27,6 +28,7 @@ const createUpdatedSettings = (settings, setting, value) => {
   if (setting === "timer") updated.timer = value;
   if (setting === "difficulty") updated.difficulty = value;
   if (setting === "guesses") updated.guesses = value;
+  if (setting === "isLearningMode") updated.isLearningMode = value;
   return updated;
 };
 
@@ -50,7 +52,7 @@ const Lobby = () => {
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
 
-  const { rounds, timer, difficulty, guesses } = gameSettings;
+  const { rounds, timer, difficulty, guesses, isLearningMode } = gameSettings;
 
   const byId = useMemo(
     () => Object.fromEntries(onlineUsers.map((u) => [u.userId, u])),
@@ -188,6 +190,7 @@ const Lobby = () => {
         timer: settings.timer,
         difficulty: settings.difficulty,
         guesses: settings.guesses,
+        isLearningMode: settings.isLearningMode
       });
     });
 
@@ -469,6 +472,31 @@ const Lobby = () => {
           <h2>Game Settings</h2>
 
           <div className="setting-section">
+            <h3>Select Game Mode</h3>
+            <div className="option-buttons">
+              <button
+                className={gameSettings.isLearningMode ? "active" : ""}
+                onClick={() => handleSettingsChange("isLearningMode", true)}
+                disabled={!isHost}
+              >
+                Learning
+              </button>
+              <button
+                className={!gameSettings.isLearningMode ? "active" : ""}
+                onClick={() => handleSettingsChange("isLearningMode", false)}
+                disabled={!isHost}
+              >
+                Blitz
+              </button>
+            </div>
+            <small style={{ marginTop: "5px", display: "block" }}>
+              {gameSettings.isLearningMode 
+                ? "Show answers after each turn." 
+                : "Fast-paced! Answers are hidden."}
+            </small>
+          </div>
+
+          <div className="setting-section">
             <h3>Select Rounds</h3>
             <div className="option-buttons">
               {[1, 2, 3, 4, 5].map((round) => (
@@ -544,6 +572,7 @@ const Lobby = () => {
                     timer,
                     difficulty,
                     guesses,
+                    isLearningMode,
                     hostData: {
                       hostId,
                       hostDisplayName: myDisplayName,

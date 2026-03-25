@@ -23,6 +23,7 @@ export const useGameSocket = (
   setImageChoices,
   setRoundKey,
   setEraseMode,
+  setReactions,
   isGameEndedRef,
   canvasRef,
   correctAudioRef,
@@ -429,6 +430,16 @@ export const useGameSocket = (
       }, 1200);
     });
 
+    // Send reactions
+    socket.on("receive-reaction", (data) => {
+      const { type, id, left } = data;
+      setReactions((prev) => [...prev, { id, type, left }]);
+
+      setTimeout(() => {
+        setReactions((prev) => prev.filter((r) => r.id !== id));
+      }, 3000);
+    });
+
     return () => {
       socket.off("connect", handleReconnect);
       socket.off("playerDisconnected");
@@ -453,6 +464,7 @@ export const useGameSocket = (
       socket.off("guessesExhausted");
       socket.off("clear-canvas");
       socket.off("gameEnded");
+      socket.off("receive-reaction");
 
       // Check for unnatural unmount (e.g. navbar navigation)
       if (!isGameEndedRef.current) {

@@ -193,6 +193,7 @@ const Play = () => {
     setImageChoices,
     setRoundKey,
     setEraseMode,
+    setReactions,
     isGameEndedRef,
     canvasRef,
     correctAudioRef,
@@ -234,21 +235,21 @@ const Play = () => {
     }
   }, [players, isHost, roomId]);
 
-  // Listerner for react
-  useEffect(() => {
-    socket.on("receive-reaction", (data) => {
-      const { type, id, left } = data;
-      setReactions((prev) => [...prev, { id, type, left }]);
+  // // Listerner for react
+  // useEffect(() => {
+  //   socket.on("receive-reaction", (data) => {
+  //     const { type, id, left } = data;
+  //     setReactions((prev) => [...prev, { id, type, left }]);
 
-      setTimeout(() => {
-        setReactions((prev) => prev.filter((r) => r.id !== id));
-      }, 3000);
-    });
+  //     setTimeout(() => {
+  //       setReactions((prev) => prev.filter((r) => r.id !== id));
+  //     }, 3000);
+  //   });
 
-    return () => {
-      socket.off("receive-reaction");
-    };
-  }, []);
+  //   return () => {
+  //     socket.off("receive-reaction");
+  //   };
+  // }, []);
 
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");

@@ -65,6 +65,7 @@ exports.login = async (req, res) => {
         userId: user._id,
         displayName: user.displayName,
         email: user.email,
+        roles: Array.isArray(user.roles) ? user.roles : [],
       },
     });
   } catch (err) {
@@ -94,7 +95,7 @@ exports.verifyToken = async (req, res) => {
   try {
     // Token already verified by middleware, req.userId is available
     const user = await User.findById(req.userId).select(
-      "displayName email _id",
+      "displayName email _id roles",
     );
 
     if (!user) {
@@ -107,6 +108,7 @@ exports.verifyToken = async (req, res) => {
         userId: user._id,
         displayName: user.displayName,
         email: user.email,
+        roles: Array.isArray(user.roles) ? user.roles : [],
       },
     });
   } catch (error) {

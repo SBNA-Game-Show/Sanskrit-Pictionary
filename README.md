@@ -19,6 +19,7 @@ Sanskrit Pictionary is a web-based multiplayer game that helps users learn Sansk
 Sanskrit-Pictionary/
 ├── client/        # React frontend
 ├── server/        # Express backend
+├── imageHostingSolution/  # Separate asset dashboard module
 ├── .env           # Contains MongoDB URI and secret
 ├── README.md
 ```
@@ -88,6 +89,42 @@ npm start
 ```
 
 This starts the frontend at `http://localhost:3000`
+
+---
+
+### 4. Run Image Dashboard (separate module)
+
+```in bash terminal
+cd ../imageHostingSolution
+npm install
+```
+
+Create `.env` in `imageHostingSolution` from `.env.example` and set:
+
+- `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`
+- `JWT_SECRET` (must match `server/.env`)
+- `ADMIN_USER_ID` (single admin user id)
+
+Start dashboard API and UI:
+
+```in bash terminal
+npm run server   # http://localhost:4000
+npm run dev      # http://localhost:5173
+```
+
+The dashboard sign-in uses Sanskrit-Pictionary credentials and only allows `ADMIN_USER_ID`.
+
+---
+
+### 5. Set Single Admin User
+
+From `server/`, run:
+
+```in bash terminal
+npm run admin:set-single -- 698cb2d895facbe7d45568a8
+```
+
+This removes `ADMIN` from all users, then adds it only to the target user.
 
 ---
 

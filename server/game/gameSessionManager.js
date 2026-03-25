@@ -39,8 +39,25 @@ function toArray(v) {
     .filter(Boolean);
 }
 
+function toPhraseAndParts(v) {
+  const raw = (v || "").toString().trim();
+  if (!raw) return [];
+  const parts = raw
+    .split(/[\/,;|、，\s]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return [raw, ...parts];
+}
+
 function pushManyDeva(set, raw) {
   for (const x of toArray(raw)) {
+    const t = normDeva(x);
+    if (t) set.add(t);
+  }
+}
+
+function pushPhraseAndPartsDeva(set, raw) {
+  for (const x of toPhraseAndParts(raw)) {
     const t = normDeva(x);
     if (t) set.add(t);
   }
@@ -195,6 +212,7 @@ class GameSessionManager extends EventEmitter {
 
     // Send flashcard privately to drawer and host
     io.to(gameId).emit("newFlashcard", {
+      id: flashcard.id || "",
       word: flashcard.word,
       transliteration: flashcard.transliteration,
       translation: flashcard.translation,
@@ -385,7 +403,8 @@ class GameSessionManager extends EventEmitter {
 
     // synonyms/aliases/altWords supported if provided by DB
     const acceptDeva = new Set();
-    pushManyDeva(acceptDeva, corWord);
+    // Add full phrase + parts so multi-word values like "hard new" match reliably.
+    pushPhraseAndPartsDeva(acceptDeva, corWord);
     pushManyDeva(acceptDeva, session.currentFlashcard.synonyms);
     pushManyDeva(acceptDeva, session.currentFlashcard.aliases);
     pushManyDeva(acceptDeva, session.currentFlashcard.altWords);
@@ -397,6 +416,32 @@ class GameSessionManager extends EventEmitter {
         romLat &&
         (subLat === romLat ||
           stripCommonEndings(subLat) === stripCommonEndings(romLat)));
+
+    if (process.env.ANSWER_DEBUG === "true") {
+      console.log(
+        "[answer-debug]",
+        JSON.stringify(
+          {
+            gameId,
+            userId,
+            submittedRaw,
+            subDeva,
+            subLat,
+            corWord,
+            traWord,
+            romWord,
+            corDeva,
+            traLat,
+            romLat,
+            acceptDeva: Array.from(acceptDeva),
+            isCorrect,
+            flashcardId: session.currentFlashcard?.id || "",
+          },
+          null,
+          2,
+        ),
+      );
+    }
 
     if (isCorrect) {
       // ----- time-based score -----

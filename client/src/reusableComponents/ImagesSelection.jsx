@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import "./ImagesSelection.css";
  // For multiple-choice image selection (guessers only)
 
@@ -16,6 +16,18 @@ function normalizeSrc(value) {
   return (value || "").toString().trim();
 }
 
+function canonicalSrc(value) {
+  const raw = normalizeSrc(value);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw, window.location.origin);
+    const decodedPath = decodeURIComponent(url.pathname || "").toLowerCase();
+    return decodedPath.replace(/\/+/g, "/");
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+
 
 export default function ImagesSelection( { flashcard, getUserId, canAnswer, roundKey, roomId, socket, setImageChoices, setShowChoices, imageChoices, showChoices }) {
     const [isShaking, setIsShaking] = useState(false);
@@ -23,6 +35,11 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
     const [pointsGained, setPointsGained] = useState(null);
 
       const [manifestImagesByDifficulty, setManifestImagesByDifficulty] = useState({
+        easy: [],
+        medium: [],
+        hard: [],
+      });
+      const recentDistractorsRef = useRef({
         easy: [],
         medium: [],
         hard: [],
@@ -48,14 +65,18 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
               const difficulty = normalizeDifficulty(card?.difficulty);
               const src = normalizeSrc(card?.imageSrc);
               if (!src) continue;
-              next[difficulty].push(src);
+              next[difficulty].push({
+                id: (card?.id || "").toString().trim(),
+                src,
+                canonical: canonicalSrc(src),
+              });
             }
 
             if (!cancelled) {
               setManifestImagesByDifficulty({
-                easy: [...new Set(next.easy)],
-                medium: [...new Set(next.medium)],
-                hard: [...new Set(next.hard)],
+                easy: dedupeChoices(next.easy),
+                medium: dedupeChoices(next.medium),
+                hard: dedupeChoices(next.hard),
               });
             }
           } catch (error) {
@@ -89,26 +110,43 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
 
         const difficulty = normalizeDifficulty(flashcard?.difficulty);
         const src = normalizeSrc(flashcard.imageSrc);
+        const srcCanonical = canonicalSrc(src);
+        const flashcardId = (flashcard?.id || "").toString().trim();
         const folderImages = manifestImagesByDifficulty[difficulty] || [];
     
-        // Remove duplicates first, just in case
-        const uniqueFolderImages = [...new Set(folderImages)];
-    
-        // Filter out correct image from distractors
-        const distractorPool = uniqueFolderImages.filter((img) => normalizeSrc(img) !== src);
+        // Filter out the correct image using id-first matching (more stable than URL only).
+        const distractorPool = folderImages.filter((entry) => {
+          if (flashcardId && entry.id) return entry.id !== flashcardId;
+          return entry.canonical !== srcCanonical;
+        });
     
         // We want 10 total including the correct one
         const maxChoices = 10;
         const distractorCount = Math.max(0, maxChoices - 1);
     
-        // Pick up to 9 distractors, or fewer if not available
-        const validDistractors = shuffle(distractorPool).slice(0, distractorCount);
+        // Prefer distractors that were not shown in the recent rounds.
+        const recent = recentDistractorsRef.current[difficulty] || [];
+        const freshPool = distractorPool.filter((entry) => !recent.includes(entry.canonical));
+        const primary = shuffle(freshPool).slice(0, distractorCount);
+        const needed = Math.max(0, distractorCount - primary.length);
+        const fallbackPool = distractorPool.filter((entry) => !primary.includes(entry));
+        const fallback = shuffle(fallbackPool).slice(0, needed);
+        const validDistractors = [...primary, ...fallback];
     
         // Mix correct + distractors and shuffle
         const mixed = shuffle([
-          { src, isCorrect: true },
-          ...validDistractors.map((s) => ({ src: s, isCorrect: false })),
+          { id: flashcardId, src, canonical: srcCanonical, isCorrect: true },
+          ...validDistractors.map((entry) => ({
+            id: entry.id,
+            src: entry.src,
+            canonical: entry.canonical,
+            isCorrect: false,
+          })),
         ]);
+
+        // Keep a short recent history to improve variety across rounds.
+        const nextRecent = [...recent, ...validDistractors.map((entry) => entry.canonical)];
+        recentDistractorsRef.current[difficulty] = nextRecent.slice(-30);
     
         setImageChoices(mixed);
     
@@ -142,7 +180,12 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
           socket.emit("submitAnswer", {
             gameId: roomId,
             userId: getUserId(),
-            answer: flashcard?.word || "",
+            // Prefer Devanagari word but fall back for malformed rows.
+            answer:
+              flashcard?.word ||
+              flashcard?.translation ||
+              flashcard?.transliteration ||
+              "",
           });
           
           // Note: Visibility and cleanup are now handled by the correctAnswer socket listener
@@ -195,4 +238,16 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
                 )}
     </div>
   )
+}
+
+function dedupeChoices(entries) {
+  const seen = new Set();
+  const out = [];
+  for (const entry of entries || []) {
+    const key = entry.id || entry.canonical || entry.src;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
 }

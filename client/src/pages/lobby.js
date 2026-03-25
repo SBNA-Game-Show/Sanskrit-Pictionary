@@ -341,11 +341,12 @@ const Lobby = () => {
       if (myTeam === "Red") {
         actions = (
           <span className="user-actions">
-            <button className="leave-btn" onClick={handleLeaveTeam}>
+            <button className="leave-btn" data-testid="leave-team-button" onClick={handleLeaveTeam}>
               Leave team
             </button>
             <button
               className="join-btn join-blue"
+              data-testid="switch-blue-button"
               onClick={() => handleJoinTeam("Blue")}
             >
               Switch to Blue
@@ -355,11 +356,11 @@ const Lobby = () => {
       } else if (myTeam === "Blue") {
         actions = (
           <span className="user-actions">
-            <button className="leave-btn" onClick={handleLeaveTeam}>
+            <button className="leave-btn" data-testid="leave-team-button" onClick={handleLeaveTeam}>
               Leave team
             </button>
             <button
-              className="join-btn join-red"
+              className="join-btn join-red" data-testid="switch-red-button"
               onClick={() => handleJoinTeam("Red")}
             >
               Switch to Red
@@ -371,12 +372,14 @@ const Lobby = () => {
           <span className="user-actions">
             <button
               className="join-btn join-red"
+              data-testid="join-red-button"
               onClick={() => handleJoinTeam("Red")}
             >
               Join Red
             </button>
             <button
               className="join-btn join-blue"
+              data-testid="join-blue-button"
               onClick={() => handleJoinTeam("Blue")}
             >
               Join Blue
@@ -412,10 +415,12 @@ const Lobby = () => {
     <div className="lobby-container" data-testid="lobby-page">
       <div className="lobby-url">
         <span>
-          <strong>Game Lobby ID:</strong> {roomId}
+          <strong>Game Lobby ID:</strong>{" "}
+          <span data-testid="room-id">{roomId}</span>
         </span>
         <button
           className="copy-button"
+          data-testid="copy-room-id"
           onClick={() => {
             navigator.clipboard.writeText(roomId);
             toastSuccess("Room ID copied to clipboard! 📋", {
@@ -449,7 +454,7 @@ const Lobby = () => {
 
         {/* TEAMS */}
         <div className="teams-col">
-          <div className="team-card red">
+          <div className="team-card red" data-testid="red-team-panel">
             <h3>Red Team / लाल दल</h3>
             {teams.Red.length === 0 ? (
               <p className="muted">No players</p>
@@ -457,7 +462,7 @@ const Lobby = () => {
               teams.Red.map((uid) => renderUserRow(uid))
             )}
           </div>
-          <div className="team-card blue">
+          <div className="team-card blue" data-testid="blue-team-panel">
             <h3>Blue Team / नील दल</h3>
             {teams.Blue.length === 0 ? (
               <p className="muted">No players</p>
@@ -475,6 +480,7 @@ const Lobby = () => {
             <h3>Select Game Mode</h3>
             <div className="option-buttons">
               <button
+                data-testid="mode-learning-button"
                 className={gameSettings.isLearningMode ? "active" : ""}
                 onClick={() => handleSettingsChange("isLearningMode", true)}
                 disabled={!isHost}
@@ -482,6 +488,7 @@ const Lobby = () => {
                 Learning
               </button>
               <button
+                data-testid="mode-blitz-button"
                 className={!gameSettings.isLearningMode ? "active" : ""}
                 onClick={() => handleSettingsChange("isLearningMode", false)}
                 disabled={!isHost}
@@ -502,6 +509,7 @@ const Lobby = () => {
               {[1, 2, 3, 4, 5].map((round) => (
                 <button
                   key={round}
+                  data-testid={`rounds-${round}-button`}
                   className={rounds === round ? "active" : ""}
                   onClick={() => handleSettingsChange("rounds", round)}
                   disabled={!isHost}
@@ -518,6 +526,7 @@ const Lobby = () => {
               {[30, 45, 60, 75, 90].map((sec) => (
                 <button
                   key={sec}
+                  data-testid={`timer-${sec}-button`}
                   className={timer === sec ? "active" : ""}
                   onClick={() => handleSettingsChange("timer", sec)}
                   disabled={!isHost}
@@ -534,6 +543,7 @@ const Lobby = () => {
               {["Easy", "Medium", "Hard"].map((level) => (
                 <button
                   key={level}
+                  data-testid={`difficulty-${level.toLowerCase()}-button`}
                   className={difficulty === level ? "active" : ""}
                   onClick={() => handleSettingsChange("difficulty", level)}
                   disabled={!isHost}
@@ -551,6 +561,7 @@ const Lobby = () => {
               {[1, 2, 3, 4].map((num) => (
                 <button
                   key={num}
+                  data-testid={`guesses-${num}-button`}
                   className={guesses === num ? "active" : ""}
                   onClick={() => handleSettingsChange("guesses", num)}
                   disabled={!isHost}
@@ -564,6 +575,7 @@ const Lobby = () => {
           {isHost && (
             <button
               className="start-game-button"
+              data-testid="start-game-button"
               onClick={() => {
                 if (isHost) {
                   socket.emit("startGame", {

@@ -97,17 +97,17 @@ const End = () => {
   }
 
   return (
-    <div className="gameend-container">
-      <h2 className="gameend-title">Leaderboard</h2>
+    <div className="gameend-container" data-testid="leaderboard-page">
+      <h2 className="gameend-title" data-testid="leaderboard-title">Leaderboard</h2>
       <Fireworks colors={winningFireworkColors(winningTeam)} />
-      <p className="winning-team" style={winningStyle(winningTeam)}>
+      <p className="winning-team" data-testid="winning-team" style={winningStyle(winningTeam)}>
         {winningTeam === "tie"
           ? "It's a Tie!"
           : `${winningTeam === "red" ? "Red Team / लाल दल" : "Blue Team / नील दल"} Wins!`}{" "}
       </p>
       <div className="leaderboard-list">
         {/* RED TEAM */}
-        <div className={`teamRed ${winningTeam === "red" ? "winner" : ""}`}>
+        <div className={`teamRed ${winningTeam === "red" ? "winner" : ""}`} data-testid="leaderboard-red-team">
           <p className="team-title" id="red">
             Red Team / लाल दल{" "}
           </p>
@@ -119,6 +119,7 @@ const End = () => {
               <div
                 className={`leaderboard-card ${index === 0 ? "first" : index === 1 ? "second" : index === 2 ? "third" : ""}`}
                 key={player.id}
+                data-testid={`leaderboard-player-${player.id}`}
               >
                 <div className="rank-badge">#{index + 1}</div>
 
@@ -157,7 +158,7 @@ const End = () => {
         </div>
 
         {/* BLUE TEAM */}
-        <div className={`teamBlue ${winningTeam === "blue" ? "winner" : ""}`}>
+        <div className={`teamBlue ${winningTeam === "blue" ? "winner" : ""}`} data-testid="leaderboard-blue-team">
           <p className="team-title" id="blue">
             Blue Team / नील दल
           </p>
@@ -169,6 +170,7 @@ const End = () => {
               <div
                 className={`leaderboard-card ${index === 0 ? "first" : index === 1 ? "second" : index === 2 ? "third" : ""}`}
                 key={player.id}
+                data-testid={`leaderboard-player-${player.id}`}
               >
                 <div className="rank-badge">#{index + 1}</div>
 

@@ -136,18 +136,21 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
   return (
     <div>
        {showChoices && canAnswer && imageChoices.length > 0 && (
-                  <div className="choice-modal">
-                    <div className="choice-card">
-                      <h3>Pick the correct image</h3>
+                  <div className="choice-modal" data-testid="choice-modal">
+                    <div className="choice-card" data-testid="choice-card">
+                      <h3 data-testid="choice-title">Pick the correct image</h3>
       
-                      <div className="choice-grid">
+                      <div className="choice-grid" data-testid="choice-grid">
                         {imageChoices.map((c, index) => (
                           <button
                             key={c.src || index}
                             className="choice-tile"
+                            data-testid={`choice-tile-${index}`}
+                            data-correct={c.isCorrect ? "true" : "false"}
+                            data-image-src={c.src}
                             onClick={() => handlePickChoice(c)}
                           >
-                            <img src={c.src} alt={`choice ${index + 1}`} />
+                            <img src={c.src} alt={`choice ${index + 1}`} data-testid={`choice-image-${index}`} />
                           </button>
                         ))}
                       </div>

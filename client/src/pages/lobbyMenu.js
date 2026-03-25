@@ -82,12 +82,13 @@ const LobbyMenu = () => {
   return (
     <div className="lobby-container" data-testid="lobby-page">
       <h2>Welcome to the Game Lobby</h2>
-      <button className="start-game-button" onClick={handleCreateRoom}>
+      <button className="start-game-button" data-testid="create-room-button" onClick={handleCreateRoom}>
         🆕 Create Room
       </button>
       <div style={{ margin: "24px 0" }}>
         <input
           className="lobby-room-input"
+          data-testid="room-input"
           placeholder="Enter Room Code"
           value={roomInput}
           onChange={(e) => setRoomInput(e.target.value)}
@@ -101,6 +102,7 @@ const LobbyMenu = () => {
         />
         <button
           className="start-game-button"
+          data-testid="enter-room-button"
           onClick={handleEnterRoom}
           disabled={loading}
         >

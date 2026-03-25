@@ -765,6 +765,9 @@ const Play = () => {
       <div
         className={chipClass}
         key={user.userId}
+        data-testid={`player-${user.userId}`}
+        data-team={user.team}
+        data-drawer={user.userId === drawerId ? "true" : "false"}
         style={{
           display: "flex",
           alignItems: "center",
@@ -792,6 +795,7 @@ const Play = () => {
           {isHost && user.userId !== currentUserId && (
             <button
               onClick={() => handleKickClick(user, displayName)}
+              data-testid={`kick-player-${user.userId}`}
               style={{
                 background: "crimson",
                 color: "white",
@@ -873,7 +877,7 @@ const Play = () => {
       <div className="play-grid">
         {/* Round result modal */}
         {roundReveal && (
-          <div className="round-reveal-popup">
+          <div className="round-reveal-popup" data-testid="round-reveal-popup">
             <div className="round-reveal-card">
               <div className="round-reveal-title">It was:</div>
 
@@ -883,7 +887,7 @@ const Play = () => {
                 alt=""
               />
 
-              <div className="round-reveal-word">{roundReveal.word}</div>
+              <div className="round-reveal-word" data-testid="round-reveal-word">{roundReveal.word}</div>
 
               <div className="round-reveal-translit">
                 {roundReveal.transliteration}
@@ -902,7 +906,7 @@ const Play = () => {
           </div>
         )}
 
-        <div className={`score-box ${isHost && "hidden"}`}>
+        <div className={`score-box ${isHost && "hidden"}`} data-testid="score-box">
           <strong>Score: </strong>
           <a>
             <label htmlFor="score">
@@ -912,14 +916,14 @@ const Play = () => {
           </a>
         </div>
 
-        <div className="time-box">
+        <div className="time-box" data-testid="time-box">
           <strong>Time Left: </strong>
           <a>
             <label htmlFor="timeleft">{timeLeft}</label> sec
           </a>
         </div>
 
-        <div className="guesses-box">
+        <div className="guesses-box" data-testid="guesses-box">
           <strong>Guesses Left: </strong>
           <a>
             <label
@@ -937,13 +941,17 @@ const Play = () => {
         </div>
 
         {/* Drawer and host see the full flashcard */}
-        {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
+        {flashcard && (isDrawer || isHost) && (
+          <div data-testid="flashcard-container">
+            <Flashcard items={[flashcard]} />
+          </div>
+        )}
 
         {/* User List */}
         <div className="user-list" data-testid="online-users-panel">
           <div className="user-panel-title">Players List</div>
 
-          <div className="team-block">
+          <div className="team-block" data-testid="red-team">
             <h3 className="team-title red">Red Team / लाल दल</h3>
             {redTeam.length === 0 ? (
               <p className="muted">No players</p>
@@ -952,7 +960,7 @@ const Play = () => {
             )}
           </div>
 
-          <div className="team-block">
+          <div className="team-block" data-testid="blue-team">
             <h3 className="team-title blue">Blue Team / नील दल</h3>
             {blueTeam.length === 0 ? (
               <p className="muted">No players</p>
@@ -964,6 +972,7 @@ const Play = () => {
 
         <div
           className="drawer-name"
+          data-testid="drawer-name"
           style={{ textAlign: "center", marginBottom: "5px" }}
         >
           <strong>Drawing by:</strong>{" "}
@@ -977,6 +986,7 @@ const Play = () => {
           </span>
         </div>
 
+        <div data-testid="drawing-canvas">
         <ReactSketchCanvas
           className="canvas"
           ref={canvasRef}
@@ -993,13 +1003,15 @@ const Play = () => {
             opacity: isDrawer ? 1 : 0.7,
           }}
         />
-
+        
+        </div>
         <div className="canvascontrols">
           {!isHost ? (
             <>
               <button
                 onClick={handlePenClick}
                 disabled={!isDrawer || !eraseMode}
+                data-testid="pen-button"
               >
                 Pen
               </button>
@@ -1021,6 +1033,7 @@ const Play = () => {
               <button
                 onClick={handleEraserClick}
                 disabled={!isDrawer || eraseMode}
+                data-testid="eraser-button"
               >
                 Eraser
               </button>
@@ -1033,14 +1046,14 @@ const Play = () => {
                 onChange={handleEraserWidthChange}
                 disabled={!isDrawer || !eraseMode}
               />
-              <button onClick={handleClear} disabled={!isDrawer}>
+              <button onClick={handleClear} disabled={!isDrawer} data-testid="clear-canvas-button">
                 Clear
               </button>
             </>
           ) : (
             <>
-              <button onClick={handleWarnDrawer}>Warn Drawer</button>
-              <button onClick={handleForceSkip}>Force Skip Round</button>
+              <button onClick={handleWarnDrawer} data-testid="warn-drawer-button">Warn Drawer</button>
+              <button onClick={handleForceSkip} data-testid="force-skip-round-button">Force Skip Round</button>
             </>
           )}
         </div>
@@ -1059,7 +1072,7 @@ const Play = () => {
           />
         )}
 
-        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
+        <div className={`input-area-wrapper ${isHost && "hidden"}`} data-testid="input-area">
           {roundResult?.type === "wrong" && (
             <div className="round-result-modal">
               <div className="modal-card wrong-answer">
@@ -1074,11 +1087,12 @@ const Play = () => {
             <input
               type="text"
               placeholder="Type answer"
+              data-testid="answer-input"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               disabled={!canAnswer}
             />
-            <button onClick={handleSubmitAnswer} disabled={!canAnswer}>
+            <button onClick={handleSubmitAnswer} disabled={!canAnswer} data-testid="send-answer-button">
               Send
             </button>
           </div>
@@ -1107,7 +1121,7 @@ const Play = () => {
 
       {/* GAME PAUSED OVERLAY */}
       {isGamePaused && (
-        <div className="pause-overlay">
+        <div className="pause-overlay" data-testid="pause-overlay">
           <div className="pause-content">
             <h2>Game Paused</h2>
             <p>Waiting 60s for Host {pausedByHost} to reconnect...</p>
@@ -1118,7 +1132,7 @@ const Play = () => {
       {/* Kick Confirmation Modal */}
       {showKickModal &&
         createPortal(
-          <div className="modal-overlay" onClick={handleKickCancel}>
+          <div className="modal-overlay" data-testid="kick-modal" onClick={handleKickCancel}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Kick Player</h2>
@@ -1168,12 +1182,14 @@ const Play = () => {
               <div className="modal-footer">
                 <button
                   className="modal-button cancel"
+                  data-testid="cancel-kick-button"
                   onClick={handleKickCancel}
                 >
                   Cancel
                 </button>
                 <button
                   className="modal-button kick"
+                  data-testid="confirm-kick-button"
                   onClick={handleKickConfirm}
                 >
                   Kick Player

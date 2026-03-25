@@ -63,6 +63,7 @@ function Signin() {
         <input
           type="email"
           id="email"
+          data-testid="email-input"
           placeholder="Enter email"
           required
           onChange={handleChange}
@@ -74,6 +75,7 @@ function Signin() {
           <input
             type={showPw ? "text" : "password"}
             id="password"
+            data-testid="password-input"
             placeholder="Enter password"
             required
             onChange={handleChange}
@@ -90,7 +92,7 @@ function Signin() {
           </button>
         </div>
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" data-testid="signin-button" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
 

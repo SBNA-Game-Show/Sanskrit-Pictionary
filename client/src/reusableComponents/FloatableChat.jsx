@@ -9,6 +9,7 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
+  const [chatCooldown, setChatCooldown] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isMinimized, setIsMinimized] = useState(true);
   const [position, setPosition] = useState({
@@ -86,8 +87,11 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
     };
   }, [roomId, isMinimized, myUserId, navigate]);
 
+  // Send message handler with cooldown and empty check
   const handleSend = () => {
+    if (chatCooldown) return;
     if (!message.trim()) return;
+
     const msgObj = {
       roomId,
       userId: myUserId,
@@ -95,8 +99,13 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
       team: myTeam,
       message,
     };
+
     socket.emit("chat", msgObj);
     setMessage("");
+    setChatCooldown(true);
+    setTimeout(() => {
+      setChatCooldown(false);
+    }, 3000);
   };
 
   // Constrain position within window boundaries
@@ -280,11 +289,13 @@ const FloatableChat = ({ myUserId, myDisplayName, myTeam }) => {
               type="text"
               placeholder="Type message..."
               value={message}
+              disabled={chatCooldown}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               onMouseDown={(e) => e.stopPropagation()}
             />
             <button
+              disabled={chatCooldown}
               onClick={handleSend}
               onMouseDown={(e) => e.stopPropagation()}
             >

@@ -217,3 +217,11 @@
   justify-content: center;
   border: 2px solid white;
 }
+/* Disabled state for cooldown */
+.chat-input-area button:disabled {
+  background-color: #999;
+  color: #ddd;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+

@@ -343,22 +343,9 @@ export const useGameSocket = (
       setTimeout(() => setRoundResult(null), 1500);
     });
 
-    // Helper: converts flashcard image path → matching audio pronunciation file
-    // Example: /FlashCardEasy/bird.png → /FlashCardEasy/audio/bird.mp3
-    const imageToAudio = (imageSrc) => {
-      if (!imageSrc) return "";
-      const src = imageSrc.startsWith("/") ? imageSrc : `/${imageSrc}`;
-      const parts = src.split("/").filter(Boolean);
-      const folder = parts[0];
-      const file = parts[parts.length - 1];
-      const base = file.split(".")[0].toLowerCase();
-      return `/${folder}/audio/${base}.mp3`;
-    };
-
     // ADDED: Round reveal audio system
     // - Plays pronunciation sound when the correct word popup appears
-    // - Uses server audioSrc if available
-    // - Falls back to generating audio path from imageSrc
+    // - Uses server audioSrc from the manifest (single source of truth)
     // - Uses refs to prevent multiple overlapping sounds
     // - Clears previous timeout and audio before starting new one
     socket.on("turnEnded", (data) => {
@@ -374,7 +361,7 @@ export const useGameSocket = (
         imageSrc: data.imageSrc,
       });
 
-      const resolvedAudioSrc = data.audioSrc || imageToAudio(data.imageSrc);
+      const resolvedAudioSrc = data.audioSrc || "";
       console.log("[Play] resolvedAudioSrc:", resolvedAudioSrc);
 
       if (resolvedAudioSrc && revealAudioRef.current) {

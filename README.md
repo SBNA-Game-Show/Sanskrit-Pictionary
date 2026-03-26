@@ -47,6 +47,15 @@ Create a `.env` file inside `/server` with:
 MONGO_URI=your_mongo_connection_string
 JWT_SECRET=your_jwt_secret
 PORT=5005
+FLASHCARD_MANIFEST_URL=https://raw.githubusercontent.com/SBNA-Game-Show/sanskrit-asset/main/data/images.json
+```
+
+Optional (client-side, for answer image choices):
+
+Create a `.env` file inside `/client` with:
+
+```
+REACT_APP_FLASHCARD_MANIFEST_URL=https://raw.githubusercontent.com/SBNA-Game-Show/sanskrit-asset/main/data/images.json
 ```
 
 Then:

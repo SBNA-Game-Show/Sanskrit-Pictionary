@@ -2,61 +2,77 @@ import React, { useEffect, useState } from 'react'
 import "./ImagesSelection.css";
  // For multiple-choice image selection (guessers only)
 
+const FLASHCARD_MANIFEST_URL =
+  process.env.REACT_APP_FLASHCARD_MANIFEST_URL ||
+  "https://raw.githubusercontent.com/SBNA-Game-Show/sanskrit-asset/main/data/images.json";
+
+function normalizeDifficulty(value) {
+  const text = (value || "").toString().trim().toLowerCase();
+  if (text === "easy" || text === "medium" || text === "hard") return text;
+  return "easy";
+}
+
+function normalizeSrc(value) {
+  return (value || "").toString().trim();
+}
+
 
 export default function ImagesSelection( { flashcard, getUserId, canAnswer, roundKey, roomId, socket, setImageChoices, setShowChoices, imageChoices, showChoices }) {
     const [isShaking, setIsShaking] = useState(false);
     const [showPointsLoss, setShowPointsLoss] = useState(false);
     const [pointsGained, setPointsGained] = useState(null);
 
+      const [manifestImagesByDifficulty, setManifestImagesByDifficulty] = useState({
+        easy: [],
+        medium: [],
+        hard: [],
+      });
 
-    
-      const DIFFICULTY_FOLDERS = {
-        Easy: [
-          "/FlashCardEasy/bird.png",
-          "/FlashCardEasy/book.png",
-          "/FlashCardEasy/cow.png",
-          "/FlashCardEasy/elephant.png",
-          "/FlashCardEasy/father.png",
-          "/FlashCardEasy/flower.png",
-          "/FlashCardEasy/friend.png",
-          "/FlashCardEasy/fruit.png",
-          "/FlashCardEasy/house.png",
-          "/FlashCardEasy/king.png",
-          "/FlashCardEasy/moon.png",
-          "/FlashCardEasy/mother.png",
-          "/FlashCardEasy/river.png",
-          "/FlashCardEasy/sun.png",
-          "/FlashCardEasy/tree.png",
-          "/FlashCardEasy/water.png",
-        ],
-    
-        Medium: [
-          "/FlashCardMedium/child.png",
-          "/FlashCardMedium/earth.png",
-          "/FlashCardMedium/fire.png",
-          "/FlashCardMedium/king.png",
-          "/FlashCardMedium/mountain.png",
-          "/FlashCardMedium/ocean.png",
-          "/FlashCardMedium/queen.png",
-          "/FlashCardMedium/sky.png",
-          "/FlashCardMedium/teacher.png",
-          "/FlashCardMedium/time.png",
-        ],
-    
-        Hard: [
-          "/FlashCardHard/compassion.png",
-          "/FlashCardHard/energy.png",
-          "/FlashCardHard/freedom.png",
-          "/FlashCardHard/happiness.png",
-          "/FlashCardHard/knowledge.png",
-          "/FlashCardHard/mind.png",
-          "/FlashCardHard/speech.png",
-          "/FlashCardHard/student.png",
-          "/FlashCardHard/truth.png",
-          "/FlashCardHard/universe.png",
-        ],
-      };
-    
+      useEffect(() => {
+        let cancelled = false;
+
+        const loadManifestImages = async () => {
+          try {
+            const response = await fetch(FLASHCARD_MANIFEST_URL);
+            if (!response.ok) {
+              throw new Error(`Manifest request failed: ${response.status}`);
+            }
+
+            const manifest = await response.json();
+            if (!Array.isArray(manifest)) {
+              throw new Error("Manifest payload is not an array");
+            }
+
+            const next = { easy: [], medium: [], hard: [] };
+            for (const card of manifest) {
+              const difficulty = normalizeDifficulty(card?.difficulty);
+              const src = normalizeSrc(card?.imageSrc);
+              if (!src) continue;
+              next[difficulty].push(src);
+            }
+
+            if (!cancelled) {
+              setManifestImagesByDifficulty({
+                easy: [...new Set(next.easy)],
+                medium: [...new Set(next.medium)],
+                hard: [...new Set(next.hard)],
+              });
+            }
+          } catch (error) {
+            console.warn("[ImagesSelection] Failed to load manifest choices", error);
+            if (!cancelled) {
+              setManifestImagesByDifficulty({ easy: [], medium: [], hard: [] });
+            }
+          }
+        };
+
+        loadManifestImages();
+        return () => {
+          cancelled = true;
+        };
+      }, []);
+
+
       function shuffle(arr) {
         const a = [...arr];
         for (let i = a.length - 1; i > 0; i--) {
@@ -72,21 +88,16 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
           setImageChoices([]);
           return;
         }
-    
-        // Detect difficulty from the imageSrc path
-        let difficulty = "Easy";
-        const src = flashcard.imageSrc;
-    
-        if (src.includes("FlashCardMedium")) difficulty = "Medium";
-        if (src.includes("FlashCardHard")) difficulty = "Hard";
-    
-        const folderImages = DIFFICULTY_FOLDERS[difficulty] || [];
+
+        const difficulty = normalizeDifficulty(flashcard?.difficulty);
+        const src = normalizeSrc(flashcard.imageSrc);
+        const folderImages = manifestImagesByDifficulty[difficulty] || [];
     
         // Remove duplicates first, just in case
         const uniqueFolderImages = [...new Set(folderImages)];
     
         // Filter out correct image from distractors
-        const distractorPool = uniqueFolderImages.filter((img) => img !== src);
+        const distractorPool = uniqueFolderImages.filter((img) => normalizeSrc(img) !== src);
     
         // We want 10 total including the correct one
         const maxChoices = 10;
@@ -105,7 +116,7 @@ export default function ImagesSelection( { flashcard, getUserId, canAnswer, roun
     
         // show modal as long as there is at least the correct image
         setShowChoices(mixed.length > 0);
-      }, [canAnswer, flashcard?.imageSrc, roundKey]);
+      }, [canAnswer, flashcard?.imageSrc, roundKey, manifestImagesByDifficulty]);
     
       useEffect(() => {
         const handleCorrect = ({ userId, scoreGained }) => {

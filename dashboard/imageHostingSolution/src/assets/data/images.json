@@ -1,0 +1,12 @@
+[
+  {
+    "id": "sample",
+    "sanskrit": "संप्ल",
+    "transliteration": "sampla",
+    "translation": "sample",
+    "difficulty": "easy",
+    "category": "demo",
+    "image": "./images/sample.png",
+    "tags": ["demo"]
+  }
+]

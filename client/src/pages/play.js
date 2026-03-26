@@ -87,9 +87,6 @@ const Play = () => {
   const correctAudioRef = useRef(new Audio(correctSound));
   const wrongAudioRef = useRef(new Audio(wrongSound));
 
-  //LOG PLAYERS
-  console.log(players);
-
   //React buttons
   const [reactions, setReactions] = useState([]);
 

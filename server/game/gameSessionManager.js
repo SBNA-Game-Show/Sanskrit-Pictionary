@@ -30,8 +30,16 @@ function stripCommonEndings(s) {
 function toArray(v) {
   if (!v) return [];
   if (Array.isArray(v)) return v;
-  return String(v)
-    .split(/[\/,;|、，\s]+/)
+  const s = String(v).trim();
+  if (!s) return [];
+
+  // Preserve spaces inside a term (e.g. "lotus flower"); split only on real list delimiters.
+  // This avoids breaking multi-word metadata during answer comparison.
+  if (!/[\/,;|、，\n\r\t]/.test(s)) return [s];
+
+  return s
+    .split(/[\/,;|、，\n\r\t]+/)
+    .map((x) => x.trim())
     .filter(Boolean);
 }
 

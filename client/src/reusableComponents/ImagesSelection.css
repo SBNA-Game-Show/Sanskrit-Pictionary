@@ -5,6 +5,22 @@
 .choice-modal {
   width: 100%;
   margin-top: 12px;
+
+  max-height: 500px;          /* visible area */
+  overflow-y: auto;           /* ONLY images scroll */
+  overflow-x: hidden;
+  padding-right: 6px;
+
+  scroll-behavior: smooth;
+}
+
+/* optional: nicer scrollbar (modern browsers) */
+.choice-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.choice-modal::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
 }
 
 /* responsive grid */

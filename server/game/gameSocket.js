@@ -1,10 +1,13 @@
 const gameSessionManager = require("../game/gameSessionManager");
-const { pauseActiveTimer, resumeActiveTimer } = require("./utils/timer");
+const {
+  pauseActiveTimer,
+  resumeActiveTimer,
+  clearActiveTimer,
+} = require("./utils/timer");
 const { proceedToNextRound } = require("./utils/roundManager");
 const { registerStateHandlers } = require("./handlers/stateHandlers");
 const { registerDrawingHandlers } = require("./handlers/drawingHandlers");
 const { registerControlHandlers } = require("./handlers/controlHandlers");
-
 const getLobbyManager = () => require("../backend/lobbyManager");
 
 function createGameSocket(io) {

@@ -41,37 +41,42 @@ function Welcome() {
     setShowGuestModal(true);
   };
 
-  const handleGuestSubmit = () => {
-    // Validate display name
-    if (!guestName.trim()) {
-      toastError("Please enter a display name");
+  const handleGuestSubmit = async () => {
+    const trimmedName = guestName.trim();
+
+    if (!trimmedName) {
+      toastError("Please enter your name");
       return;
     }
 
-    if (guestName.trim().length < 3) {
-      toastError("Display name must be at least 3 characters");
-      return;
-    }
+    try {
+      // Validate with backend
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
+      const response = await fetch(`${API_BASE}/api/users/validate-username`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: trimmedName }),
+      });
 
-    if (guestName.trim().length > 15) {
-      toastError("Display name must be 15 characters or less");
-      return;
-    }
+      const data = await response.json();
 
-    // Save guest data
-    const result = saveGuestData(guestName.trim());
+      if (!data.valid) {
+        toastError(data.error);
+        return;
+      }
 
-    if (result) {
-      toastSuccess(`Welcome, ${result.displayName}! 🎮`);
-      setShowGuestModal(false);
-
-      window.dispatchEvent(new Event("displayNameChanged"));
-
-      setTimeout(() => {
-        navigate("/lobby");
-      }, 100);
-    } else {
-      toastError("Failed to start guest session. Please try again.");
+      // If valid, create guest
+      const result = saveGuestData(trimmedName);
+      if (result) {
+        window.dispatchEvent(new Event("displayNameChanged"));
+        toastSuccess("Welcome! You can now join games as a guest.");
+        setTimeout(() => navigate("/lobby"), 100);
+      } else {
+        toastError("Failed to create guest session");
+      }
+    } catch (error) {
+      console.error("Validation error:", error);
+      // toastError("Failed to validate username");
     }
   };
 

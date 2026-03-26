@@ -7,37 +7,21 @@ import Flashcard from "../reusableComponents/flashcard";
 import RoundPopups from "../reusableComponents/RoundPopups";
 import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
 import { ReactSketchCanvas } from "react-sketch-canvas";
-import { createAvatar } from "@dicebear/core";
-import * as DiceStyles from "@dicebear/collection";
+
 import { socket } from "./socket";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastWarning, toastError, toastInfo, toastSuccess } from "../utils/toast";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
 import ImagesSelection from "../reusableComponents/ImagesSelection";
-
-const svgToDataUrl = (svg) =>
-  `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-
-function makeAvatarDataUrl(styleKey, seed) {
-  const style = DiceStyles[styleKey] || DiceStyles.funEmoji;
-  const svg = createAvatar(style, { seed: seed || "player" }).toString();
-  return svgToDataUrl(svg);
-}
-function maskPhraseToUnderscores(phrase) {
-  if (!phrase || typeof phrase !== "string") return "";
-  // collapse combining marks so each letter (incl. ā, ś, etc.) becomes ONE "_"
-  return phrase.normalize("NFC").replace(/\p{L}\p{M}*/gu, "_");
-}
+import { useGameSocket } from "../hooks/socket/useGameSocket";
+import ReactionOverlay from "../reusableComponents/ReactionOverlay";
 
 const Play = () => {
   const canvasRef = useRef(null);
-  const playersRef = useRef([]); // holds freshest players for end screen
   const profilesRef = useRef({});
   const hostRef = useRef(false);
   const { roomId } = useParams();
-  const navigate = useNavigate(); // for /end navigation
 
   // Tracking if game ended naturally
   const isGameEndedRef = useRef(false);
@@ -53,12 +37,10 @@ const Play = () => {
   const [flashcard, setFlashcard] = useState(null);
   const [currentUserId, setCurrentUserId] = useState("");
   const [drawerId, setDrawerId] = useState(null);
-  const [drawerTeam, setDrawerTeam] = useState("");
-  const [currentPlayerName, setCurrentPlayerName] = useState("");
-  const [myTeam, setMyTeam] = useState("");
   const [answer, setAnswer] = useState("");
-  const [remainingGuesses, setRemainingGuesses] = useState(4);
   const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
+  const [currentRound, setCurrentRound] = useState(1);
+  const [totalRounds, setTotalRounds] = useState(1);
 
   // Audio + timeout refs for round reveal popup sound
   const roundRevealTimeoutRef = useRef(null);
@@ -74,8 +56,6 @@ const Play = () => {
 
   // Pause state
   const [isGamePaused, setIsGamePaused] = useState(false);
-  const [pausedByHost, setPausedByHost] = useState("");
-
 
   // Small modal to show round result (e.g., correct answer)
   const [roundResult, setRoundResult] = useState(null); // {type: 'correct', displayName: 'X'} or null
@@ -89,6 +69,16 @@ const Play = () => {
   const [kickTarget, setKickTarget] = useState(null); // { userId, displayName }
 
   // Derived booleans
+  const drawerDisplayName = players.find(
+    (p) => p.userId === drawerId,
+  )?.displayName;
+  const drawerTeam = players.find((p) => p.userId === drawerId)?.team;
+  const remainingGuesses = players.find(
+    (p) => p.userId === (getUserId() || currentUserId),
+  )?.remainingGuesses;
+  const myTeam = players.find(
+    (p) => p.userId === (getUserId() || currentUserId),
+  )?.team;
   const isDrawer = (getUserId() || currentUserId) === drawerId;
   const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
   const canAnswer = isEligibleGuesser && remainingGuesses > 0;
@@ -96,6 +86,9 @@ const Play = () => {
   // Audio cues
   const correctAudioRef = useRef(new Audio(correctSound));
   const wrongAudioRef = useRef(new Audio(wrongSound));
+
+  //React buttons
+  const [reactions, setReactions] = useState([]);
 
   // ---------- UI helpers ----------
   const handlePenClick = () => {
@@ -186,502 +179,76 @@ const Play = () => {
     setKickTarget(null);
   };
 
-  // ---------- Socket setup ----------
-  useEffect(() => {
-    const userId = getUserId();
-    setCurrentUserId(userId || "");
-    console.log("[Play] mounting | roomId=", roomId, "userId=", userId);
-    if (!roomId) return;
-
-    // Function to rejoin and sync state
-    const rejoinAndSync = async () => {
-
-      // Checking room existence before joining
-      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
-
-      try {
-        // Call API for room exists status
-        const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
-        const data = await response.json();
-
-        if (data.exists) {
-          // Emit registerLobby only when room exists
-          socket.emit("registerLobby", {
-            userId,
-            displayName: getDisplayName() || userId,
-            roomId,
-          });
-          socket.emit("getGameState", { roomId });
-          socket.emit("requestLobbyUsers", { roomId });
-        } else {
-          // Navigate to home if room code is invalid.
-          toastError("Invalid room code! Navigating to the lobby", { toastId: "invalid-room" });
-          navigate(`/lobby`, { replace: true })
-        }
-      } catch (error) {
-        console.error("[Play] Failed to verify room status:", error);
-      }
-    };
-
-    rejoinAndSync();
-
-    const handleReconnect = () => {
-      console.log("[Play] Socket reconnected, rejoining game");
-      rejoinAndSync();
-    };
-
-    socket.on("connect", handleReconnect);
-
-    socket.on("playerDisconnected", ({ userId, displayName }) => {
-      toastWarning(`${displayName} disconnected`, { autoClose: 2000 });
-    });
-
-    socket.on("playerReconnected", ({ userId, displayName }) => {
-      toastInfo(`${displayName} reconnected! 🎮`, { autoClose: 2000 });
-    });
-
-    socket.on("hostDisconnectedOthers", ({ hostName, hostId }) => {
-      if (hostId === getUserId()) return;
-      isGameEndedRef.current = true;
-      toastError(`Host ${hostName} disconnected. You have been kicked out.`, {
-        autoClose: 4000,
-      });
-      navigate("/lobby");
-    });
-
-    socket.on("gamePaused", ({ hostName }) => {
-      setIsGamePaused(true);
-      setPausedByHost(hostName);
-    });
-
-    socket.on("gameResumed", ({ hostName }) => {
-      setIsGamePaused(false);
-      setPausedByHost("");
-      toastInfo(`Host ${hostName} returned! Game resumed.`, { autoClose: 3000 });
-    });
-
-    socket.on("userKicked", (kickedPlayer) => {
-      if (kickedPlayer.userId === getUserId()) {
-        isGameEndedRef.current = true;
-        toastInfo("You were kicked from the game.");
-        navigate("/lobby");
-      } else {
-        toastInfo(`${kickedPlayer.displayName} was kicked from the game.`);
-      }
-    });
-
-    const onLobbyUsers = (users) => {
-      const map = {};
-      (users || []).forEach((u) => {
-        map[u.userId] = {
-          displayName: u.displayName,
-          avatarSeed: u.avatarSeed,
-          avatarStyle: u.avatarStyle,
-          avatarData: u.avatarData,
-        };
-      });
-      setProfiles(map);
-      profilesRef.current = map;
-    };
-    socket.on("lobbyUsers", onLobbyUsers);
-
-    // Navigate to /lobby/code if the game not started
-    socket.once("newGame", (data) => {
-      toastWarning("Game is not started! Navigating to the lobby");
-      navigate(`/lobby/${data.roomId}`, { replace: true });
-    });
-
-    const onProfileUpdated = ({
-      userId,
-      displayName,
-      avatarSeed,
-      avatarStyle,
-      avatarData,
-    }) => {
-      setProfiles((prev) => {
-        const updated = {
-          ...prev,
-          [userId]: {
-            displayName: displayName ?? prev[userId]?.displayName,
-            avatarSeed: avatarSeed ?? prev[userId]?.avatarSeed,
-            avatarStyle: avatarStyle ?? prev[userId]?.avatarStyle,
-            avatarData: avatarData ?? prev[userId]?.avatarData,
-          },
-        };
-        profilesRef.current = updated;
-        return updated;
-      });
-    };
-    socket.on("profileUpdated", onProfileUpdated);
-
-    // ✅ UPDATED: gameState with canvas data
-    socket.on("gameState", (state) => {
-      console.log("[Play] received gameState:", state);
-      const serverFlash = state.currentFlashcard ?? state.flashcard ?? null;
-
-      setTotalGuesses(state.guesses); // set total guesses
-      setPlayers((prev) => {
-        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
-        const merged = (state.players || []).map((p) => {
-          const prevP = prevMap.get(p.userId);
-          return {
-            ...p,
-            remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
-          };
-        });
-        playersRef.current = merged;
-        return merged;
-      });
-      setHostData(state.hostData || null);
-      setDrawerId(state.drawer?.userId || null);
-      setDrawerTeam(state.drawer?.team || "");
-      setCurrentPlayerName(state.drawer?.displayName || "");
-      setTimeLeft(state.timer || 0);
-
-      if (serverFlash) setFlashcard(serverFlash);
-
-      const me = (state.players || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
-      setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
-      );
-
-      // ✅ Handle canvas data from gameState
-      if (canvasRef.current) {
-        canvasRef.current.clearCanvas();
-
-        if (state.canvasData && state.canvasData.length > 0) {
-          setTimeout(() => {
-            if (canvasRef.current) {
-              console.log("[Play] Loading canvas data from gameState");
-              canvasRef.current.loadPaths(state.canvasData);
-            }
-          }, 100);
-        }
-      }
-    });
-
-    socket.on("updatePlayers", (list) => {
-      setPlayers((prev) => {
-        const prevMap = new Map((prev || []).map((p) => [p.userId, p]));
-        const merged = (list || []).map((p) => {
-          const prevP = prevMap.get(p.userId);
-          return {
-            ...p,
-            remainingGuesses:
-              p.remainingGuesses ?? prevP?.remainingGuesses ?? totalGuesses,
-          };
-        });
-        playersRef.current = merged;
-        return merged;
-      });
-
-      const me = (list || []).find((p) => p.userId === userId);
-      setMyTeam(me?.team || "");
-      setRemainingGuesses(
-        me?.remainingGuesses !== undefined ? me.remainingGuesses : totalGuesses,
-      );
-    });
-
-    // drawerChanged clears canvas
-    socket.on("drawerChanged", ({ userId: newDrawerId, displayName, team }) => {
-      console.log("[Play] drawerChanged", {
-        newDrawerId,
-        displayName,
-        team,
-        clientUserId: getUserId(),
-      });
-
-      setDrawerId(newDrawerId);
-      setDrawerTeam(team || "");
-
-      const name =
-        typeof displayName === "string"
-          ? displayName
-          : displayName?.displayName || displayName?.userId || "";
-      setCurrentPlayerName(name);
-
-      // Clear canvas when drawer changes
-      if (canvasRef.current) {
-        canvasRef.current.clearCanvas();
-      }
-    });
-
-    socket.on("timerUpdate", ({ secondsLeft }) => {
-      setTimeLeft(secondsLeft);
-    });
-
-    socket.on("drawing-data", (data) => {
-      if (canvasRef.current) {
-        canvasRef.current.clearCanvas();
-        canvasRef.current.loadPaths(data);
-      }
-    });
-
-    socket.on("newFlashcard", (data) => {
-      console.log("[Play] received newFlashcard (drawer-only):", {
-        data,
-        clientUserId: getUserId(),
-        drawerId,
-        translation: data.translation ?? data.hint ?? "",
-        imageSrc: data.imageSrc ?? data.image ?? "",
-        audioSrc: data.audioSrc ?? data.audio ?? "",
-      });
-      setFlashcard(data);
-    });
-
-    // roundStarted clears canvas
-    socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
-      console.log("[Play] roundStarted payload:", {
-        currentRound,
-        currentPlayer,
-        timer,
-      });
-
-      let cpName = "";
-      if (typeof currentPlayer === "string") cpName = currentPlayer;
-      else if (currentPlayer && typeof currentPlayer === "object")
-        cpName = currentPlayer.displayName || currentPlayer.userId || "";
-
-      setCurrentPlayerName(cpName);
-      setAnswer("");
-      setTimeLeft(timer || 0);
-      setRemainingGuesses(totalGuesses);
-      setCorrectUserIds([]); // Reset the correct answer highlights
-
-      // Reset answer and choices when drawer changes
-      setImageChoices([]);
-      setRoundKey((k) => k + 1);
-      setFlashcard(null); //  clear old card instantly
-      socket.emit("getGameState", { roomId }); // fetch new card
-
-      // Clear canvas when new round starts
-      if (canvasRef.current) {
-        canvasRef.current.clearCanvas();
-      }
-    });
-
-    socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
-      if (userId === getUserId()) {
-        correctAudioRef.current.currentTime = 0;
-        correctAudioRef.current.play();
-      }
-      if (userId) {
-        setCorrectUserIds((prev) =>
-          prev.includes(userId) ? prev : [...prev, userId],
-        );
-      }
-      toastSuccess(
-        `🎉 ${displayName || "Someone"} guessed correctly and earned ${scoreGained} points!`,
-        {
-          autoClose: 3000,
-          position: "top-left",
-        },
-      );
-    });
-
-    socket.on(
-      "wrongAnswer",
-      ({ userId: wrongUserId, displayName, remainingGuesses, scoreLost }) => {
-        if (wrongUserId === getUserId()) {
-          wrongAudioRef.current.currentTime = 0;
-          wrongAudioRef.current.play();
-        }
-
-        console.log("[Play] wrongAnswer", {
-          wrongUserId,
-          displayName,
-          remainingGuesses,
-          scoreLost,
-        });
-        if (wrongUserId === getUserId() && remainingGuesses !== undefined) {
-          setRemainingGuesses(remainingGuesses);
-        }
-
-        // Update the user list for everyone immediately (server also emits updatePlayers,
-        // but this makes the UI responsive even if packets arrive out-of-order)
-        if (wrongUserId && remainingGuesses !== undefined) {
-          setPlayers((prev) => {
-            const next = (prev || []).map((p) =>
-              p.userId === wrongUserId ? { ...p, remainingGuesses } : p,
-            );
-            playersRef.current = next;
-            return next;
-          });
-        }
-
-        // Show penalty notification if this is the current user
-        if (scoreLost && wrongUserId === getUserId()) {
-          setRoundResult({
-            type: "wrong",
-            displayName: displayName || "You",
-            scoreLost: scoreLost,
-          });
-          setTimeout(() => setRoundResult(null), 1200);
-        }
-      },
-    );
-
-    socket.on("guessesExhausted", () => {
-      console.log("[Play] guessesExhausted");
-
-      setRoundResult({
-        type: "guessesExhausted",
-        displayName: "Out of guesses!",
-      });
-      setTimeout(() => setRoundResult(null), 1500);
-    });
-
-    // ADDED: Round reveal audio system
-    // - Plays pronunciation sound when the correct word popup appears
-    // - Uses server audioSrc from the manifest (single source of truth)
-    // - Uses refs to prevent multiple overlapping sounds
-    // - Clears previous timeout and audio before starting new one
-    socket.on("turnEnded", (data) => {
-  console.log("[Play] turnEnded", data);
-
-  if (roundRevealTimeoutRef.current) {
-    clearTimeout(roundRevealTimeoutRef.current);
-  }
-
-  setRoundReveal({
-    word: data.word,
-    transliteration: data.transliteration,
-    imageSrc: data.imageSrc,
-  });
-
-  const resolvedAudioSrc = data.audioSrc || "";
-  console.log("[Play] resolvedAudioSrc:", resolvedAudioSrc);
-
-  if (resolvedAudioSrc && revealAudioRef.current) {
-    const audioEl = revealAudioRef.current;
-
-    try {
-      audioEl.pause();
-      audioEl.removeAttribute("src");
-      audioEl.load();
-
-      audioEl.src = resolvedAudioSrc;
-      audioEl.currentTime = 0;
-
-      const playPromise = audioEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("[Play] reveal audio play failed:", err, resolvedAudioSrc);
-        });
-      }
-    } catch (err) {
-      console.warn("[Play] audio reset/play error:", err, resolvedAudioSrc);
-    }
-  }
-
-  roundRevealTimeoutRef.current = setTimeout(() => {
-    setRoundReveal(null);
-
-    if (revealAudioRef.current) {
-      revealAudioRef.current.pause();
-      revealAudioRef.current.currentTime = 0;
-    }
-  }, 5000);
-});
-    
-
-    socket.on("clear-canvas", () => {
-      canvasRef.current?.clearCanvas();
-      canvasRef.current?.eraseMode(false);
-      setEraseMode(false);
-    });
-
-    socket.on("warnDrawer", (drawerId, newScore) => {
-      canvasRef.current?.clearCanvas();
-
-      setPlayers((prev) => {
-        const next = (prev || []).map((p) =>
-          p.userId === drawerId ? { ...p, points: newScore } : p,
-        );
-
-        playersRef.current = next;
-        return next;
-      });
-    });
-
-    socket.on("gameEnded", (data) => {
-      isGameEndedRef.current = true;
-      setRoundResult({ type: "gameEnded" });
-      const base = Array.isArray(playersRef.current)
-        ? playersRef.current
-        : players;
-
-      const currentProfiles = profilesRef.current;
-
-      const withAvatars = data.finalPlayers.map((p) => {
-        const prof = currentProfiles[p.userId] || {};
-        const seed = prof.avatarSeed || p.displayName || p.userId || "player";
-        const style = prof.avatarStyle || "funEmoji";
-
-        // Use custom avatar if available
-        const avatarUrl = prof.avatarData || makeAvatarDataUrl(style, seed);
-        return {
-          ...p,
-          avatar: avatarUrl,
-          avatarSeed: seed,
-          avatarStyle: style,
-        };
-      });
-
-      setTimeout(() => {
-        setRoundResult(null);
-        if (hostRef.current) {
-          socket.emit("deleteRoom", { roomId });
-        }
-        navigate("/end", { state: { players: withAvatars } });
-      }, 1200);
-    });
-
-    return () => {
-      socket.off("connect", handleReconnect);
-      socket.off("playerDisconnected");
-      socket.off("playerReconnected");
-      socket.off("hostDisconnectedOthers");
-      socket.off("gamePaused");
-      socket.off("gameResumed");
-      socket.off("userKicked");
-      socket.off("lobbyUsers", onLobbyUsers);
-      socket.off("newGame");
-      socket.off("profileUpdated", onProfileUpdated);
-      socket.off("gameState");
-      socket.off("updatePlayers");
-      socket.off("drawerChanged");
-      socket.off("turnEnded");
-      socket.off("timerUpdate");
-      socket.off("drawing-data");
-      socket.off("newFlashcard");
-      socket.off("roundStarted");
-      socket.off("correctAnswer");
-      socket.off("wrongAnswer");
-      socket.off("guessesExhausted");
-      socket.off("clear-canvas");
-      socket.off("warnDrawer");
-      socket.off("gameEnded");
-
-      // Check for unnatural unmount (e.g. navbar navigation)
-      if (!isGameEndedRef.current) {
-        console.log("[Play] Unmounting mid-game, simulating disconnect...");
-        socket.emit("manualDisconnect");
-      }
-    };
-  }, [roomId, navigate]); // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Socket setup
+  useGameSocket(
+    setCurrentUserId,
+    setPlayers,
+    setHostData,
+    drawerId,
+    setDrawerId,
+    setTimeLeft,
+    setFlashcard,
+    setTotalGuesses,
+    setCurrentRound,
+    setTotalRounds,
+    setProfiles,
+    setIsGamePaused,
+    setRoundResult,
+    setRoundReveal,
+    setCorrectUserIds,
+    setAnswer,
+    setImageChoices,
+    setRoundKey,
+    setEraseMode,
+    setReactions,
+    isGameEndedRef,
+    canvasRef,
+    correctAudioRef,
+    wrongAudioRef,
+    revealAudioRef,
+    roundRevealTimeoutRef,
+    profilesRef,
+    hostRef,
+  );
 
   const isHost = currentUserId === hostData?.hostId;
+
+  // Send reactions
+  const sendReaction = (emoji) => {
+    socket.emit("send-reaction", {
+      roomId,
+      type: emoji,
+      left: Math.random() * 40 + 30,
+    });
+  };
 
   useEffect(() => {
     hostRef.current = isHost;
   }, [isHost]);
-  
+
+  // Listerner for players changing
+  useEffect(() => {
+    // Only send from host to avoid duplication
+    if (!isHost || players.length === 0 || isGameEndedRef.current) return;
+
+    const redTeamCount = players.filter((p) => p.team === "Red").length;
+    const blueTeamCount = players.filter((p) => p.team === "Blue").length;
+
+    if (redTeamCount < 2 || blueTeamCount < 2) {
+      socket.emit("gameEnded", {
+        roomId,
+        reason: "Not enough players in one of the teams.",
+      });
+    }
+  }, [players, isHost, roomId]);
+
   // team lists
   const redTeam = players.filter((p) => p.team === "Red");
   const blueTeam = players.filter((p) => p.team === "Blue");
+
+  // Check if current user is a spectator (not in players list AND not host)
+  const isSpectator =
+    !isHost && !players.find((p) => p.userId === currentUserId);
 
   const renderUserChip = (user) => {
     const prof = profiles[user.userId] || {};
@@ -720,12 +287,19 @@ const Play = () => {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "12px 2px",
-          minWidth: "200px",
+          /* I am changing this for responsiveness */
+          width: "100%",
         }}
       >
-        
         {/* Avatar + Kick button */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "3px",
+          }}
+        >
           <InteractiveAvatar
             avatarSeed={seed}
             avatarStyle={style}
@@ -755,11 +329,24 @@ const Play = () => {
         </div>
 
         {/* DisplayName */}
-        <div style={{ display: "flex", alignItems: "center", width: "120px", gap: "2px" }}>
-          <span style={{
-            fontWeight: "bold", fontSize: "18px", maxWidth: "110px",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-          }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            width: "120px",
+            gap: "2px",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: "bold",
+              fontSize: "18px",
+              maxWidth: "110px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {displayName}
           </span>
           <span style={{ fontSize: "15px" }}>
@@ -798,38 +385,33 @@ const Play = () => {
 
   const targetPhrase = flashcard?.transliteration || "";
 
-
-
   return (
     <>
+      <ReactionOverlay reactions={reactions} />
       <RoundPopups />
-      <div className="play-grid">
+      <div
+        className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}
+      >
         {/* Round result modal */}
-      {roundReveal && (
-        <div className="round-reveal-popup">
-          <div className="round-reveal-card">
+        {roundReveal && (
+          <div className="round-reveal-popup">
+            <div className="round-reveal-card">
+              <div className="round-reveal-title">It was:</div>
 
-            <div className="round-reveal-title">
-              It was:
+              <img
+                className="round-reveal-image"
+                src={roundReveal.imageSrc}
+                alt=""
+              />
+
+              <div className="round-reveal-word">{roundReveal.word}</div>
+
+              <div className="round-reveal-translit">
+                {roundReveal.transliteration}
+              </div>
             </div>
-
-            <img
-              className="round-reveal-image"
-              src={roundReveal.imageSrc}
-              alt=""
-            />
-
-            <div className="round-reveal-word">
-              {roundReveal.word}
-            </div>
-
-            <div className="round-reveal-translit">
-              {roundReveal.transliteration}
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
         {roundResult && (
           <div className="round-result-modal">
             {/* Removed the JSX popups here as we are using toast 
@@ -858,46 +440,55 @@ const Play = () => {
           </a>
         </div>
 
-        <div className="guesses-box">
-          <strong>Guesses Left: </strong>
-          <a>
-            <label
-              htmlFor="guessesleft"
-              style={{
-                color:
-                  isEligibleGuesser && remainingGuesses <= 2
-                    ? "red"
-                    : "inherit",
-              }}
-            >
-              {isEligibleGuesser ? remainingGuesses : "—"}
+        {isHost && (
+          <div className="time-box">
+            <strong>Round: </strong>
+            <label style={{ color: "#e65100", fontWeight: "900" }}>
+              {currentRound}
             </label>
-          </a>
-        </div>
-
-        {/* Drawer and host see the full flashcard */}
-        {flashcard && (isDrawer || isHost) && <Flashcard items={[flashcard]} />}
+            <label style={{ color: "#8b5e3c" }}>/{totalRounds}</label>
+          </div>
+        )}
+        {!isHost && (
+          <div className="guesses-box">
+            <strong>Guesses Left: </strong>
+            <a>
+              <label
+                htmlFor="guessesleft"
+                style={{
+                  color:
+                    isEligibleGuesser && remainingGuesses <= 2
+                      ? "red"
+                      : "inherit",
+                }}
+              >
+                {isEligibleGuesser ? remainingGuesses : "—"}
+              </label>
+            </a>
+          </div>
+        )}
 
         {/* User List */}
         <div className="user-list">
           <div className="user-panel-title">Players List</div>
+          <div className="team-container">
+            <div className="team-block">
+              <h3 className="team-title red">Red Team / लाल दल</h3>
+              {redTeam.length === 0 ? (
+                <p className="muted">No players</p>
+              ) : (
+                redTeam.map(renderUserChip)
+              )}
+            </div>
 
-          <div className="team-block">
-            <h3 className="team-title red">Red Team / लाल दल</h3>
-            {redTeam.length === 0 ? (
-              <p className="muted">No players</p>
-            ) : (
-              redTeam.map(renderUserChip)
-            )}
-          </div>
-
-          <div className="team-block">
-            <h3 className="team-title blue">Blue Team / नील दल</h3>
-            {blueTeam.length === 0 ? (
-              <p className="muted">No players</p>
-            ) : (
-              blueTeam.map(renderUserChip)
-            )}
+            <div className="team-block">
+              <h3 className="team-title blue">Blue Team / नील दल</h3>
+              {blueTeam.length === 0 ? (
+                <p className="muted">No players</p>
+              ) : (
+                blueTeam.map(renderUserChip)
+              )}
+            </div>
           </div>
         </div>
 
@@ -912,7 +503,7 @@ const Play = () => {
               fontWeight: "bold",
             }}
           >
-            {currentPlayerName}
+            {drawerDisplayName}
           </span>
         </div>
 
@@ -984,51 +575,57 @@ const Play = () => {
           )}
         </div>
 
-        {/* FLOATABLE CHAT */}
-        <FloatableChat
-          myUserId={currentUserId}
-          myDisplayName={
-            isHost
-              ? hostData.hostDisplayName
-              : players.find((p) => p.userId === currentUserId)?.displayName ||
-                ""
-          }
-          myTeam={myTeam}
-        />
-
-        <div className={`input-area-wrapper ${isHost && "hidden"}`}>
-          {roundResult?.type === "wrong" && (
-            <div className="round-result-modal">
-              <div className="modal-card wrong-answer">
-                <h3>Wrong Answer</h3>
-                <p>-{roundResult.scoreLost} points 😪</p>
-              </div>
+        {/* FLOATABLE CHAT - Hide for spectators */}
+        {!isSpectator && (
+          <FloatableChat
+            myUserId={currentUserId}
+            myDisplayName={
+              isHost
+                ? hostData.hostDisplayName
+                : players.find((p) => p.userId === currentUserId)
+                    ?.displayName || ""
+            }
+            myTeam={myTeam}
+          />
+        )}
+        
+        {/* Team not in turn can react to the drawing */}
+        {!isEligibleGuesser && !isDrawer && !isHost && !isSpectator && (
+          <div className="like-panel"> 
+            <h2>How do you like the drawing ?</h2>
+            <div className="reaction-buttons">
+              <button onClick={() => sendReaction('👍')}>👍</button>
+              <button onClick={() => sendReaction('💐')}>💐</button>
+              <button onClick={() => sendReaction('💯')}>💯</button>
+              <button onClick={() => sendReaction('👎')}>👎</button>
             </div>
-          )}
-
-          <h5>Answer Box</h5>
-          <div className="input-area2">
-            <input
-              type="text"
-              placeholder="Type answer"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              disabled={!canAnswer}
-            />
-            <button onClick={handleSubmitAnswer} disabled={!canAnswer}>
-              Send
-            </button>
           </div>
-          
-        {/* image selection logic all and i called the necessary usestates */}
-        <ImagesSelection flashcard={flashcard} getUserId={getUserId} canAnswer={canAnswer} roundKey={roundKey} roomId={roomId} socket={socket} setImageChoices={setImageChoices} setShowChoices={setShowChoices} showChoices={showChoices} imageChoices={imageChoices} />
+        )}
 
-          {!canAnswer && (
-            <small style={{ color: "#c00" }}>
-              Only the {drawerTeam} team can answer, and not the drawer.
-            </small>
-          )}
-        </div>
+        {/* Drawer and host see the full flashcard */}
+        {flashcard && (isDrawer || isHost) && (
+          <div className="flashcard">
+            <Flashcard items={[flashcard]} />
+          </div>
+        )}
+
+        {/* image selection logic all and i called the necessary usestates */}
+        {isEligibleGuesser && !isHost && (
+          <div className="input-area-wrapper">
+            <ImagesSelection
+              flashcard={flashcard}
+              getUserId={getUserId}
+              canAnswer={canAnswer}
+              roundKey={roundKey}
+              roomId={roomId}
+              socket={socket}
+              setImageChoices={setImageChoices}
+              setShowChoices={setShowChoices}
+              showChoices={showChoices}
+              imageChoices={imageChoices}
+            /> 
+          </div>
+        )}
       </div>
 
       {/* GAME PAUSED OVERLAY */}
@@ -1036,7 +633,7 @@ const Play = () => {
         <div className="pause-overlay">
           <div className="pause-content">
             <h2>Game Paused</h2>
-            <p>Waiting 60s for Host {pausedByHost} to reconnect...</p>
+            <p>Waiting 60s for Host to reconnect...</p>
           </div>
         </div>
       )}
@@ -1063,12 +660,32 @@ const Play = () => {
                   Are you sure you want to kick{" "}
                   <strong>{kickTarget?.displayName}</strong> from the game?
                 </p>
-                <div className="modal-note">
-                  <span className="note-icon">ⓘ</span>
+                <div
+                  className="modal-note"
+                  style={{ display: "flex", flexDirection: "column" }}
+                >
                   <span>
-                    Kicked players will be removed from the leaderboard and
+                    ⚠️ Kicked players will be removed from the leaderboard and
                     cannot rejoin until a new game starts.
                   </span>
+                  {/* Warning of gameEnded in confirm popup  */}
+                  {(() => {
+                    const targetUser = players.find(
+                      (p) => p.userId === kickTarget?.userId,
+                    );
+                    const teamCount = players.filter(
+                      (p) => p.team === targetUser?.team,
+                    ).length;
+                    if (teamCount <= 2) {
+                      return (
+                        <span>
+                          ⚠️ <strong>Game will be ended</strong> as no enough
+                          players in {targetUser?.team} team.
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
               <div className="modal-footer">

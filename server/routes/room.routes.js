@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { isUserKicked } = require("../backend/lobbyManager");
 
 // Import rooms from lobbyManager (we'll need to export it)
 let roomsRef = null;
@@ -30,11 +31,14 @@ router.get("/exists/:roomId", (req, res) => {
   const playerCount =
     (room.teams?.Red?.length || 0) + (room.teams?.Blue?.length || 0);
 
+  const userId = req.query.userId || null;
+
   res.json({
     exists: true,
     playerCount,
     hasPassword: false, // For future feature
     isFull: playerCount >= 20, // Max 20 players
+    isKicked: userId ? isUserKicked(roomId, userId) : false,
   });
 });
 

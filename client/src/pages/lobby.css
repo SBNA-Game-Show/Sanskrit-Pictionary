@@ -352,6 +352,35 @@
 /* ===========================
    Responsive tweaks
    =========================== */
+
+   @media(max-width:1300px){
+    .lobby-content {
+      flex-wrap: wrap;
+      gap: 30px;
+      width:80%;
+    }
+    .user-list{
+      width:100%;
+      max-width:320px;
+    }
+    .game-settings {
+      width: 100%;
+      max-width: 400px;
+    }
+   }
+
+   @media(max-width: 650px){
+    .chat-container {
+      width: 100%;
+      max-width: 400px;
+    }
+   
+   }
+
+
+
+
+
 @media (max-width: 640px) {
   :root {
     --avatar-size: 36px;
@@ -360,9 +389,16 @@
   }
   .user-list {
     width: 230px;
+    flex-wrap: wrap;
   }
   .team-card {
     min-width: 220px;
+  }
+  
+  .toastInfo{
+    font-size:12px;
+    background-color: black;
+    color: white;
   }
 }
 

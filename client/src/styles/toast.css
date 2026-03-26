@@ -9,3 +9,17 @@
 .Toastify__toast-container--top-center {
   top: 65px !important;
 }
+
+@media (max-width: 570px) {
+  .Toastify__toast-container--top-right,
+  .Toastify__toast-container--top-left,
+  .Toastify__toast-container--top-center {
+    top: 50px !important;
+  }
+
+  .Toastify__toast--info, .Toastify__toast--default, .Toastify__toast--success, .Toastify__toast--warning, .Toastify__toast--error {
+    font-size: 14px;
+    width:50%;
+  }
+
+}

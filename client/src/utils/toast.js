@@ -1,5 +1,4 @@
 import { toast } from "react-toastify";
-
 /**
  * Reusable toast notification utility
  * @param {string} message - The message to display

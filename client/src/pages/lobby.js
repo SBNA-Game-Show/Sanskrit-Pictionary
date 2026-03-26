@@ -17,6 +17,7 @@ const DEFAULT_GAME_SETTINGS = {
   timer: 30,
   difficulty: "Easy",
   guesses: 4,
+  isLearningMode: true,
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
@@ -27,6 +28,7 @@ const createUpdatedSettings = (settings, setting, value) => {
   if (setting === "timer") updated.timer = value;
   if (setting === "difficulty") updated.difficulty = value;
   if (setting === "guesses") updated.guesses = value;
+  if (setting === "isLearningMode") updated.isLearningMode = value;
   return updated;
 };
 
@@ -50,7 +52,7 @@ const Lobby = () => {
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
 
-  const { rounds, timer, difficulty, guesses } = gameSettings;
+  const { rounds, timer, difficulty, guesses, isLearningMode } = gameSettings;
 
   const byId = useMemo(
     () => Object.fromEntries(onlineUsers.map((u) => [u.userId, u])),
@@ -93,13 +95,26 @@ const Lobby = () => {
 
     console.log("[Lobby] Rejoining lobby");
     try {
-      const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
+      const response = await fetch(
+        `${API_BASE}/api/room/exists/${roomId}?userId=${myUserId}`,
+      );
       const data = await response.json();
 
       if (!data.exists) {
         toastError("Invalid room code! Navigating to the lobby", {
           toastId: "invalid-room",
         });
+        navigate(`/lobby`, { replace: true });
+        return;
+      }
+
+      if (data.isKicked) {
+        toastError(
+          "You've been removed from this game and can't rejoin. Please start or join a new game.",
+          {
+            autoClose: 5000,
+          },
+        );
         navigate(`/lobby`, { replace: true });
         return;
       }
@@ -113,6 +128,10 @@ const Lobby = () => {
       socket.emit("getHost", { roomId });
     } catch (error) {
       console.error("[Lobby] Failed to verify room status:", error);
+      toastError("Unable to connect to the game server. Please try again.", {
+        autoClose: 2000,
+      });
+      navigate("/lobby", { replace: true });
     }
   };
 
@@ -188,16 +207,20 @@ const Lobby = () => {
         timer: settings.timer,
         difficulty: settings.difficulty,
         guesses: settings.guesses,
+        isLearningMode: settings.isLearningMode,
       });
     });
 
-    socket.on("roundStarted", ({ currentRound, currentPlayer, timer, guesses }) => {
-      setCurrentRound(currentRound);
-      setCurrentPlayer(currentPlayer);
-      setTimeLeft(timer);
-      setGameSettings((prev) => ({ ...prev, guesses }));
-      navigate(`/play/${roomId}`);
-    });
+    socket.on(
+      "roundStarted",
+      ({ currentRound, currentPlayer, timer, guesses }) => {
+        setCurrentRound(currentRound);
+        setCurrentPlayer(currentPlayer);
+        setTimeLeft(timer);
+        setGameSettings((prev) => ({ ...prev, guesses }));
+        navigate(`/play/${roomId}`);
+      },
+    );
 
     socket.on("startTimer", ({ duration }) => {
       clearCountdown();
@@ -219,8 +242,27 @@ const Lobby = () => {
       navigate("/lobby", { replace: true });
     });
 
-    // Redirect player to /play/roomId
-    socket.once("gameInProgress", (data) => {
+    // Redirect player to /play/roomId, but block if they were kicked
+    socket.once("gameInProgress", async (data) => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/room/exists/${data.roomId}?userId=${myUserId}`,
+        );
+        const roomData = await res.json();
+
+        if (roomData.isKicked) {
+          toastError(
+            "You've been removed from this game and can't rejoin. Please start or join a new game.",
+            {
+              autoClose: 5000,
+            },
+          );
+          return;
+        }
+      } catch (e) {
+        console.error("[Lobby] Failed to check kicked status:", e);
+      }
+
       toastWarning("Game in progress. Joining as spectator.");
       navigate(`/play/${data.roomId}`);
     });
@@ -469,6 +511,31 @@ const Lobby = () => {
           <h2>Game Settings</h2>
 
           <div className="setting-section">
+            <h3>Select Game Mode</h3>
+            <div className="option-buttons">
+              <button
+                className={gameSettings.isLearningMode ? "active" : ""}
+                onClick={() => handleSettingsChange("isLearningMode", true)}
+                disabled={!isHost}
+              >
+                Learning
+              </button>
+              <button
+                className={!gameSettings.isLearningMode ? "active" : ""}
+                onClick={() => handleSettingsChange("isLearningMode", false)}
+                disabled={!isHost}
+              >
+                Blitz
+              </button>
+            </div>
+            <small style={{ marginTop: "5px", display: "block" }}>
+              {gameSettings.isLearningMode
+                ? "Show answers after each turn."
+                : "Fast-paced! Answers are hidden."}
+            </small>
+          </div>
+
+          <div className="setting-section">
             <h3>Select Rounds</h3>
             <div className="option-buttons">
               {[1, 2, 3, 4, 5].map((round) => (
@@ -544,6 +611,7 @@ const Lobby = () => {
                     timer,
                     difficulty,
                     guesses,
+                    isLearningMode,
                     hostData: {
                       hostId,
                       hostDisplayName: myDisplayName,

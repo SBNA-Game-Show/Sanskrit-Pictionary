@@ -5,22 +5,38 @@
 .choice-modal {
   width: 100%;
   margin-top: 12px;
+
+  max-height: 500px;          /* visible area */
+  overflow-y: auto;           /* ONLY images scroll */
+  overflow-x: hidden;
+  padding-right: 6px;
+
+  scroll-behavior: smooth;
 }
 
-/* responsive grid */
+/* optional: nicer scrollbar (modern browsers) */
+.choice-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.choice-modal::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
+}
+
+/* ============================= */
+/* GRID (2 IMAGES PER ROW)       */
+/* ============================= */
+
 .choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(2, 1fr); /* always 2 columns */
+  gap: 16px;
   width: 100%;
 }
 
-/* square tiles */
-.choice-card {
-  padding: 15px;
-  border-radius: 20px;
-  transition: background-color 0.2s ease;
-}
+/* ============================= */
+/* IMAGE TILE                    */
+/* ============================= */
 
 .choice-tile {
   border: none;
@@ -30,7 +46,7 @@
   cursor: pointer;
   padding: 0;
 
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1 / 1; /* square */
 
   display: flex;
   align-items: center;
@@ -43,121 +59,57 @@
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
 
   transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-/* image fills tile */
+/* image fits perfectly */
 .choice-tile img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 
-  transition: transform 0.25s ease;
-  will-change: transform;
+  transition: transform 0.2s ease;
 }
 
-/* hover effect */
+/* ============================= */
+/* INTERACTIONS                  */
+/* ============================= */
+
 .choice-tile:hover {
-  transform: scale(1.12);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25);
-  z-index: 10;
+  transform: scale(1.06);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
+  z-index: 2;
 }
 
 .choice-tile:hover img {
-  transform: scale(1.18);
+  transform: scale(1.08);
 }
 
-/* click feedback */
 .choice-tile:active {
-  transform: scale(1.04);
+  transform: scale(0.98);
 }
 
-/* mobile adjustments */
+/* ============================= */
+/* MOBILE                        */
+/* ============================= */
+
 @media (max-width: 700px) {
 
+  .choice-modal {
+    max-height: 400px;
+  }
+
   .choice-grid {
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 16px;
+    gap: 12px;
   }
 
   .choice-tile:hover {
-    transform: scale(1.06);
+    transform: scale(1.03);
   }
 
   .choice-tile:hover img {
-    transform: scale(1.1);
-  }
-}
-
-/* Shake Animation */
-@keyframes shake {
-  10%, 90% { transform: translate3d(-2px, 0, 0); }
-  20%, 80% { transform: translate3d(4px, 0, 0); }
-  30%, 50%, 70% { 
-    transform: translate3d(-8px, 0, 0);
-    background-color: rgba(255, 0, 0, 0.4);
-  }
-  40%, 60% { 
-    transform: translate3d(8px, 0, 0);
-    background-color: rgba(255, 0, 0, 0.4);
-  }
-}
-
-.shake {
-  animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-}
-
-/* Points Loss Animation */
-.points-loss {
-  position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(255, 51, 51, 0.9);
-  color: #ffffff;
-  padding: 8px 20px;
-  border-radius: 50px;
-  font-size: 32px;
-  font-weight: 900;
-  pointer-events: none;
-  z-index: 100;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  animation: riseAndFade 1s ease-out forwards;
-}
-
-.points-gain {
-  position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(76, 175, 80, 0.9);
-  color: #ffffff;
-  padding: 8px 20px;
-  border-radius: 50px;
-  font-size: 32px;
-  font-weight: 900;
-  pointer-events: none;
-  z-index: 100;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  animation: riseAndFade 1s ease-out forwards;
-}
-
-@keyframes riseAndFade {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-  30% {
-    opacity: 1;
-    transform: translate(-50%, -80%) scale(1.2);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -150%) scale(1);
+    transform: scale(1.05);
   }
 }

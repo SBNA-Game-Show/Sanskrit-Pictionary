@@ -135,6 +135,24 @@
   text-align: left;
 }
 
+.team-container {
+  max-height: 500px; /* limits the height and enables scrolling */
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* Custom scrollbar for player list */
+.team-container::-webkit-scrollbar {
+  width: 6px;
+}
+.team-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.team-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
 .team-block {
   margin-top: 8px;
 }

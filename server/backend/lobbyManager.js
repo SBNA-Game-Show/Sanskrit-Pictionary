@@ -1,8 +1,9 @@
 // lobbyManager.js
 const mongoose = require("mongoose");
 const gameSessionManager = require("../game/gameSessionManager");
-const { clearActiveTimer, proceedToNextRound } = require("../game/gameSocket");
 const { containsProfanity } = require("../utils/profanityFilter");
+
+const getGameSocket = () => require("../game/gameSocket");
 
 // In-memory room state: roomId => { hostId, settings, teams, chat }
 const rooms = {};
@@ -10,6 +11,18 @@ const rooms = {};
 // Track profanity violations per user per room
 // Structure: { roomId: { userId: violationCount } }
 const profanityViolations = {};
+
+const kickedUsers = {};
+
+// Helper used by controlHandlers.js to register a host-kicked user
+function addKickedUser(roomId, userId) {
+  if (!kickedUsers[roomId]) kickedUsers[roomId] = new Set();
+  kickedUsers[roomId].add(userId);
+}
+
+function isUserKicked(roomId, userId) {
+  return kickedUsers[roomId]?.has(userId) || false;
+}
 
 function createLobbyManager(io, UserModel) {
   // Helper: find a socket by userId
@@ -58,6 +71,7 @@ function createLobbyManager(io, UserModel) {
         gameSessionManager.deleteSession(roomId);
       }
       delete rooms[roomId];
+      delete kickedUsers[roomId];
 
       const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
       if (socketsInRoom) {
@@ -87,8 +101,8 @@ function createLobbyManager(io, UserModel) {
             gameSessionManager.getPlayersWithScores(roomId),
           );
           if (isCurrentDrawer) {
-            clearActiveTimer(roomId);
-            proceedToNextRound(io, roomId, kickedPlayer);
+           getGameSocket().clearActiveTimer(roomId);
+           getGameSocket().proceedToNextRound(io, roomId, kickedPlayer);
           }
         }
       }
@@ -170,8 +184,8 @@ function createLobbyManager(io, UserModel) {
 
           // If kicked player was drawing, proceed to next round
           if (isCurrentDrawer) {
-            clearActiveTimer(roomId);
-            proceedToNextRound(io, roomId, kickedPlayer);
+            getGameSocket().clearActiveTimer(roomId);
+            getGameSocket().proceedToNextRound(io, roomId, kickedPlayer);
           }
         }
       }
@@ -190,6 +204,9 @@ function createLobbyManager(io, UserModel) {
 
       // Clean up violation tracking for this user
       delete profanityViolations[roomId][userId];
+
+      // Block user from rejoining this room
+      addKickedUser(roomId, userId);
 
       return true; // User was kicked
     }
@@ -243,6 +260,10 @@ function createLobbyManager(io, UserModel) {
             await forceLeaveRoom(userId, existingRoomId, socket);
           }
         }
+      }
+      if (isUserKicked(roomId, userId)) {
+        socket.emit("kickedRejoinBlocked", { roomId });
+        return;
       }
 
       socket.roomId = roomId;
@@ -728,8 +749,8 @@ function createLobbyManager(io, UserModel) {
             );
 
             if (isCurrentDrawer) {
-              clearActiveTimer(roomId);
-              proceedToNextRound(io, roomId, kickedPlayer);
+              getGameSocket().clearActiveTimer(roomId);
+              getGameSocket().proceedToNextRound(io, roomId, kickedPlayer);
             }
 
             delete room.playerDisconnectTimeouts[userId];
@@ -776,6 +797,7 @@ function createLobbyManager(io, UserModel) {
     socket.on("deleteRoom", ({ roomId }) => {
       if (rooms[roomId]) {
         delete rooms[roomId];
+        delete kickedUsers[roomId];
         console.log(`[Lobby] Deleted room ${roomId}`);
       }
     });
@@ -785,3 +807,5 @@ function createLobbyManager(io, UserModel) {
 }
 
 module.exports = createLobbyManager;
+module.exports.addKickedUser = addKickedUser;
+module.exports.isUserKicked = isUserKicked;

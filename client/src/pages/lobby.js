@@ -17,7 +17,7 @@ const DEFAULT_GAME_SETTINGS = {
   timer: 30,
   difficulty: "Easy",
   guesses: 4,
-  isLearningMode: true
+  isLearningMode: true,
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
@@ -95,13 +95,26 @@ const Lobby = () => {
 
     console.log("[Lobby] Rejoining lobby");
     try {
-      const response = await fetch(`${API_BASE}/api/room/exists/${roomId}`);
+      const response = await fetch(
+        `${API_BASE}/api/room/exists/${roomId}?userId=${myUserId}`,
+      );
       const data = await response.json();
 
       if (!data.exists) {
         toastError("Invalid room code! Navigating to the lobby", {
           toastId: "invalid-room",
         });
+        navigate(`/lobby`, { replace: true });
+        return;
+      }
+
+      if (data.isKicked) {
+        toastError(
+          "You've been removed from this game and can't rejoin. Please start or join a new game.",
+          {
+            autoClose: 5000,
+          },
+        );
         navigate(`/lobby`, { replace: true });
         return;
       }
@@ -115,6 +128,10 @@ const Lobby = () => {
       socket.emit("getHost", { roomId });
     } catch (error) {
       console.error("[Lobby] Failed to verify room status:", error);
+      toastError("Unable to connect to the game server. Please try again.", {
+        autoClose: 2000,
+      });
+      navigate("/lobby", { replace: true });
     }
   };
 
@@ -190,17 +207,20 @@ const Lobby = () => {
         timer: settings.timer,
         difficulty: settings.difficulty,
         guesses: settings.guesses,
-        isLearningMode: settings.isLearningMode
+        isLearningMode: settings.isLearningMode,
       });
     });
 
-    socket.on("roundStarted", ({ currentRound, currentPlayer, timer, guesses }) => {
-      setCurrentRound(currentRound);
-      setCurrentPlayer(currentPlayer);
-      setTimeLeft(timer);
-      setGameSettings((prev) => ({ ...prev, guesses }));
-      navigate(`/play/${roomId}`);
-    });
+    socket.on(
+      "roundStarted",
+      ({ currentRound, currentPlayer, timer, guesses }) => {
+        setCurrentRound(currentRound);
+        setCurrentPlayer(currentPlayer);
+        setTimeLeft(timer);
+        setGameSettings((prev) => ({ ...prev, guesses }));
+        navigate(`/play/${roomId}`);
+      },
+    );
 
     socket.on("startTimer", ({ duration }) => {
       clearCountdown();
@@ -222,8 +242,27 @@ const Lobby = () => {
       navigate("/lobby", { replace: true });
     });
 
-    // Redirect player to /play/roomId
-    socket.once("gameInProgress", (data) => {
+    // Redirect player to /play/roomId, but block if they were kicked
+    socket.once("gameInProgress", async (data) => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/room/exists/${data.roomId}?userId=${myUserId}`,
+        );
+        const roomData = await res.json();
+
+        if (roomData.isKicked) {
+          toastError(
+            "You've been removed from this game and can't rejoin. Please start or join a new game.",
+            {
+              autoClose: 5000,
+            },
+          );
+          return;
+        }
+      } catch (e) {
+        console.error("[Lobby] Failed to check kicked status:", e);
+      }
+
       toastWarning("Game in progress. Joining as spectator.");
       navigate(`/play/${data.roomId}`);
     });
@@ -490,8 +529,8 @@ const Lobby = () => {
               </button>
             </div>
             <small style={{ marginTop: "5px", display: "block" }}>
-              {gameSettings.isLearningMode 
-                ? "Show answers after each turn." 
+              {gameSettings.isLearningMode
+                ? "Show answers after each turn."
                 : "Fast-paced! Answers are hidden."}
             </small>
           </div>

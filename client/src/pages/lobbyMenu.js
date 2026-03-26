@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { nanoid } from "nanoid";
 import { getUserId, getDisplayName } from "../utils/authStorage";
-import { toastError, toastSuccess } from "../utils/toast";
-import { socket } from "./socket"; 
+import { toastError } from "../utils/toast";
+import { socket } from "./socket";
 
 const LobbyMenu = () => {
   const [roomInput, setRoomInput] = useState("");
@@ -26,10 +26,10 @@ const LobbyMenu = () => {
     }
 
     const myRoomId = nanoid(6); // short alpha-numeric room code
-    // emit room creation 
+    // emit room creation
     socket.emit("createRoom", {
       userId: userId,
-      displayName: getDisplayName() ,
+      displayName: getDisplayName(),
       roomId: myRoomId,
     });
     navigate(`/lobby/${myRoomId}`);
@@ -48,10 +48,24 @@ const LobbyMenu = () => {
     try {
       // Check if room exists
       const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5005";
-      const response = await fetch(`${API_BASE}/api/room/exists/${roomCode}`);
+      const response = await fetch(
+        `${API_BASE}/api/room/exists/${roomCode}?userId=${userId}`,
+      );
       const data = await response.json();
 
       if (data.exists) {
+        // Block kicked users before they even navigate
+        if (data.isKicked) {
+          toastError(
+            "You've been removed from this game and can't rejoin. Please start or join a new game.",
+            {
+              autoClose: 3000,
+            },
+          );
+          setLoading(false);
+          return;
+        }
+
         // Room exists - check if full
         if (data.isFull) {
           toastError("This room is full (20/20 players)");
@@ -93,11 +107,11 @@ const LobbyMenu = () => {
           onChange={(e) => setRoomInput(e.target.value)}
           onKeyPress={handleKeyPress}
           disabled={loading}
-            style={{
+          style={{
             padding: "10px",
             borderRadius: "6px",
             border: "1px solid #ccc",
-          }}  
+          }}
         />
         <button
           className="start-game-button"

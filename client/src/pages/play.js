@@ -364,7 +364,7 @@ const Play = () => {
             flexDirection: "column",
             alignItems: "flex-end",
             fontSize: "13px",
-            minWidth: "55px",
+            minWidth: "57px",
           }}
         >
           {/* Points */}

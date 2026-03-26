@@ -26,4 +26,6 @@ function createGameSocket(io) {
 
 module.exports = {
   createGameSocket,
+  clearActiveTimer,
+  proceedToNextRound,
 };

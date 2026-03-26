@@ -1,7 +1,12 @@
 import { useEffect } from "react";
 import { socket } from "../../pages/socket";
 import { useParams, useNavigate } from "react-router-dom";
-import { toastError, toastInfo, toastSuccess, toastWarning } from "../../utils/toast";
+import {
+  toastError,
+  toastInfo,
+  toastSuccess,
+  toastWarning,
+} from "../../utils/toast";
 import { getUserId, getDisplayName } from "../../utils/authStorage";
 import { makeAvatarDataUrl } from "../../utils/game/avatarUtils";
 
@@ -14,6 +19,8 @@ export const useGameSocket = (
   setTimeLeft,
   setFlashcard,
   setTotalGuesses,
+  setCurrentRound,
+  setTotalRounds,
   setProfiles,
   setIsGamePaused,
   setRoundResult,
@@ -121,6 +128,17 @@ export const useGameSocket = (
       }
     });
 
+    socket.on("kickedRejoinBlocked", () => {
+      isGameEndedRef.current = true;
+      toastError(
+        "You've been removed from this game and can't rejoin. Please start or join a new game.",
+        {
+          autoClose: 5000,
+        },
+      );
+      navigate("/lobby");
+    });
+
     const onLobbyUsers = (users) => {
       const map = {};
       (users || []).forEach((u) => {
@@ -175,6 +193,9 @@ export const useGameSocket = (
       setHostData(state.hostData || null);
       setDrawerId(state.drawer?.userId || null);
       setTimeLeft(state.timer || 0);
+
+      if (state.currentRound) setCurrentRound(state.currentRound);
+      if (state.totalRounds) setTotalRounds(state.totalRounds);
 
       if (serverFlash) setFlashcard(serverFlash);
 
@@ -238,28 +259,33 @@ export const useGameSocket = (
     });
 
     // roundStarted clears canvas
-    socket.on("roundStarted", ({ currentRound, currentPlayer, timer }) => {
-      console.log("[Play] roundStarted payload:", {
-        currentRound,
-        currentPlayer,
-        timer,
-      });
+    socket.on(
+      "roundStarted",
+      ({ currentRound, currentPlayer, timer, totalRounds }) => {
+        console.log("[Play] roundStarted payload:", {
+          currentRound,
+          currentPlayer,
+          timer,
+        });
 
-      setAnswer("");
-      setTimeLeft(timer || 0);
-      setCorrectUserIds([]); // Reset the correct answer highlights
+        setAnswer("");
+        setTimeLeft(timer || 0);
+        setCorrectUserIds([]); // Reset the correct answer highlights
+        if (currentRound) setCurrentRound(currentRound);
+        if (totalRounds) setTotalRounds(totalRounds);
 
-      // Reset answer and choices when drawer changes
-      setImageChoices([]);
-      setRoundKey((k) => k + 1);
-      setFlashcard(null); //  clear old card instantly
-      socket.emit("getGameState", { roomId }); // fetch new card
+        // Reset answer and choices when drawer changes
+        setImageChoices([]);
+        setRoundKey((k) => k + 1);
+        setFlashcard(null); //  clear old card instantly
+        socket.emit("getGameState", { roomId }); // fetch new card
 
-      // Clear canvas when new round starts
-      if (canvasRef.current) {
-        canvasRef.current.clearCanvas();
-      }
-    });
+        // Clear canvas when new round starts
+        if (canvasRef.current) {
+          canvasRef.current.clearCanvas();
+        }
+      },
+    );
 
     socket.on("correctAnswer", ({ displayName, scoreGained, userId }) => {
       if (userId === getUserId()) {
@@ -448,6 +474,7 @@ export const useGameSocket = (
       socket.off("gamePaused");
       socket.off("gameResumed");
       socket.off("userKicked");
+      socket.off("kickedRejoinBlocked");
       socket.off("lobbyUsers", onLobbyUsers);
       socket.off("newGame");
       socket.off("profileUpdated", onProfileUpdated);

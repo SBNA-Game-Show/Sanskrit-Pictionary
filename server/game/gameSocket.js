@@ -1,9 +1,11 @@
 const gameSessionManager = require("../game/gameSessionManager");
-const {pauseActiveTimer, resumeActiveTimer} = require("./utils/timer");
-const {proceedToNextRound} = require("./utils/roundManager");
-const {registerStateHandlers} = require("./handlers/stateHandlers");
-const {registerDrawingHandlers} = require("./handlers/drawingHandlers");
-const {registerControlHandlers} = require("./handlers/controlHandlers");
+const { pauseActiveTimer, resumeActiveTimer } = require("./utils/timer");
+const { proceedToNextRound } = require("./utils/roundManager");
+const { registerStateHandlers } = require("./handlers/stateHandlers");
+const { registerDrawingHandlers } = require("./handlers/drawingHandlers");
+const { registerControlHandlers } = require("./handlers/controlHandlers");
+
+const getLobbyManager = () => require("../backend/lobbyManager");
 
 function createGameSocket(io) {
   // Listen for pause/resume events from session manager
@@ -18,7 +20,7 @@ function createGameSocket(io) {
   io.on("connection", (socket) => {
     registerStateHandlers(socket, io);
     registerDrawingHandlers(socket, io);
-    registerControlHandlers(socket, io);
+    registerControlHandlers(socket, io, getLobbyManager().addKickedUser);
   });
 }
 

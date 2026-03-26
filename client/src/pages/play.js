@@ -39,6 +39,8 @@ const Play = () => {
   const [drawerId, setDrawerId] = useState(null);
   const [answer, setAnswer] = useState("");
   const [totalGuesses, setTotalGuesses] = useState(4); // To store configed guesses
+  const [currentRound, setCurrentRound] = useState(1);
+  const [totalRounds, setTotalRounds] = useState(1);
 
   // Audio + timeout refs for round reveal popup sound
   const roundRevealTimeoutRef = useRef(null);
@@ -67,10 +69,16 @@ const Play = () => {
   const [kickTarget, setKickTarget] = useState(null); // { userId, displayName }
 
   // Derived booleans
-  const drawerDisplayName = players.find((p) => p.userId === drawerId)?.displayName;
+  const drawerDisplayName = players.find(
+    (p) => p.userId === drawerId,
+  )?.displayName;
   const drawerTeam = players.find((p) => p.userId === drawerId)?.team;
-  const remainingGuesses = players.find((p) => p.userId === (getUserId() || currentUserId))?.remainingGuesses;
-  const myTeam = players.find((p) => p.userId === (getUserId() || currentUserId))?.team;
+  const remainingGuesses = players.find(
+    (p) => p.userId === (getUserId() || currentUserId),
+  )?.remainingGuesses;
+  const myTeam = players.find(
+    (p) => p.userId === (getUserId() || currentUserId),
+  )?.team;
   const isDrawer = (getUserId() || currentUserId) === drawerId;
   const isEligibleGuesser = myTeam === drawerTeam && !isDrawer;
   const canAnswer = isEligibleGuesser && remainingGuesses > 0;
@@ -80,7 +88,7 @@ const Play = () => {
   const wrongAudioRef = useRef(new Audio(wrongSound));
 
   //LOG PLAYERS
-  console.log(players)
+  console.log(players);
 
   //React buttons
   const [reactions, setReactions] = useState([]);
@@ -184,6 +192,8 @@ const Play = () => {
     setTimeLeft,
     setFlashcard,
     setTotalGuesses,
+    setCurrentRound,
+    setTotalRounds,
     setProfiles,
     setIsGamePaused,
     setRoundResult,
@@ -202,7 +212,7 @@ const Play = () => {
     roundRevealTimeoutRef,
     profilesRef,
     hostRef,
-  )
+  );
 
   const isHost = currentUserId === hostData?.hostId;
 
@@ -382,7 +392,9 @@ const Play = () => {
     <>
       <ReactionOverlay reactions={reactions} />
       <RoundPopups />
-      <div className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}>
+      <div
+        className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}
+      >
         {/* Round result modal */}
         {roundReveal && (
           <div className="round-reveal-popup">
@@ -431,46 +443,56 @@ const Play = () => {
           </a>
         </div>
 
-        <div className="guesses-box">
-          <strong>Guesses Left: </strong>
-          <a>
-            <label
-              htmlFor="guessesleft"
-              style={{
-                color:
-                  isEligibleGuesser && remainingGuesses <= 2
-                    ? "red"
-                    : "inherit",
-              }}
-            >
-              {isEligibleGuesser ? remainingGuesses : "—"}
+        {isHost && (
+          <div className="time-box">
+            <strong>Round: </strong>
+            <label style={{ color: "#e65100", fontWeight: "900" }}>
+              {currentRound}
             </label>
-          </a>
-        </div>
+            <label style={{ color: "#8b5e3c" }}>/{totalRounds}</label>
+          </div>
+        )}
+        {!isHost && (
+          <div className="guesses-box">
+            <strong>Guesses Left: </strong>
+            <a>
+              <label
+                htmlFor="guessesleft"
+                style={{
+                  color:
+                    isEligibleGuesser && remainingGuesses <= 2
+                      ? "red"
+                      : "inherit",
+                }}
+              >
+                {isEligibleGuesser ? remainingGuesses : "—"}
+              </label>
+            </a>
+          </div>
+        )}
 
         {/* User List */}
         <div className="user-list">
           <div className="user-panel-title">Players List</div>
           <div className="team-container">
-          <div className="team-block">
-            <h3 className="team-title red">Red Team / लाल दल</h3>
-            {redTeam.length === 0 ? (
-              <p className="muted">No players</p>
-            ) : (
-              redTeam.map(renderUserChip)
-            )}
-          </div>
+            <div className="team-block">
+              <h3 className="team-title red">Red Team / लाल दल</h3>
+              {redTeam.length === 0 ? (
+                <p className="muted">No players</p>
+              ) : (
+                redTeam.map(renderUserChip)
+              )}
+            </div>
 
-          <div className="team-block">
-            <h3 className="team-title blue">Blue Team / नील दल</h3>
-            {blueTeam.length === 0 ? (
-              <p className="muted">No players</p>
-            ) : (
-              blueTeam.map(renderUserChip)
-            )}
+            <div className="team-block">
+              <h3 className="team-title blue">Blue Team / नील दल</h3>
+              {blueTeam.length === 0 ? (
+                <p className="muted">No players</p>
+              ) : (
+                blueTeam.map(renderUserChip)
+              )}
+            </div>
           </div>
-        </div>
-
         </div>
 
         <div
@@ -488,7 +510,6 @@ const Play = () => {
           </span>
         </div>
 
-          
         <ReactSketchCanvas
           className="canvas"
           ref={canvasRef}

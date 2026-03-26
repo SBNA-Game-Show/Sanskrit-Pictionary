@@ -1,8 +1,8 @@
 const gameSessionManager = require("../gameSessionManager");
-const {activeTimers, clearActiveTimer} = require("../utils/timer");
-const {proceedToNextRound} = require("../utils/roundManager");
+const { activeTimers, clearActiveTimer } = require("../utils/timer");
+const { proceedToNextRound } = require("../utils/roundManager");
 
-function registerControlHandlers(socket, io) {
+function registerControlHandlers(socket, io, addKickedUser) {
   // ---- force skip round ----
   socket.on("forceSkipRound", ({ gameId, userId }) => {
     const session = gameSessionManager.getSession(gameId);
@@ -24,6 +24,9 @@ function registerControlHandlers(socket, io) {
     if (!kickResult) return;
 
     const { isCurrentDrawer, kickedPlayer } = kickResult;
+
+    // Prevent kicked user from rejoining this room
+    addKickedUser(roomId, targetUserId);
 
     if (kickedPlayer) {
       io.to(roomId).emit("userKicked", kickedPlayer);

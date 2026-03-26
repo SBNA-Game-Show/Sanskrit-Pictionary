@@ -66,6 +66,13 @@ const Navbar = () => {
       <div className="nav-links">
         <Link to="/lobby">Start Game</Link>
         <Link to="/tutorialrules">Tutorial & Rules</Link>
+        <a
+          href="https://sanskrit-dashboard.onrender.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Dashboard
+        </a>
         {displayName ? (
           <a href="/profile">
             <span className="nav-user">{displayName}</span>

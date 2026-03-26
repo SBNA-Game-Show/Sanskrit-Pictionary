@@ -71,7 +71,7 @@ const Navbar = () => {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Dashboard
+          Image Dashboard
         </a>
         {displayName ? (
           <a href="/profile">

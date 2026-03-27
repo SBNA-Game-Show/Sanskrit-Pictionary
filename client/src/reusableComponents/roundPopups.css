@@ -6,7 +6,8 @@
   display: grid;
   place-items: center;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 20000;
+  background: rgba(0, 0, 0, 0.4);
   animation: rp2FadeIn 120ms ease-out;
 }
 
@@ -53,6 +54,90 @@
   margin-top: 6px;
   font-size: 14px;
   color: #4a4a4a;
+}
+
+/* ============= COUNTDOWN ANIMATION ============= */
+.rp2-card.rp2-countdown-active {
+  padding: 30px 20px;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  gap: 20px;
+}
+
+.rp2-countdown-active .rp2-title {
+  font-size: 24px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.rp2-countdown-active .rp2-sub {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 0;
+}
+
+.rp2-countdown {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 140px;
+  width: 100%;
+}
+
+.rp2-number {
+  font-size: 6rem;
+  font-weight: 900;
+  line-height: 1;
+  animation: rp2CountPulse 900ms ease-out forwards;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.rp2-number.rp2-begin {
+  font-size: 4rem;
+  animation: rp2BeginScale 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  color: #28a745;
+  text-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+  font-weight: 900;
+}
+
+@keyframes rp2CountPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+    color: #2a64db;
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+}
+
+@keyframes rp2BeginScale {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* subtle entrance */

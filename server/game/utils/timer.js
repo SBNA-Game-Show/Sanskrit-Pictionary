@@ -1,6 +1,7 @@
 const gameSessionManager = require("../gameSessionManager");
 
 const activeTimers = {};
+const pendingTimerStarts = {};
 
 // Synchronize timer to all clients and write remaining seconds back to activeTimers for scoring
 function startSynchronizedTimer(io, gameId, duration, onTimeUp) {
@@ -77,16 +78,67 @@ function resumeActiveTimer(io, gameId, onTimeUp) {
 }
 
 function clearActiveTimer(gameId) {
+  clearPendingTimerStart(gameId);
   if (activeTimers[gameId]) {
     clearInterval(activeTimers[gameId].intervalId);
     delete activeTimers[gameId];
   }
 }
 
+//5s round timer funcs
+function createTimerSyncId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function clearPendingTimerStart(gameId) {
+  if (!pendingTimerStarts[gameId]) return;
+  clearTimeout(pendingTimerStarts[gameId].timeoutId);
+  delete pendingTimerStarts[gameId];
+}
+
+function scheduleTimerStart(io, gameId, duration, source) {
+  clearPendingTimerStart(gameId);
+
+  const syncId = createTimerSyncId();
+  const safeDuration = Number.isFinite(duration)
+    ? Math.max(0, Math.floor(duration))
+    : 0;
+
+  pendingTimerStarts[gameId] = {
+    syncId,
+    duration: safeDuration,
+    source,
+    timeoutId: setTimeout(() => {
+      startPendingTimer(io, gameId, "fallbackTimeout");
+    }, 15000),
+  };
+
+  return syncId;
+}
+
+function startPendingTimer(io, gameId, startReason) {
+  const pending = pendingTimerStarts[gameId];
+  if (!pending) return false;
+
+  clearTimeout(pending.timeoutId);
+  delete pendingTimerStarts[gameId];
+
+  console.log(
+    `[timerSync] Starting timer for ${gameId} (${pending.duration}s) source=${pending.source} reason=${startReason}`,
+  );
+  io.to(gameId).emit("startTimer", { duration: pending.duration });
+  startSynchronizedTimer(io, gameId, pending.duration);
+  return true;
+}
+
 module.exports = {
   activeTimers,
+  pendingTimerStarts,
   startSynchronizedTimer,
   pauseActiveTimer,
   resumeActiveTimer,
   clearActiveTimer,
+  scheduleTimerStart,
+  startPendingTimer,
+  clearPendingTimerStart,
 };

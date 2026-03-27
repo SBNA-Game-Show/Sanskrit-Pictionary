@@ -388,7 +388,7 @@ const Play = () => {
   return (
     <>
       <ReactionOverlay reactions={reactions} />
-      <RoundPopups />
+      <RoundPopups roomId={roomId}/>
       <div
         className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}
       >

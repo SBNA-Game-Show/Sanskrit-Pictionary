@@ -20,10 +20,12 @@ const teamLabel = (team) =>
   team === "Blue" ? "Blue Team / नील दल" :
   team ? `${team} Team` : "";
 
-export default function RoundPopups() {
+export default function RoundPopups({roomId}) {
   const [msg, setMsg] = useState(null);    // { title, subtitle, kind, team, duration }
+  const [countdownNum, setCountdownNum] = useState(null); // for animated countdowns
   const queueRef = useRef([]);
   const showingRef = useRef(false);
+  const countdownIntervalRef = useRef(null);
 
   // persistent refs to track the latest known state
   const roundRef = useRef(0);
@@ -40,11 +42,55 @@ export default function RoundPopups() {
     if (queueRef.current.length === 0) {
       showingRef.current = false;
       setMsg(null);
+      setCountdownNum(null);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
       return;
     }
     showingRef.current = true;
     const next = queueRef.current.shift();
     setMsg(next);
+    // Handle countdown animation
+    if (next.kind === "drawerCountdown" || next.kind === "teamSwitchCountdown") {
+      console.log("📢 [RoundPopups] Starting countdown animation");
+      let count = 5;
+      setCountdownNum(count);
+
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+
+      countdownIntervalRef.current = setInterval(() => {
+        count--;
+        if (count >= 0) {
+          setCountdownNum(count);
+        } else {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+          // End this message after "Begin"
+          console.log("📢 [RoundPopups] Countdown finished, moving to next");
+          setTimeout(() => {
+            if (
+              next.kind === "drawerCountdown" &&
+              next.syncId &&
+              (next.gameId || roomId)
+            ) {
+              socket.emit("drawerCountdownComplete", {
+                gameId: next.gameId || roomId,
+                syncId: next.syncId,
+              });
+            }
+            setMsg(null);
+            requestAnimationFrame(drain);
+          }, 800);
+          return;
+        }
+      }, 900); // Update every 900ms for ~5-4-3-2-1 then Begin
+
+      return; // Don't use duration timer for countdown
+    }
     const dur = next.duration ?? 1700;
     setTimeout(() => {
       setMsg(null);
@@ -54,6 +100,37 @@ export default function RoundPopups() {
   }
 
   useEffect(() => {
+    // ---- Drawer intro countdown ----
+    const onDrawerCountdown = ({ displayName, team, message, gameId, syncId }) => {
+      console.log("📢 [RoundPopups] Received drawerCountdown:", { displayName, team, message, gameId, syncId });
+      const dname = typeof displayName === "string" ? displayName : displayName?.displayName || "Player";
+      drawerTeamRef.current = team || drawerTeamRef.current;
+
+      enqueue({
+        title: message || `${dname} is Drawing`,
+        subtitle: `🎨 Drawer: ${dname}`,
+        kind: "drawerCountdown",
+        team: drawerTeamRef.current,
+        isCountdown: true,
+        gameId,
+        syncId,
+      });
+    };
+
+    // ---- Team switch countdown ----
+    const onTeamSwitchCountdown = ({ currentTeam, nextTeam, currentTeamLabel, nextTeamLabel, nextDrawerName }) => {
+      console.log("📢 [RoundPopups] Received teamSwitchCountdown:", { nextTeam, nextDrawerName });
+      drawerTeamRef.current = nextTeam || drawerTeamRef.current;
+
+      enqueue({
+        title: `${nextTeamLabel || teamLabel(nextTeam)} Turn Starts!`,
+        subtitle: `🎨 Drawer: ${nextDrawerName}`,
+        kind: "teamSwitchCountdown",
+        team: nextTeam,
+        isCountdown: true,
+      });
+    };
+
     // ---- Drawer / team changed ----
     const onDrawerChanged = ({ displayName, team }) => {
       const dname =
@@ -71,7 +148,7 @@ export default function RoundPopups() {
           subtitle: `Drawer is now ${dname} (${teamLabel(nextTeam)})`,
           kind: "switch",
           team: nextTeam,
-          duration: 3000,
+          duration: 2500,
         });
       }
 
@@ -84,7 +161,7 @@ export default function RoundPopups() {
       enqueue({
         title: `Round ${roundNumber} Complete!`,
         kind: "end",
-        duration: 2000,
+        duration: 1500,
       });
     };
 
@@ -110,12 +187,16 @@ export default function RoundPopups() {
       });
     };
 
+    socket.on("drawerCountdown", onDrawerCountdown);
+    socket.on("teamSwitchCountdown", onTeamSwitchCountdown);
     socket.on("drawerChanged", onDrawerChanged);
     socket.on("roundEnded", onRoundEnded);
     socket.on("warnDrawer", onWarnPlayer);
     socket.on("gameEnded", onGameEnded);
 
     return () => {
+      socket.off("drawerCountdown", onDrawerCountdown);
+      socket.off("teamSwitchCountdown", onTeamSwitchCountdown);
       socket.off("drawerChanged", onDrawerChanged);
       socket.off("roundEnded", onRoundEnded);
       socket.off("warnDrawer", onWarnPlayer);
@@ -130,10 +211,17 @@ export default function RoundPopups() {
     msg.team === "Red" ? "rp2-red" : msg.team === "Blue" ? "rp2-blue" : "";
 
   return createPortal(
-    <div className={`rp2-backdrop ${msg.kind}`}>
-      <div className={`rp2-card ${teamClass}`}>
+    <div className={`rp2-backdrop`}>
+      <div className={`rp2-card ${teamClass} ${msg.isCountdown ? "rp2-countdown-active" : ""}`}>
         <div className="rp2-title">{msg.title}</div>
         {msg.subtitle && <div className="rp2-sub">{msg.subtitle}</div>}
+        {msg.isCountdown && countdownNum !== null && (
+          <div className="rp2-countdown">
+            <div className={`rp2-number ${countdownNum === 0 ? "rp2-begin" : ""}`}>
+              {countdownNum === 0 ? "BEGIN!" : countdownNum}
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.body

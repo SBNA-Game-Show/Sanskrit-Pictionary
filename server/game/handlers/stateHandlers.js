@@ -1,6 +1,13 @@
 const gameSessionManager = require("../gameSessionManager");
-const { activeTimers, clearActiveTimer, startSynchronizedTimer } =
-  require("../utils/timer");
+const {
+  activeTimers,
+  pendingTimerStarts,
+  clearActiveTimer,
+  startSynchronizedTimer,
+  startPendingTimer,
+  clearPendingTimerStart,
+  scheduleTimerStart
+} = require("../utils/timer");
 const { proceedToNextRound } = require("../utils/roundManager");
 
 function registerStateHandlers(socket, io) {
@@ -162,12 +169,32 @@ function registerStateHandlers(socket, io) {
       );
       await gameSessionManager.startRound(gameId, io);
 
+      // Give clients a moment to navigate from /lobby to /play and mount listeners.
+      await new Promise((resolve) => setTimeout(resolve, 900));
+
+      // Emit drawer countdown after navigation so users can actually see it.
+      const session = gameSessionManager.getSession(gameId);
+      const currentDrawer = session.players[session.currentPlayerIndex];
+      const startingTeam = currentDrawer?.team || "Red";
+      
+      console.log("🎮 [Backend] Emitting drawerCountdown event:", { 
+        drawer: currentDrawer?.displayName, 
+        team: startingTeam,
+        gameId 
+      });
+      
+      io.to(gameId).emit("drawerCountdown", {
+        displayName: currentDrawer?.displayName || "Drawer",
+        team: startingTeam,
+        message: `${startingTeam === "Red" ? "Red Team / रक्तदल" : "Blue Team / नीलदल"} is Starting!`,
+        gameId,
+        syncId: scheduleTimerStart(io, gameId, timer, "startGame"),
+      });
+
       io.to(gameId).emit(
         "updatePlayers",
         gameSessionManager.getPlayersWithScores(gameId),
       );
-      io.to(gameId).emit("startTimer", { duration: timer });
-      startSynchronizedTimer(io, gameId, timer, proceedToNextRound);
     },
   );
 
@@ -175,6 +202,13 @@ function registerStateHandlers(socket, io) {
   socket.on("nextRound", ({ gameId }) => {
     clearActiveTimer(gameId);
     proceedToNextRound(io, gameId);
+  });
+
+  socket.on("drawerCountdownComplete", ({ gameId, syncId }) => {
+    const pending = pendingTimerStarts[gameId];
+    if (!pending) return;
+    if (pending.syncId !== syncId) return;
+    startPendingTimer(io, gameId, `clientAck:${socket.id}`);
   });
 
   socket.on("startRound", async ({ roomId }) => {
@@ -189,6 +223,7 @@ function registerStateHandlers(socket, io) {
 
   socket.on("deleteRoom", ({ roomId }) => {
     console.log(`[socket] deleteRoom requested for: ${roomId}`);
+    clearPendingTimerStart(roomId);
     gameSessionManager.deleteSession(roomId);
   });
 

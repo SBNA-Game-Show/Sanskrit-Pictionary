@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import "./play.css";
 import FloatableChat from "../reusableComponents/FloatableChat";
 import Flashcard from "../reusableComponents/flashcard";
@@ -9,7 +9,7 @@ import InteractiveAvatar from "../reusableComponents/InteractiveAvatar";
 import { ReactSketchCanvas } from "react-sketch-canvas";
 
 import { socket } from "./socket";
-import { getUserId, getDisplayName } from "../utils/authStorage";
+import { getUserId } from "../utils/authStorage";
 
 import correctSound from "../assets/sounds/correct.wav";
 import wrongSound from "../assets/sounds/wrong.wav";
@@ -386,12 +386,10 @@ const Play = () => {
     );
   };
 
-  const targetPhrase = flashcard?.transliteration || "";
-
   return (
     <>
       <ReactionOverlay reactions={reactions} />
-      <RoundPopups />
+      <RoundPopups roomId={roomId} />
       <div
         className={`play-grid ${isHost ? "host-view" : "player-view"} ${isDrawer ? "drawer-view" : "guesser-view"}`}
       >
@@ -476,7 +474,7 @@ const Play = () => {
           <div className="user-panel-title">Players List</div>
           <div className="team-container">
             <div className="team-block">
-              <h3 className="team-title red">Red Team / लाल दल</h3>
+              <h3 className="team-title red">Red Team / रक्तदल</h3>
               {redTeam.length === 0 ? (
                 <p className="muted">No players</p>
               ) : (
@@ -485,7 +483,7 @@ const Play = () => {
             </div>
 
             <div className="team-block">
-              <h3 className="team-title blue">Blue Team / नील दल</h3>
+              <h3 className="team-title blue">Blue Team / नीलदल</h3>
               {blueTeam.length === 0 ? (
                 <p className="muted">No players</p>
               ) : (
@@ -591,16 +589,16 @@ const Play = () => {
             myTeam={myTeam}
           />
         )}
-        
+
         {/* Team not in turn can react to the drawing */}
         {!isEligibleGuesser && !isDrawer && !isHost && !isSpectator && (
-          <div className="like-panel"> 
+          <div className="like-panel">
             <h2>How do you like the drawing ?</h2>
             <div className="reaction-buttons">
-              <button onClick={() => sendReaction('👍')}>👍</button>
-              <button onClick={() => sendReaction('💐')}>💐</button>
-              <button onClick={() => sendReaction('💯')}>💯</button>
-              <button onClick={() => sendReaction('👎')}>👎</button>
+              <button onClick={() => sendReaction("👍")}>👍</button>
+              <button onClick={() => sendReaction("💐")}>💐</button>
+              <button onClick={() => sendReaction("💯")}>💯</button>
+              <button onClick={() => sendReaction("👎")}>👎</button>
             </div>
           </div>
         )}
@@ -626,7 +624,7 @@ const Play = () => {
               setShowChoices={setShowChoices}
               showChoices={showChoices}
               imageChoices={imageChoices}
-            /> 
+            />
           </div>
         )}
       </div>

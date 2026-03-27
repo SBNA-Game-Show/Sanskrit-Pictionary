@@ -69,7 +69,7 @@ class GameSessionManager extends EventEmitter {
       }
     });
 
-    // make sure the first drawer is on Red team if available
+    // make sure the first drawer is on Red Team / रक्तदल if available
     let firstDrawerIndex = players.findIndex((p) => p.team === "Red");
     if (firstDrawerIndex === -1) firstDrawerIndex = 0;
 
@@ -79,8 +79,8 @@ class GameSessionManager extends EventEmitter {
       currentRound: 1, // Round number should be starts from 1 
       totalRounds,
       currentPlayerIndex: firstDrawerIndex,
-      redTeamRound: 1, // Indicater the n-th drawer of red team
-      blueTeamRound: 1, // Indicater the n-th drawer of blue team
+      redTeamRound: 1, // Indicater the n-th drawer of Red Team / रक्तदल
+      blueTeamRound: 1, // Indicater the n-th drawer of Blue Team / नीलदल
       timer,
       difficulty,
       isLearningMode, // Added isLearningMode
@@ -270,14 +270,14 @@ class GameSessionManager extends EventEmitter {
 
     const lastDrawer = lastDrawerOverride || session.players[session.currentPlayerIndex];
 
-    // No next round if reached total rounds and last drawer was Blue team
+    // No next round if reached total rounds and last drawer was Blue Team / नीलदल
     if (lastDrawer && lastDrawer.team === "Blue" 
         && session.currentRound >= session.totalRounds){
           session.gameEnded = true; // Mark game as ended
           return null;
         } 
 
-    // Round number only increments after Blue team's turn, as Red always starts first
+    // Round number only increments after Blue Team / नीलदल turn, as Red Team / रक्तदल always starts first
     if (lastDrawer && lastDrawer.team === "Blue") {
       // Trigger roundEnded popup message
       io.to(gameId).emit("roundEnded", {

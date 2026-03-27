@@ -16,8 +16,8 @@ import "./roundPopups.css";
  */
 
 const teamLabel = (team) =>
-  team === "Red" ? "Red Team / लाल दल" :
-  team === "Blue" ? "Blue Team / नील दल" :
+  team === "Red" ? "Red Team / रक्तदल" :
+  team === "Blue" ? "Blue Team / नीलदल" :
   team ? `${team} Team` : "";
 
 export default function RoundPopups({roomId}) {

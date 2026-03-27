@@ -96,7 +96,7 @@ function clearPendingTimerStart(gameId) {
   delete pendingTimerStarts[gameId];
 }
 
-function scheduleTimerStart(io, gameId, duration, source) {
+function scheduleTimerStart(io, gameId, duration, source, onTimeUp) {
   clearPendingTimerStart(gameId);
 
   const syncId = createTimerSyncId();
@@ -108,6 +108,7 @@ function scheduleTimerStart(io, gameId, duration, source) {
     syncId,
     duration: safeDuration,
     source,
+    onTimeUp,
     timeoutId: setTimeout(() => {
       startPendingTimer(io, gameId, "fallbackTimeout");
     }, 15000),
@@ -127,7 +128,7 @@ function startPendingTimer(io, gameId, startReason) {
     `[timerSync] Starting timer for ${gameId} (${pending.duration}s) source=${pending.source} reason=${startReason}`,
   );
   io.to(gameId).emit("startTimer", { duration: pending.duration });
-  startSynchronizedTimer(io, gameId, pending.duration);
+  startSynchronizedTimer(io, gameId, pending.duration, pending.onTimeUp);
   return true;
 }
 

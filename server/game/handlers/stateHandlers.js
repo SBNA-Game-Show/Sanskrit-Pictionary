@@ -188,7 +188,7 @@ function registerStateHandlers(socket, io) {
         team: startingTeam,
         message: `${startingTeam === "Red" ? "Red Team / रक्तदल" : "Blue Team / नीलदल"} is Starting!`,
         gameId,
-        syncId: scheduleTimerStart(io, gameId, timer, "startGame"),
+        syncId: scheduleTimerStart(io, gameId, timer, "startGame", proceedToNextRound),
       });
 
       io.to(gameId).emit(

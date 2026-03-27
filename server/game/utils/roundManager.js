@@ -79,6 +79,7 @@ async function proceedToNextRound(io, gameId, lastDrawerOverride = null) {
           gameId,
           nextRoundInfo.timer,
           "proceedToNextRound",
+          proceedToNextRound
         ),
       });
     } else {
